@@ -455,17 +455,13 @@ describe('POST /api/entries — additional validation', () => {
     definitions: [{ text: 'house' }],
   });
 
-  test('invalid partOfSpeech enum value is rejected — BUG: no express-validator rule, Mongoose throws 500', async () => {
-    // partOfSpeech is only validated by Mongoose enum, not by express-validator,
-    // so an invalid value reaches the DB and causes a 500 ValidationError.
-    // The correct fix is to add body('partOfSpeech').isIn([...]) to createValidators.
+  test('invalid partOfSpeech enum value returns 400', async () => {
     const token = makeToken();
     const res = await request
       .post('/api/entries')
       .set('Authorization', `Bearer ${token}`)
       .send({ ...valid(), partOfSpeech: 'emoji' });
-    // Documents current (broken) behaviour — should be 400 once validator is added
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
