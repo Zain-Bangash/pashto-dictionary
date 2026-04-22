@@ -21,6 +21,8 @@ app.use((err, _req, res, _next) => {
   });
 });
 
+module.exports = app;
+
 const PORT = process.env.PORT || 5000;
 
 mongoose
