@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(npm install *)",
+      "Bash(npm create *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"require\\('./src/routes/health'\\); require\\('./src/utils/logger'\\); console.log\\('imports ok'\\)\")",
+      "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" branch)",
+      "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" ls-files server/.env client/.env)",
+      "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" log dev --oneline)"
+    ]
+  }
+}

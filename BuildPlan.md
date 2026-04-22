@@ -8,7 +8,7 @@
 A community-driven dictionary platform for preserving Pashto regional dialects. Users submit entries, moderators review them, admins approve and publish. Every technical decision should serve this purpose.
 
 **Core features:**
-- Browse and search dictionary entries by word, meaning
+- Browse and search dictionary entries by word, dialect, or region
 - User submission form with validation
 - Moderation queue (pending → approved → rejected → published)
 - Role-based access: Guest · User · Moderator · Admin
@@ -90,7 +90,8 @@ Examples:
 3. Initialise `server/` with Express + dotenv + mongoose
 4. Initialise `client/` with Vite + React + Tailwind
 5. Add `.gitignore` (node_modules, .env, dist)
-6. Confirm: `GET /api/health` returns `{ status: "ok" }`, React renders, MongoDB connects
+6. Add placeholder `README.md` and `CLAUDE.md` (copy from template)
+7. Confirm: `GET /api/health` returns `{ status: "ok" }`, React renders, MongoDB connects
 
 **Commits this phase:**
 ```
@@ -98,6 +99,30 @@ chore(server): initialise Express + mongoose project structure
 chore(client): initialise Vite + React + Tailwind
 chore: add .gitignore and root README placeholder
 feat(server): add /api/health check endpoint
+```
+
+**Tester prompt — run after Phase 1:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The server runs on port 5000
+and the client runs on port 5173. Your job is to verify Phase 1 is complete and correct.
+
+Run the following checks using curl and by reading the source files. Report each check as
+PASS or FAIL with a one-line reason. At the end, list any failures with what needs to be fixed.
+
+Checks:
+1. GET http://localhost:5000/api/health returns HTTP 200 with body { "status": "ok" }
+2. Server logs show a successful MongoDB connection on startup (read server console output or logs)
+3. server/src/index.js exists and imports mongoose, express, cors, dotenv
+4. server/.env.example exists and contains PORT, MONGODB_URI, JWT_SECRET
+5. server/src/controllers/, models/, routes/, middleware/, utils/ directories all exist
+6. client/src/App.jsx exists and renders without import errors (check for obvious syntax issues)
+7. client/tailwind.config.js exists and is configured
+8. node_modules/ is NOT committed (check .gitignore contains node_modules)
+9. .env is NOT committed (check .gitignore contains .env)
+10. At least one commit exists with message matching conventional commits format
+
+Do not fix anything. Report only. If a check cannot be run because the server is not
+currently running, note that and verify the source files instead.
 ```
 
 ---
@@ -111,7 +136,7 @@ feat(server): add /api/health check endpoint
 ```
 Entry {
   word: String (required)
-  english: String
+  phonetic: String
   partOfSpeech: Enum [noun, verb, adjective, adverb, phrase, other]
   definitions: [{ text: String, example: String }]
   submittedBy: ObjectId → User
@@ -145,6 +170,42 @@ feat(models): add User schema with role enum
 feat(models): add ModerationLog schema for audit trail
 ```
 
+**Tester prompt — run after Phase 2:**
+```
+You are a tester sub-agent for the pashto-dictionary project. Your job is to verify
+Phase 2 (Data Models) is complete and correct. Do not fix anything — report only.
+
+Read the files in server/src/models/ and verify each check. Report PASS or FAIL with reason.
+
+Entry model checks:
+1. Entry.js exists in server/src/models/
+2. pashto field is required and type String
+3. dialect field is an enum with exactly: kandahari, peshawar, quetta, wardak, other
+4. status field is an enum with: pending, approved, rejected, published — default is 'pending'
+5. definitions is an array of objects with text (required) and example fields
+6. submittedBy and reviewedBy are ObjectId refs to User
+7. timestamps: true is set
+8. A MongoDB text index is defined on the pashto field
+9. Indexes are defined on status and dialect fields
+
+User model checks:
+10. User.js exists in server/src/models/
+11. username is required, unique, and trimmed
+12. email is required, unique, and lowercased
+13. passwordHash is required (NOT named "password")
+14. role enum contains exactly: user, moderator, admin — default is 'user'
+
+ModerationLog model checks:
+15. ModerationLog.js exists in server/src/models/
+16. entry field is ObjectId ref to Entry, required
+17. action enum contains: submitted, approved, rejected, published
+18. performedBy is ObjectId ref to User, required
+19. note field exists as String
+20. timestamp defaults to Date.now
+
+At the end, list all FAILs and what specifically needs to be corrected.
+```
+
 ---
 
 ### Phase 3 — Authentication
@@ -164,6 +225,48 @@ feat(auth): add register and login endpoints with bcrypt + JWT
 feat(auth): add authMiddleware for protected routes
 feat(auth): add requireRole middleware for RBAC
 feat(auth): add /api/auth/me endpoint
+```
+
+**Tester prompt — run after Phase 3:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The server runs on
+port 5000 with MongoDB connected. Verify Phase 3 (Authentication) using curl commands.
+Report each check as PASS or FAIL with a one-line reason. Do not fix anything.
+
+Run these checks in order (some depend on earlier results):
+
+Registration:
+1. POST /api/auth/register with { "username": "testuser", "email": "test@test.com", "password": "password123" }
+   → expect 201, body contains token and user object (no passwordHash field)
+2. POST /api/auth/register with the same email again
+   → expect 400, error message about duplicate email
+3. POST /api/auth/register with password "abc" (too short)
+   → expect 400, validation error on password field
+4. POST /api/auth/register with missing username
+   → expect 400, validation error
+
+Login:
+5. POST /api/auth/login with { "email": "test@test.com", "password": "password123" }
+   → expect 200, body contains token
+6. POST /api/auth/login with wrong password
+   → expect 401
+7. POST /api/auth/login with non-existent email
+   → expect 401
+
+Protected routes:
+8. GET /api/auth/me with valid Bearer token from check 1 or 5
+   → expect 200, user object returned, no passwordHash
+9. GET /api/auth/me with no Authorization header
+   → expect 401
+10. GET /api/auth/me with "Bearer invalidtoken"
+    → expect 401
+
+Source checks (read files):
+11. authMiddleware in server/src/middleware/auth.js does not contain the JWT_SECRET hardcoded
+12. requireRole is a factory function (takes role as argument, returns middleware)
+13. Passwords are hashed with bcrypt — no plain text storage in register controller
+
+All responses must use the envelope: { success, data/error }. Check this on at least checks 1 and 6.
 ```
 
 ---
@@ -188,6 +291,45 @@ feat(entries): add GET /api/entries with pagination and dialect filter
 feat(entries): add GET /api/entries/:id endpoint
 feat(entries): add full-text search endpoint
 feat(entries): add POST /api/entries for authenticated submissions
+```
+
+**Tester prompt — run after Phase 4:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The server runs on port 5000.
+You need a valid user token — first run:
+  POST /api/auth/register { "username": "tester", "email": "tester@test.com", "password": "password123" }
+Save the returned token as TOKEN. Then verify Phase 4 (Entry API) with these checks.
+Report PASS or FAIL with reason. Do not fix anything.
+
+Before testing, seed one published entry directly via the Mongoose model or a seed script
+if no published entries exist yet, so GET /api/entries has data to return.
+
+List endpoint:
+1. GET /api/entries → 200, data is array, meta contains page/limit/total
+2. GET /api/entries?page=1&limit=5 → meta.limit is 5
+3. GET /api/entries?dialect=kandahari → all results have dialect=kandahari (or empty array, not error)
+4. GET /api/entries with no auth → 200 (public endpoint, should not require auth)
+5. GET /api/entries does NOT return entries with status=pending
+
+Single entry:
+6. GET /api/entries/:id with a valid published entry ID → 200, full entry returned
+7. GET /api/entries/:id for a pending entry → 404
+8. GET /api/entries/invalidid → 400 or 404, not a 500 crash
+
+Search:
+9. GET /api/entries/search?q=test → 200, array returned (may be empty)
+10. GET /api/entries/search (no q param) → 400 or returns empty, NOT a 500
+
+Submission:
+11. POST /api/entries without auth → 401
+12. POST /api/entries with TOKEN and valid body:
+    { "pashto": "آب", "dialect": "kandahari", "partOfSpeech": "noun",
+      "definitions": [{ "text": "water" }] }
+    → 201, status is "pending", submittedBy matches tester user ID
+13. POST /api/entries with missing pashto field → 400 validation error
+14. POST /api/entries with invalid dialect value → 400 validation error
+
+Check response envelope on all responses — must be { success, data/error }.
 ```
 
 ---
@@ -224,6 +366,54 @@ feat(moderation): add publish endpoint for admin role
 feat(moderation): write ModerationLog on every state transition
 ```
 
+**Tester prompt — run after Phase 5:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The server runs on port 5000.
+This is the most critical phase — the moderation state machine must be airtight.
+
+Setup: create three users via /api/auth/register and note their tokens:
+  USER_TOKEN   — role: user (default)
+  MOD_TOKEN    — manually set role to 'moderator' in MongoDB
+  ADMIN_TOKEN  — manually set role to 'admin' in MongoDB
+
+Then submit a test entry as USER_TOKEN and note its ID as ENTRY_ID.
+
+Report each check as PASS or FAIL with reason. Do not fix anything.
+
+Queue access:
+1. GET /api/moderation/queue with no auth → 401
+2. GET /api/moderation/queue with USER_TOKEN → 403
+3. GET /api/moderation/queue with MOD_TOKEN → 200, ENTRY_ID appears in results
+4. GET /api/moderation/queue with ADMIN_TOKEN → 200
+
+Approve flow:
+5. PATCH /api/moderation/ENTRY_ID/approve with MOD_TOKEN → 200, entry status is now 'approved'
+6. GET /api/moderation/queue with MOD_TOKEN → ENTRY_ID no longer in pending queue
+7. Check MongoDB: ModerationLog has a record with action='approved' for ENTRY_ID
+
+Reject flow (submit a second entry first, note as ENTRY_ID_2):
+8. PATCH /api/moderation/ENTRY_ID_2/reject with MOD_TOKEN and no note in body → 400
+9. PATCH /api/moderation/ENTRY_ID_2/reject with MOD_TOKEN and { "note": "needs phonetic" } → 200, status='rejected'
+10. Check MongoDB: ModerationLog has action='rejected' with the note for ENTRY_ID_2
+
+Invalid transitions:
+11. PATCH /api/moderation/ENTRY_ID/approve (already approved) → 400, cannot transition
+12. PATCH /api/moderation/ENTRY_ID_2/publish with ADMIN_TOKEN (still rejected) → 400
+
+Publish flow:
+13. PATCH /api/moderation/ENTRY_ID/publish with MOD_TOKEN (not admin) → 403
+14. PATCH /api/moderation/ENTRY_ID/publish with ADMIN_TOKEN → 200, status='published'
+15. GET /api/entries/ENTRY_ID (public) → 200, entry is now visible
+16. Check MongoDB: ModerationLog has action='published' for ENTRY_ID
+
+Audit log:
+17. GET /api/moderation/log with USER_TOKEN → 403
+18. GET /api/moderation/log with ADMIN_TOKEN → 200, contains all 3 log entries for ENTRY_ID
+
+Total ModerationLog records for ENTRY_ID should be: submitted + approved + published = 3 records.
+Verify this count in the audit log response.
+```
+
 ---
 
 ### Phase 6 — Frontend Core
@@ -247,9 +437,39 @@ feat(moderation): write ModerationLog on every state transition
 **Commits this phase:**
 ```
 feat(client): add landing page with search bar
+feat(client): add reusable Pagination component
 feat(client): add entries browse page with dialect filters
 feat(client): add entry detail page
-feat(client): add reusable Pagination component
+```
+
+**Tester prompt — run after Phase 6:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The client runs on
+port 5173. Your job is to verify Phase 6 (Frontend Core) by reading source files
+and checking the running app. Do not fix anything — report PASS or FAIL with reason.
+
+Source file checks:
+1. src/services/api.js exists and creates an axios instance using VITE_API_URL env variable
+2. All API calls in components/pages use this api.js service — no raw fetch() or direct axios calls
+3. Home.jsx uses a debounced search input (check for debounce logic or a useDebounce hook)
+4. Entries.jsx reads query params: q, dialect, page from the URL
+5. DialectFilter renders a pill/button for each dialect value from the Entry enum
+6. Pagination component accepts page, totalPages (or total+limit), and onPageChange props
+7. EntryCard renders: pashto word, phonetic, dialect badge, truncated first definition
+8. EntryDetail renders: pashto, phonetic, dialect, region, part of speech, all definitions with examples
+
+Behaviour checks (with server running and at least 2 published entries seeded):
+9. http://localhost:5173/ loads without console errors
+10. Typing in the search bar on Home and pressing Enter navigates to /entries?q=<term>
+11. http://localhost:5173/entries loads and displays entry cards
+12. Clicking a dialect filter pill updates the URL with ?dialect= and filters the results
+13. http://localhost:5173/entries/:validId loads the entry detail page
+14. http://localhost:5173/entries/invalidid shows a not-found state, not a blank crash
+
+Loading/error states:
+15. Entries.jsx has a loading state shown while the API call is in flight
+16. Entries.jsx has an error state shown if the API call fails
+17. EntryDetail.jsx has both loading and error states
 ```
 
 ---
@@ -274,6 +494,51 @@ feat(client): add entry submission form with dialect and POS fields
 feat(client): add my-submissions page with status indicators
 ```
 
+**Tester prompt — run after Phase 7:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The client runs on
+port 5173 and the server on port 5000. Verify Phase 7 (Auth UI + Submission).
+Report PASS or FAIL with reason. Do not fix anything.
+
+AuthContext checks (read src/context/AuthContext.jsx):
+1. token is stored in and read from localStorage
+2. On app load, token presence is checked to restore session
+3. logout() clears the token from localStorage
+4. AuthContext exposes: user, isAuthenticated, login, logout, role
+
+Protected route checks:
+5. Navigate to http://localhost:5173/submit without being logged in
+   → should redirect to /login, not render the form
+6. Navigate to http://localhost:5173/my-submissions without being logged in
+   → should redirect to /login
+
+Registration flow:
+7. http://localhost:5173/register loads without errors
+8. Submit with mismatched or short password → inline validation error shown, no API call made
+9. Submit with valid data → redirected to home or login, success feedback shown
+
+Login flow:
+10. http://localhost:5173/login loads without errors
+11. Submit with wrong password → error message shown (not a blank screen or uncaught error)
+12. Submit with valid credentials → redirected, nav updates to show username
+
+Submission form:
+13. http://localhost:5173/submit renders all fields: pashto, phonetic, dialect (select),
+    region, partOfSpeech (select), definitions list with add/remove rows
+14. Submit with empty pashto field → validation error shown before API call
+15. Submit valid entry → success message shown with link to /my-submissions
+16. Submitted entry appears on /my-submissions with status badge 'pending'
+
+My submissions:
+17. /my-submissions shows only the current user's entries
+18. Each entry shows a colour-coded status badge (pending/approved/rejected/published)
+19. A rejected entry shows the moderator's note
+
+Nav:
+20. When logged out: Login and Register links visible, Submit link not visible
+21. When logged in: username visible, Submit and My Submissions links visible, Logout works
+```
+
 ---
 
 ### Phase 8 — Admin Dashboard
@@ -294,6 +559,49 @@ feat(client): add my-submissions page with status indicators
 feat(client): add dashboard layout with role-based nav
 feat(client): add moderation queue with inline approve/reject
 feat(client): add audit log view for admin role
+```
+
+**Tester prompt — run after Phase 8:**
+```
+You are a tester sub-agent for the pashto-dictionary project. The client runs on
+port 5173. You need three browser sessions or separate tokens:
+  - USER: regular user account
+  - MOD: moderator role account
+  - ADMIN: admin role account
+
+Verify Phase 8 (Admin Dashboard). Report PASS or FAIL with reason. Do not fix anything.
+
+Access control:
+1. Navigate to /dashboard as USER → redirected away or shown access denied
+2. Navigate to /dashboard as MOD → dashboard loads
+3. Navigate to /dashboard as ADMIN → dashboard loads
+
+Dashboard nav (as ADMIN):
+4. Sidebar shows: Dashboard, Moderation Queue, Entries, Users, Audit Log
+5. Sidebar as MOD shows: Dashboard, Moderation Queue, Entries — NOT Users or Audit Log
+
+Moderation queue (as MOD, with at least one pending entry):
+6. /dashboard/queue shows pending entries with: pashto word, dialect, submitted by, date
+7. Approve button on a pending entry → entry disappears from queue, success feedback shown
+8. Reject button opens a modal or inline input for a note
+9. Clicking reject without entering a note → blocked, error shown
+10. Clicking reject with a note → entry removed from queue, entry status updates to rejected
+
+Entries view (as MOD):
+11. /dashboard/entries shows all entries regardless of status
+12. Status filter tabs work — clicking 'Pending' shows only pending entries
+13. Status badges are colour-coded
+
+Audit log (as ADMIN):
+14. /dashboard/log shows actions with: entry word, action type, performed by username, timestamp
+15. Rejected entries show the moderator note in the log
+
+Users view (as ADMIN):
+16. /dashboard/users shows registered users with their roles
+
+Source check:
+17. Dashboard routes are protected — read DashboardLayout.jsx or the router config and
+    confirm unauthenticated users and users without sufficient role cannot reach any /dashboard/* route
 ```
 
 ---
