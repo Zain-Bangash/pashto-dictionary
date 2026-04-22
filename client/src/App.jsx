@@ -1,9 +1,16 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Entries from './pages/Entries';
+import EntryDetail from './pages/EntryDetail';
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-      <h1 className="text-4xl font-semibold text-neutral-800 font-sans">
-        Pashto Dictionary
-      </h1>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/entries" element={<Entries />} />
+        <Route path="/entries/:id" element={<EntryDetail />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
