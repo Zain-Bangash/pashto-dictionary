@@ -5,6 +5,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const healthRouter = require('./routes/health');
+const authRouter = require('./routes/auth');
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api', healthRouter);
+app.use('/api/auth', authRouter);
 
 app.use((err, _req, res, _next) => {
   logger.error(err.message);
