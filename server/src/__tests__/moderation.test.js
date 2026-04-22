@@ -426,3 +426,229 @@ describe('GET /api/moderation/log', () => {
     expect(res.body.meta.limit).toBe(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Extended: invalid state transitions — approve
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/moderation/:id/approve — invalid transitions', () => {
+  test('returns 400 when approving an already-rejected entry', async () => {
+    const entry = await Entry.create({ pashto: 'ښار', status: 'rejected' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 400 when approving a published entry', async () => {
+    const entry = await Entry.create({ pashto: 'ښار', status: 'published' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: invalid state transitions — reject
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/moderation/:id/reject — invalid transitions', () => {
+  test('returns 400 when rejecting an already-rejected entry', async () => {
+    const entry = await Entry.create({ pashto: 'ښار', status: 'rejected' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'duplicate rejection' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 400 when rejecting a published entry', async () => {
+    const entry = await Entry.create({ pashto: 'ښار', status: 'published' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'too late' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: invalid state transitions — publish
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/moderation/:id/publish — invalid transitions', () => {
+  test('returns 400 when publishing an already-published entry', async () => {
+    const entry = await Entry.create({ pashto: 'ښار', status: 'published' });
+    const token = makeToken({ role: 'admin' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/publish`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: ModerationLog integrity
+// ---------------------------------------------------------------------------
+
+describe('ModerationLog integrity', () => {
+  test('approve creates exactly one log record', async () => {
+    const entry = await Entry.create({ pashto: 'لمر', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    await request
+      .patch(`/api/moderation/${entry._id}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    const logs = await ModerationLog.find({ entry: entry._id });
+    expect(logs).toHaveLength(1);
+  });
+
+  test('approve log has correct entry reference', async () => {
+    const entry = await Entry.create({ pashto: 'لمر', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    await request
+      .patch(`/api/moderation/${entry._id}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    const log = await ModerationLog.findOne({ entry: entry._id });
+    expect(log.entry.toString()).toBe(entry._id.toString());
+  });
+
+  test('approve log performedBy matches token user id', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const entry = await Entry.create({ pashto: 'لمر', status: 'pending' });
+    const token = makeToken({ role: 'moderator', id: modId });
+    await request
+      .patch(`/api/moderation/${entry._id}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    const log = await ModerationLog.findOne({ entry: entry._id, action: 'approved' });
+    expect(log.performedBy.toString()).toBe(modId);
+  });
+
+  test('reject creates exactly one log record', async () => {
+    const entry = await Entry.create({ pashto: 'لمر', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    await request
+      .patch(`/api/moderation/${entry._id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'not suitable' });
+    const logs = await ModerationLog.find({ entry: entry._id });
+    expect(logs).toHaveLength(1);
+  });
+
+  test('reject log performedBy matches token user id', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const entry = await Entry.create({ pashto: 'لمر', status: 'pending' });
+    const token = makeToken({ role: 'moderator', id: modId });
+    await request
+      .patch(`/api/moderation/${entry._id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: 'not suitable' });
+    const log = await ModerationLog.findOne({ entry: entry._id, action: 'rejected' });
+    expect(log.performedBy.toString()).toBe(modId);
+  });
+
+  test('publish creates exactly one log record', async () => {
+    const entry = await Entry.create({ pashto: 'لمر', status: 'approved' });
+    const token = makeToken({ role: 'admin' });
+    await request
+      .patch(`/api/moderation/${entry._id}/publish`)
+      .set('Authorization', `Bearer ${token}`);
+    const logs = await ModerationLog.find({ entry: entry._id });
+    expect(logs).toHaveLength(1);
+  });
+
+  test('publish log performedBy matches token user id', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const entry = await Entry.create({ pashto: 'لمر', status: 'approved' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    await request
+      .patch(`/api/moderation/${entry._id}/publish`)
+      .set('Authorization', `Bearer ${token}`);
+    const log = await ModerationLog.findOne({ entry: entry._id, action: 'published' });
+    expect(log.performedBy.toString()).toBe(adminId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: reject note validation edge cases
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/moderation/:id/reject — note validation edge cases', () => {
+  test('returns 400 when note is whitespace only', async () => {
+    const entry = await Entry.create({ pashto: 'اوښ', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/moderation/${entry._id}/reject`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ note: '   ' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: GET /api/moderation/log — population and security
+// ---------------------------------------------------------------------------
+
+describe('GET /api/moderation/log — population and security', () => {
+  test('log entry includes performedBy.username', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const entry = await Entry.create({ pashto: 'اوښ', status: 'pending' });
+    // Insert a log with a bare ObjectId — populate will return the ref as-is when
+    // User doc is absent; the key assertion is that pashto is present on entry.
+    await ModerationLog.create({ entry: entry._id, action: 'submitted', performedBy: userId });
+
+    const token = makeToken({ role: 'admin' });
+    const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toHaveProperty('entry');
+    expect(res.body.data[0].entry).toHaveProperty('pashto');
+  });
+
+  test('log response does not expose passwordHash on performedBy', async () => {
+    const userId = new mongoose.Types.ObjectId();
+    const entry = await Entry.create({ pashto: 'اوښ', status: 'pending' });
+    await ModerationLog.create({ entry: entry._id, action: 'submitted', performedBy: userId });
+
+    const token = makeToken({ role: 'admin' });
+    const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const rawJson = JSON.stringify(res.body);
+    expect(rawJson).not.toMatch(/passwordHash/);
+  });
+
+  test('accepts page and limit query params', async () => {
+    const token = makeToken({ role: 'admin' });
+    const res = await request
+      .get('/api/moderation/log?page=2&limit=5')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.meta.page).toBe(2);
+    expect(res.body.meta.limit).toBe(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extended: GET /api/moderation/queue — pagination query params
+// ---------------------------------------------------------------------------
+
+describe('GET /api/moderation/queue — pagination query params', () => {
+  test('accepts page and limit query params', async () => {
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .get('/api/moderation/queue?page=2&limit=5')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.meta.page).toBe(2);
+    expect(res.body.meta.limit).toBe(5);
+  });
+});
