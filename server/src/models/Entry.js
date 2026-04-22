@@ -12,11 +12,6 @@ const entrySchema = new mongoose.Schema(
   {
     pashto: { type: String, required: true },
     phonetic: { type: String },
-    dialect: {
-      type: String,
-      enum: ['kandahari', 'peshawar', 'quetta', 'wardak', 'other'],
-      required: true,
-    },
     region: { type: String },
     partOfSpeech: {
       type: String,
@@ -37,6 +32,5 @@ const entrySchema = new mongoose.Schema(
 
 entrySchema.index({ pashto: 'text' });
 entrySchema.index({ status: 1 });
-entrySchema.index({ dialect: 1 });
 
 module.exports = mongoose.model('Entry', entrySchema);
