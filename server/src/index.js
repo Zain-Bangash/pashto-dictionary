@@ -7,6 +7,7 @@ const logger = require('./utils/logger');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
 const entriesRouter = require('./routes/entries');
+const moderationRouter = require('./routes/moderation');
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/entries', entriesRouter);
+app.use('/api/moderation', moderationRouter);
 
 app.use((err, _req, res, _next) => {
   logger.error(err.message);
