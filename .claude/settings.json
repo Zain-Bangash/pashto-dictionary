@@ -9,7 +9,11 @@
       "Bash(node -e \"require\\('./src/routes/health'\\); require\\('./src/utils/logger'\\); console.log\\('imports ok'\\)\")",
       "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" branch)",
       "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" ls-files server/.env client/.env)",
-      "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" log dev --oneline)"
+      "Bash(git -C \"c:/Users/Zain/Desktop/Zain/Pakhto/pashto-dictionary\" log dev --oneline)",
+      "Bash(git add *)",
+      "Bash(npm test *)",
+      "Bash(git commit --allow-empty -m ' *)",
+      "Bash(node -e ' *)"
     ]
   }
 }
