@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Noto Sans', system-ui, sans-serif;
+
+  --color-neutral-50:  oklch(0.985 0 0);
+  --color-neutral-100: oklch(0.960 0 0);
+  --color-neutral-200: oklch(0.910 0 0);
+  --color-neutral-300: oklch(0.850 0 0);
+  --color-neutral-400: oklch(0.700 0 0);
+  --color-neutral-500: oklch(0.550 0 0);
+  --color-neutral-600: oklch(0.430 0 0);
+  --color-neutral-700: oklch(0.360 0 0);
+  --color-neutral-800: oklch(0.260 0 0);
+  --color-neutral-900: oklch(0.200 0 0);
+  --color-neutral-950: oklch(0.140 0 0);
+}
