@@ -13,7 +13,9 @@
       "Bash(git add *)",
       "Bash(npm test *)",
       "Bash(git commit --allow-empty -m ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git push *)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

@@ -1,10 +1,10 @@
 ---
 name: coder
 description: >
-  Phase implementation agent for the pashto-dictionary project. Reads the build
-  plan directly, implements one phase at a time, self-verifies with npm test,
-  fixes failures, then reports completion and waits for user confirmation before
-  the next phase.
+  Phase implementation agent for the pashto-dictionary project. Runs after the
+  tester agent has written failing tests for the phase. Reads the build plan,
+  implements until the pre-written tests are green, then reports completion and
+  waits for user confirmation before the next phase.
 tools:
   - Bash
   - Read
@@ -27,7 +27,7 @@ until the user explicitly tells you to continue.
 ## Phase sequence
 
 Read the full specification for each phase from:
-`logs/PashtoDict-BuildPlan.md`
+`BuildPlan.md`
 
 | Phase | Name | Primary deliverable |
 |---|---|---|
@@ -152,7 +152,7 @@ style     Tailwind / formatting only
 ## How to implement a phase
 
 ### Step 1 — Read before building
-Read the phase specification from `logs/PashtoDict-BuildPlan.md`. Identify every
+Read the phase specification from `BuildPlan.md`. Identify every
 deliverable. Check existing files with Glob/Grep before creating anything new.
 
 ### Step 2 — Build in order
@@ -161,9 +161,10 @@ deliverable. Check existing files with Glob/Grep before creating anything new.
 
 Commit after each logical unit with a conventional commit message.
 
-### Step 3 — Self-verify
+### Step 3 — Run the pre-written tests
 
-After all deliverables are built, run the test suite:
+The tester agent already wrote failing tests for this phase before you started.
+Run them now:
 
 ```bash
 # If server code changed:
@@ -172,6 +173,9 @@ cd server && npm test
 # If client code changed:
 cd client && npm test
 ```
+
+Your goal is to turn every red test green. Do not write new tests — only fix
+application code until the existing tests pass.
 
 ### Step 4 — Fix failures
 

@@ -77,14 +77,22 @@ Examples:
 
 ## Build Phases
 
-### How to invoke the coder agent
+### How to run a phase (TDD order)
 
-Paste this once per phase into Claude Code (replace `N` with the phase number):
+For each phase, run the agents in this order:
 
+**Step 1 — tester first (writes failing tests from the spec):**
 ```
-Spawn the coder agent with this instruction:
-"Read Phase N from logs/PashtoDict-BuildPlan.md. Build it. Self-verify with
-npm test. Fix any failures. Report completion and wait for my confirmation."
+Spawn the tester agent:
+"Read Phase N from BuildPlan.md. Write failing tests for everything the spec
+requires. Run them to confirm they are red. Report and stop."
+```
+
+**Step 2 — coder second (implements until tests are green):**
+```
+Spawn the coder agent:
+"Read Phase N from BuildPlan.md. The tester has already written failing tests.
+Build the phase, run the existing tests, fix failures, and report completion."
 ```
 
 ---
@@ -112,11 +120,12 @@ feat(server): add /api/health check endpoint
 
 **Done when:** repo initialised, both apps running, `/api/health` returns 200, `npm test` passes, no `.env` committed
 
-**Tester agent (optional, after Phase 1):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 1 (Project Initialisation) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 1 from BuildPlan.md. Write failing tests for the /api/health
+endpoint and basic server/client startup. Run them to confirm they are red.
+Report and stop."
 ```
 
 ---
@@ -167,16 +176,23 @@ feat(models): add ModerationLog schema for audit trail
 
 **Done when:** all three schemas exist, indexes defined, `npm test` passes
 
-**Tester agent (optional, after Phase 2):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 2 (Data Models) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 2 from BuildPlan.md. Write failing tests for all three Mongoose
+schemas — required fields, enums, defaults, and unique constraints. Run them
+to confirm they are red. Report and stop."
 ```
 
 ---
 
 ### Phase 3 — Authentication
+
+> **Note:** From this phase onwards, every endpoint must use `express-validator`
+> for input validation and return the API response envelope
+> `{ success, data/error, meta }` on every response — success and error alike.
+> Phase 9 adds rate limiting and indexes, but validation and the envelope are
+> required from day one per CLAUDE.md.
 
 **Goal:** Register, login, JWT issuance, protected route middleware.
 
@@ -197,11 +213,14 @@ feat(auth): add /api/auth/me endpoint
 
 **Done when:** register, login, and /me work, protected routes reject unauthenticated requests, `npm test` passes
 
-**Tester agent (optional, after Phase 3):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 3 (Authentication) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 3 from BuildPlan.md. Write failing tests for register, login, /me,
+authMiddleware, and requireRole. Cover auth boundaries, validation rules (per
+CLAUDE.md all endpoints use express-validator and the response envelope from
+this phase onwards), and JWT behaviour. Run them to confirm they are red.
+Report and stop."
 ```
 
 ---
@@ -230,11 +249,13 @@ feat(entries): add POST /api/entries for authenticated submissions
 
 **Done when:** all four endpoints work, pagination returns correct meta, unauthenticated submission returns 401, `npm test` passes
 
-**Tester agent (optional, after Phase 4):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 4 (Entry API) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 4 from BuildPlan.md. Write failing tests for all four entry
+endpoints — pagination meta, unauthenticated submission returning 401,
+search returning correct results, and response envelope shape on every
+response. Run them to confirm they are red. Report and stop."
 ```
 
 ---
@@ -273,13 +294,13 @@ feat(moderation): write ModerationLog on every state transition
 
 **Done when:** all state transitions enforced, invalid transitions return 400, every transition writes a ModerationLog, `npm test` passes
 
-**Tester agent (optional, after Phase 5):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 5 (Moderation Workflow) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
-Note: pay special attention to the state machine — every valid transition,
-every invalid transition, and every ModerationLog write must be covered.
+Spawn the tester agent:
+"Read Phase 5 from BuildPlan.md. Write failing tests for every state machine
+transition — every valid path and every invalid transition returning 400.
+Verify ModerationLog is written on every transition. Cover role boundaries
+(moderator vs admin). Run them to confirm they are red. Report and stop."
 ```
 
 ---
@@ -311,11 +332,13 @@ feat(client): add entry detail page
 
 **Done when:** all three pages render, search navigates correctly, loading/error states present, `npm test` passes
 
-**Tester agent (optional, after Phase 6):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 6 (Frontend Core) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 6 from BuildPlan.md. Write failing Vitest + RTL tests for the
+landing page, entries browse page, and entry detail page. Cover loading states,
+error states, and search navigation. Run them to confirm they are red.
+Report and stop."
 ```
 
 ---
@@ -342,11 +365,12 @@ feat(client): add my-submissions page with status indicators
 
 **Done when:** auth flow works, protected routes redirect, submission form validates, my-submissions shows status badges, `npm test` passes
 
-**Tester agent (optional, after Phase 7):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 7 (Frontend Auth + Submission) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 7 from BuildPlan.md. Write failing tests for login, register,
+protected route redirect, submission form validation, and my-submissions
+status display. Run them to confirm they are red. Report and stop."
 ```
 
 ---
@@ -373,11 +397,12 @@ feat(client): add audit log view for admin role
 
 **Done when:** role-based nav works, queue approve/reject function correctly, non-moderator users cannot reach dashboard, `npm test` passes
 
-**Tester agent (optional, after Phase 8):**
+**Tester agent (run before coder):**
 ```
-Spawn the tester agent. Phase 8 (Admin Dashboard) is complete.
-Read what was built using git diff, derive test cases from the source files,
-write test files to disk, run them, and report results.
+Spawn the tester agent:
+"Read Phase 8 from BuildPlan.md. Write failing tests for role-based nav,
+queue approve/reject actions, and non-moderator redirect. Run them to confirm
+they are red. Report and stop."
 ```
 
 ---
