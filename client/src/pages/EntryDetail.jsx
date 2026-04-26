@@ -19,42 +19,62 @@ export default function EntryDetail() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="max-w-2xl mx-auto px-4 py-10">
-        <Link to="/entries" className="text-neutral-500 hover:text-neutral-700 text-sm mb-6 inline-block">
+    <div className="min-h-screen bg-charcoal">
+      <div className="max-w-2xl mx-auto px-5 py-10">
+        <Link to="/entries" className="inline-flex items-center gap-1.5 text-sm font-ui text-muted hover:text-warm transition-colors mb-8">
           ← Back to entries
         </Link>
 
-        {loading && <p className="text-neutral-400 text-sm">Loading…</p>}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {loading && <p className="text-muted font-ui text-sm">Loading…</p>}
+        {error && <p className="text-red-400 font-ui text-sm">{error}</p>}
 
         {!loading && !error && entry && (
-          <article>
-            <h1 className="text-4xl font-bold text-neutral-900">{entry.pashto}</h1>
+          <article className="bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-8 space-y-6">
+            {/* Hero Pashto word */}
+            <h1
+              dir="rtl"
+              className="font-pashto text-warm"
+              style={{ fontSize: 72, lineHeight: 1.7 }}
+            >
+              {entry.pashto}
+            </h1>
+
+            {/* Phonetic / romanization */}
             {entry.phonetic && (
-              <p className="text-neutral-500 text-lg mt-1">{entry.phonetic}</p>
+              <p
+                className="font-display text-xl italic text-gold"
+                style={{ textShadow: '0 0 12px rgba(232,197,71,0.7), 0 0 30px rgba(232,197,71,0.35)' }}
+              >
+                {entry.phonetic}
+              </p>
             )}
-            <div className="flex gap-3 mt-3 flex-wrap">
+
+            {/* Badges */}
+            <div className="flex gap-2 flex-wrap">
               {entry.partOfSpeech && (
-                <span className="text-xs bg-neutral-200 text-neutral-700 px-2 py-1 rounded">
+                <span className="meta-label bg-white/[0.05] border border-white/[0.08] rounded-full px-3 py-1">
                   {entry.partOfSpeech}
                 </span>
               )}
               {entry.region && (
-                <span className="text-xs bg-neutral-200 text-neutral-700 px-2 py-1 rounded">
+                <span className="meta-label bg-white/[0.05] border border-white/[0.08] rounded-full px-3 py-1">
                   {entry.region}
                 </span>
               )}
             </div>
 
+            {/* Definitions */}
             {entry.definitions?.length > 0 && (
-              <ol className="mt-6 space-y-4 list-decimal list-inside">
+              <ol className="space-y-4">
                 {entry.definitions.map((def, i) => (
-                  <li key={i} className="text-neutral-800">
-                    <span>{def.text}</span>
-                    {def.example && (
-                      <p className="text-neutral-500 text-sm mt-1 ml-4 italic">{def.example}</p>
-                    )}
+                  <li key={i} className="flex gap-3">
+                    <span className="text-gold font-display text-lg shrink-0">{i + 1}.</span>
+                    <div>
+                      <span className="text-warm font-ui text-sm leading-relaxed">{def.text}</span>
+                      {def.example && (
+                        <p className="text-muted font-ui text-sm mt-1 italic">{def.example}</p>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ol>

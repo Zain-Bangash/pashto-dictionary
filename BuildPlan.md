@@ -191,7 +191,7 @@ to confirm they are red. Report and stop."
 > **Note:** From this phase onwards, every endpoint must use `express-validator`
 > for input validation and return the API response envelope
 > `{ success, data/error, meta }` on every response — success and error alike.
-> Phase 9 adds rate limiting and indexes, but validation and the envelope are
+> Phase 10 adds rate limiting and indexes, but validation and the envelope are
 > required from day one per CLAUDE.md.
 
 **Goal:** Register, login, JWT issuance, protected route middleware.
@@ -407,7 +407,26 @@ they are red. Report and stop."
 
 ---
 
-### Phase 9 — Polish & Production Readiness
+### Phase 9 — Frontend Design & Navigation
+
+**Goal:** Apply Cyber-Traditional design system, global navbar, auth interceptors, and post-login redirect.
+
+- [x] Design token infrastructure — Tailwind v4 `@theme {}` tokens, Google Fonts, keyframes, utility classes
+- [x] API interceptors — Bearer token on every request, 401 → auto-logout
+- [x] App restructure — `AppRoutes` wrapper so interceptor can access `useAuth`
+- [x] Navbar — sticky, context-aware (Browse; Login/Register when logged out; Submit/dropdown when logged in)
+- [x] Auth flow fix — `state.from` redirect on Login and Register
+- [x] Home page — bento grid with WOTD hero, search tile, stats tile, word tiles, CTA tile
+- [x] Remaining pages — Entries, EntryDetail, Submit, MySubmissions, all dashboard pages
+
+**Commits this phase:**
+```
+style(client): apply cyber-traditional design system and navbar
+```
+
+---
+
+### Phase 10 — Polish & Production Readiness
 
 **Goal:** The things that separate a portfolio project from a toy.
 

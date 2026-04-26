@@ -1,42 +1,51 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+
+const NAV_ITEMS = [
+  { to: '/dashboard',         label: 'Overview', roles: ['moderator', 'admin'] },
+  { to: '/dashboard/queue',   label: 'Queue',    roles: ['moderator', 'admin'] },
+  { to: '/dashboard/entries', label: 'Entries',  roles: ['moderator', 'admin'] },
+  { to: '/dashboard/users',   label: 'Users',    roles: ['admin'] },
+  { to: '/dashboard/log',     label: 'Log',      roles: ['admin'] },
+];
 
 export default function DashboardLayout({ children }) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
 
   if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
     return <Navigate to="/login" replace />;
   }
 
-  const isAdmin = user.role === 'admin';
+  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex gap-6">
-          <span className="font-bold text-gray-800">Dashboard</span>
-          <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">
-            Overview
-          </Link>
-          <Link to="/dashboard/queue" className="text-gray-600 hover:text-gray-900">
-            Queue
-          </Link>
-          <Link to="/dashboard/entries" className="text-gray-600 hover:text-gray-900">
-            Entries
-          </Link>
-          {isAdmin && (
-            <Link to="/dashboard/users" className="text-gray-600 hover:text-gray-900">
-              Users
+    <div className="min-h-screen bg-charcoal flex">
+      {/* Sidebar */}
+      <aside className="w-52 shrink-0 border-r border-white/[0.06] flex flex-col pt-6 pb-8 px-3 gap-1">
+        <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-widest px-3 mb-3">
+          Dashboard
+        </p>
+        {visibleItems.map((item) => {
+          const active = pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`px-3 py-2 rounded-[10px] text-sm font-ui transition-colors ${
+                active
+                  ? 'bg-white/[0.06] text-gold'
+                  : 'text-muted hover:text-warm hover:bg-white/[0.03]'
+              }`}
+            >
+              {item.label}
             </Link>
-          )}
-          {isAdmin && (
-            <Link to="/dashboard/log" className="text-gray-600 hover:text-gray-900">
-              Log
-            </Link>
-          )}
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+          );
+        })}
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 px-8 py-8 overflow-y-auto">{children}</main>
     </div>
   );
 }

@@ -1,6 +1,10 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
+import { setLogoutHandler } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
+import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Entries from './pages/Entries';
 import EntryDetail from './pages/EntryDetail';
@@ -15,73 +19,88 @@ import DashboardEntries from './pages/dashboard/DashboardEntries';
 import DashboardUsers from './pages/dashboard/DashboardUsers';
 import DashboardLog from './pages/dashboard/DashboardLog';
 
+function AppRoutes() {
+  const { logout } = useAuth();
+
+  useEffect(() => {
+    setLogoutHandler(logout);
+  }, [logout]);
+
+  return (
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/entries" element={<Entries />} />
+        <Route path="/entries/:id" element={<EntryDetail />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/submit"
+          element={
+            <ProtectedRoute>
+              <Submit />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-submissions"
+          element={
+            <ProtectedRoute>
+              <MySubmissions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <DashboardLayout>
+              <DashboardHome />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/queue"
+          element={
+            <DashboardLayout>
+              <DashboardQueue />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/entries"
+          element={
+            <DashboardLayout>
+              <DashboardEntries />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/users"
+          element={
+            <DashboardLayout>
+              <DashboardUsers />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/log"
+          element={
+            <DashboardLayout>
+              <DashboardLog />
+            </DashboardLayout>
+          }
+        />
+      </Routes>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/entries" element={<Entries />} />
-          <Route path="/entries/:id" element={<EntryDetail />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/submit"
-            element={
-              <ProtectedRoute>
-                <Submit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-submissions"
-            element={
-              <ProtectedRoute>
-                <MySubmissions />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <DashboardLayout>
-                <DashboardHome />
-              </DashboardLayout>
-            }
-          />
-          <Route
-            path="/dashboard/queue"
-            element={
-              <DashboardLayout>
-                <DashboardQueue />
-              </DashboardLayout>
-            }
-          />
-          <Route
-            path="/dashboard/entries"
-            element={
-              <DashboardLayout>
-                <DashboardEntries />
-              </DashboardLayout>
-            }
-          />
-          <Route
-            path="/dashboard/users"
-            element={
-              <DashboardLayout>
-                <DashboardUsers />
-              </DashboardLayout>
-            }
-          />
-          <Route
-            path="/dashboard/log"
-            element={
-              <DashboardLayout>
-                <DashboardLog />
-              </DashboardLayout>
-            }
-          />
-        </Routes>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   );

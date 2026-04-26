@@ -9,6 +9,10 @@ vi.mock('../../services/api', () => ({
   default: { get: vi.fn() },
 }));
 
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: vi.fn(() => ({ user: null })),
+}));
+
 const renderHome = (initialEntries = ['/']) => {
   let locationRef = {};
   function LocationCapture() {

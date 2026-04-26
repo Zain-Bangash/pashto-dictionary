@@ -7,14 +7,19 @@ export default function EntryCard({ entry }) {
   return (
     <Link
       to={`/entries/${entry._id}`}
-      className="block bg-white border border-neutral-200 rounded-lg p-4 hover:border-neutral-400 hover:shadow-sm transition-all"
+      className="bento-card mint-glow block bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5 no-underline"
     >
-      <p className="text-xl font-semibold text-neutral-900">{entry.pashto}</p>
+      <div dir="rtl" className="font-pashto text-warm text-2xl" style={{ lineHeight: 1.7 }}>
+        {entry.pashto}
+      </div>
       {entry.phonetic && (
-        <p className="text-sm text-neutral-500 mt-1">{entry.phonetic}</p>
+        <p className="text-sm font-display italic text-gold mt-1">{entry.phonetic}</p>
+      )}
+      {entry.partOfSpeech && (
+        <span className="meta-label">{entry.partOfSpeech}</span>
       )}
       {truncated && (
-        <p className="text-sm text-neutral-700 mt-2">{truncated}</p>
+        <p className="text-sm font-ui text-muted mt-2 leading-snug">{truncated}</p>
       )}
     </Link>
   );

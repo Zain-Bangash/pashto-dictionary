@@ -48,20 +48,21 @@ export default function Entries() {
   const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <div className="flex justify-center mb-8">
+    <div className="min-h-screen bg-charcoal">
+      <div className="max-w-5xl mx-auto px-5 py-10">
+        <div className="mb-8">
+          <h1 className="text-2xl font-display text-warm mb-6">Browse Entries</h1>
           <SearchBar initialValue={q} onSubmit={handleSearch} />
         </div>
 
-        {loading && <p className="text-neutral-400 text-sm text-center">Loading…</p>}
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        {loading && <p className="text-muted font-ui text-sm text-center py-20">Loading…</p>}
+        {error && <p className="text-red-400 font-ui text-sm text-center py-20">{error}</p>}
         {!loading && !error && entries.length === 0 && (
-          <p className="text-neutral-400 text-sm text-center">No entries found.</p>
+          <p className="text-muted font-ui text-sm text-center py-20">No entries found.</p>
         )}
         {!loading && !error && entries.length > 0 && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {entries.map((entry) => (
                 <EntryCard key={entry._id} entry={entry} />
               ))}

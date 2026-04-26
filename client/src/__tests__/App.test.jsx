@@ -7,12 +7,13 @@ vi.mock('../services/api', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: [], meta: { page: 1, limit: 20, total: 0 } } })),
   },
+  setLogoutHandler: vi.fn(),
 }));
 
 describe('App router', () => {
-  test('renders the Pashto Dictionary heading on home route', async () => {
+  test('renders the navbar on home route', async () => {
     render(<App />);
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Pashto Dictionary');
+    expect(await screen.findByText('Dictionary')).toBeInTheDocument();
   });
 
   test('home page contains a search input', async () => {

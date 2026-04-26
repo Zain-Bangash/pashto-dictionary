@@ -1,18 +1,138 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Noto Sans', system-ui, sans-serif;
+  /* Typography */
+  --font-display: "Cormorant Garamond", serif;
+  --font-ui:      "DM Sans", sans-serif;
+  --font-pashto:  "Noto Nastaliq Urdu", serif;
 
-  --color-neutral-50:  oklch(0.985 0 0);
-  --color-neutral-100: oklch(0.960 0 0);
-  --color-neutral-200: oklch(0.910 0 0);
-  --color-neutral-300: oklch(0.850 0 0);
-  --color-neutral-400: oklch(0.700 0 0);
-  --color-neutral-500: oklch(0.550 0 0);
-  --color-neutral-600: oklch(0.430 0 0);
-  --color-neutral-700: oklch(0.360 0 0);
-  --color-neutral-800: oklch(0.260 0 0);
-  --color-neutral-900: oklch(0.200 0 0);
-  --color-neutral-950: oklch(0.140 0 0);
+  /* Colours */
+  --color-charcoal: #0A0A0A;
+  --color-gold:     #e8c547;
+  --color-mint:     #00f5b4;
+  --color-cyan:     #00d4ff;
+  --color-violet:   #a78bfa;
+  --color-warm:     #fffef8;
+  --color-muted:    #555555;
+
+  /* Shadows */
+  --shadow-gold-glow: 0 16px 48px rgba(232,197,71,0.18);
+  --shadow-mint-glow: 0 16px 48px rgba(0,245,180,0.14);
+  --shadow-gold-btn:  0 6px 24px rgba(232,197,71,0.3);
+  --shadow-mint-btn:  0 4px 20px rgba(0,245,180,0.3);
+
+  /* Border radius */
+  --radius-card:  20px;
+  --radius-inner: 12px;
+
+  /* Animations */
+  --animate-shimmer:      shimmer 6s linear infinite;
+  --animate-grain:        grainShift 0.4s steps(1) infinite;
+  --animate-pulse-soft:   pulse-soft 2s ease-in-out infinite;
+  --animate-wave-idle:    waveIdle 2.4s ease-in-out infinite;
+  --animate-wave-active:  wave 1.2s ease-in-out infinite;
+  --animate-slide-up:     slideUpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
+
+  /* Keyframes */
+  @keyframes shimmer {
+    0%   { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+  @keyframes slideUpFadeIn {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-soft {
+    0%,100% { opacity: 1;   transform: scale(1); }
+    50%     { opacity: 0.5; transform: scale(0.85); }
+  }
+  @keyframes waveIdle {
+    0%,100% { transform: scaleY(0.5); opacity: 0.35; }
+    50%     { transform: scaleY(1);   opacity: 0.7; }
+  }
+  @keyframes wave {
+    0%,100% { transform: scaleY(1); }
+    50%     { transform: scaleY(0.4); }
+  }
+  @keyframes grainShift {
+    0%   { background-position: 0 0; }
+    25%  { background-position: -15px 10px; }
+    50%  { background-position: 10px -8px; }
+    75%  { background-position: -8px -12px; }
+  }
+}
+
+/* ─── Global resets ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: #0A0A0A;
+  color: #fffef8;
+  font-family: "DM Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Nastaliq: prevent descender clipping ──────────────────── */
+.font-pashto { line-height: 1.7 !important; }
+
+/* ─── Shimmer text ──────────────────────────────────────────── */
+.shimmer-text {
+  background: linear-gradient(90deg, #fffef8 30%, #00f5b4 50%, #e8c547 65%, #fffef8 80%);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 6s linear infinite;
+}
+
+/* ─── Waveform bars ─────────────────────────────────────────── */
+.wave-idle   { animation: waveIdle  2.4s ease-in-out infinite; }
+.wave-active { animation: wave      1.2s ease-in-out infinite; }
+
+/* ─── Bento entrance animation ──────────────────────────────── */
+.bento-enter { animation: slideUpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* ─── Bento card spring hover ───────────────────────────────── */
+.bento-card {
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
+}
+.bento-card:hover { transform: translateY(-5px) scale(1.012); }
+.bento-card.gold-glow:hover {
+  box-shadow: 0 16px 48px rgba(232,197,71,0.18);
+  border-color: rgba(232,197,71,0.25);
+}
+.bento-card.mint-glow:hover {
+  box-shadow: 0 16px 48px rgba(0,245,180,0.14);
+  border-color: rgba(0,245,180,0.25);
+}
+
+/* ─── Meta label (POS badges, etc.) ────────────────────────── */
+.meta-label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #444;
+  font-family: "DM Sans", sans-serif;
+}
+
+/* ─── Ghost watermark (CSS-generated — invisible to test queries) ── */
+.ghost-word::before {
+  content: attr(data-word);
+  font-family: "Noto Nastaliq Urdu", serif;
+  line-height: 1.7;
+}
+
+/* ─── Film grain overlay ────────────────────────────────────── */
+.grain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  animation: grainShift 0.4s steps(1) infinite;
 }
