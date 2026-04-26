@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    extensions: ['.js', '.jsx', '.ts', '.tsx'],
+  },
   test: {
     environment: 'jsdom',
     environmentOptions: {
@@ -13,5 +16,6 @@ export default defineConfig({
     },
     setupFiles: ['./src/__tests__/setup.js'],
     globals: true,
+    pool: 'vmForks',
   },
 })

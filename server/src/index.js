@@ -8,6 +8,7 @@ const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
 const entriesRouter = require('./routes/entries');
 const moderationRouter = require('./routes/moderation');
+const usersRouter = require('./routes/users');
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/entries', entriesRouter);
 app.use('/api/moderation', moderationRouter);
+app.use('/api/users', usersRouter);
 
 app.use((err, _req, res, _next) => {
   logger.error(err.message);

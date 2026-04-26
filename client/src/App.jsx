@@ -8,6 +8,12 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Submit from './pages/Submit';
 import MySubmissions from './pages/MySubmissions';
+import DashboardLayout from './pages/dashboard/DashboardLayout';
+import DashboardHome from './pages/dashboard/DashboardHome';
+import DashboardQueue from './pages/dashboard/DashboardQueue';
+import DashboardEntries from './pages/dashboard/DashboardEntries';
+import DashboardUsers from './pages/dashboard/DashboardUsers';
+import DashboardLog from './pages/dashboard/DashboardLog';
 
 export default function App() {
   return (
@@ -33,6 +39,46 @@ export default function App() {
               <ProtectedRoute>
                 <MySubmissions />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <DashboardLayout>
+                <DashboardHome />
+              </DashboardLayout>
+            }
+          />
+          <Route
+            path="/dashboard/queue"
+            element={
+              <DashboardLayout>
+                <DashboardQueue />
+              </DashboardLayout>
+            }
+          />
+          <Route
+            path="/dashboard/entries"
+            element={
+              <DashboardLayout>
+                <DashboardEntries />
+              </DashboardLayout>
+            }
+          />
+          <Route
+            path="/dashboard/users"
+            element={
+              <DashboardLayout>
+                <DashboardUsers />
+              </DashboardLayout>
+            }
+          />
+          <Route
+            path="/dashboard/log"
+            element={
+              <DashboardLayout>
+                <DashboardLog />
+              </DashboardLayout>
             }
           />
         </Routes>
