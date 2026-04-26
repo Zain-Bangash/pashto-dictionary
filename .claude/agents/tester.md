@@ -221,13 +221,24 @@ const getToken = async (email = 'test@test.com', password = 'password123') => {
 ```jsx
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { vi, beforeEach } from 'vitest'
 import api from '../../services/api'
+// Import all page/component modules at the TOP of the file — never inside test functions.
+// Vitest runs in ESM mode; require() inside test functions fails even if the file exists.
+import MyComponent from '../../pages/MyComponent'
 
 // Always mock — never make real HTTP calls in client tests
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() }
 }))
+
+// Use vi.resetAllMocks() not vi.clearAllMocks().
+// clearAllMocks() does NOT clear mockReturnValueOnce/mockRejectedValueOnce queues —
+// unresolved once-mocks from one test bleed into the next and cause silent timeouts.
+// resetAllMocks() wipes the queue so each test starts clean.
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 // Wrap with required providers
 const renderWithProviders = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
@@ -292,3 +303,5 @@ note them separately — they are not a problem, just worth flagging.
 - Write the minimum tests that give maximum confidence — do not pad with redundant cases
 - Failing tests at the end of your run is correct — that is the goal of the red phase
 - Stop after confirming tests are red — the coder agent runs next
+- **ESM imports only** — all imports must be top-level `import` statements. Never use `require()` inside test functions or describe blocks; Vitest runs in ESM mode and `require()` will fail at runtime even when the file exists on disk
+- **Use `vi.resetAllMocks()` in `beforeEach`**, not `vi.clearAllMocks()` — `clearAllMocks` does not drain `mockReturnValueOnce` / `mockRejectedValueOnce` queues; stale once-mocks from a previous test silently replace the mocks in the next test, causing mysterious timeouts
