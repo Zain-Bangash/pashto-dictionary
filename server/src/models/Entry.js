@@ -12,7 +12,7 @@ const entrySchema = new mongoose.Schema(
   {
     pashto: { type: String, required: true },
     phonetic: { type: String },
-    region: { type: String },
+    region: { type: String, enum: ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'] },
     partOfSpeech: {
       type: String,
       enum: ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'],

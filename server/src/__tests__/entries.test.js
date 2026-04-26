@@ -308,12 +308,12 @@ describe('POST /api/entries', () => {
       .send({
         ...valid(),
         phonetic: 'kor',
-        region: 'Kandahar',
+        region: 'Kohat',
         partOfSpeech: 'noun',
       });
     expect(res.status).toBe(201);
     expect(res.body.data.phonetic).toBe('kor');
-    expect(res.body.data.region).toBe('Kandahar');
+    expect(res.body.data.region).toBe('Kohat');
     expect(res.body.data.partOfSpeech).toBe('noun');
   });
 });
@@ -463,6 +463,29 @@ describe('POST /api/entries — additional validation', () => {
       .send({ ...valid(), partOfSpeech: 'emoji' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
+  });
+
+  test('invalid region value returns 400', async () => {
+    const token = makeToken();
+    const res = await request
+      .post('/api/entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...valid(), region: 'Kandahar' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('accepts all valid region values', async () => {
+    const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+    for (const region of regions) {
+      const token = makeToken();
+      const res = await request
+        .post('/api/entries')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ...valid(), region });
+      expect(res.status).toBe(201);
+      expect(res.body.data.region).toBe(region);
+    }
   });
 
   test('returns 400 when second definition in array is missing text', async () => {

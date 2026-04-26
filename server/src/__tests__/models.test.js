@@ -55,6 +55,20 @@ describe('Entry model', () => {
     await expect(entry.save()).rejects.toThrow(/partOfSpeech/i);
   });
 
+  test('rejects an invalid region enum value', async () => {
+    const entry = new Entry({ pashto: 'کور', region: 'Kandahar' });
+    await expect(entry.save()).rejects.toThrow(/region/i);
+  });
+
+  test('accepts all valid region values', async () => {
+    const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+    for (const region of regions) {
+      const entry = await new Entry({ pashto: 'کور', region }).save();
+      expect(entry.region).toBe(region);
+      await Entry.deleteOne({ _id: entry._id });
+    }
+  });
+
   test('accepts every valid partOfSpeech value', async () => {
     const values = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
     for (const pos of values) {

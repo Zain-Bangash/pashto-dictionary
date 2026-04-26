@@ -68,6 +68,34 @@ describe('Submit page (entry submission form)', () => {
     );
   });
 
+  it('renders all valid region options in the region select', () => {
+    renderSubmit();
+    const select = screen.getByLabelText(/region/i);
+    const options = Array.from(select.options).map((o) => o.value);
+    expect(options).toEqual(
+      expect.arrayContaining(['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'])
+    );
+  });
+
+  it('includes region in the payload when a region is selected', async () => {
+    const user = userEvent.setup();
+    api.post.mockResolvedValueOnce({
+      data: { success: true, data: { _id: 'entry1', pashto: 'کور', status: 'pending' } },
+    });
+    renderSubmit();
+    await user.type(screen.getByLabelText(/pashto word/i), 'کور');
+    await user.type(screen.getByLabelText(/definition/i), 'house');
+    await user.selectOptions(screen.getByLabelText(/part of speech/i), 'noun');
+    await user.selectOptions(screen.getByLabelText(/region/i), 'Kohat');
+    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/entries',
+        expect.objectContaining({ region: 'Kohat' })
+      );
+    });
+  });
+
   it('shows a validation error when pashto word is empty on submit', async () => {
     const user = userEvent.setup();
     renderSubmit();
