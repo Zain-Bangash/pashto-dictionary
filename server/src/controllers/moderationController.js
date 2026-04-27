@@ -1,119 +1,72 @@
-const { validationResult } = require('express-validator');
 const mongoose = require('mongoose');
-const Entry = require('../models/Entry');
+const Concept = require('../models/Concept');
+const Variant = require('../models/Variant');
 const ModerationLog = require('../models/ModerationLog');
 // Require User so the schema is registered for populate calls
 require('../models/User');
 
-function invalidId(res) {
-  return res.status(400).json({ success: false, error: { message: 'Invalid entry id' } });
-}
-
-function notFound(res) {
-  return res.status(404).json({ success: false, error: { message: 'Entry not found' } });
-}
-
-function badTransition(res, msg) {
-  return res.status(400).json({ success: false, error: { message: msg } });
-}
-
-async function getQueue(req, res) {
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+async function getConceptQueue(req, res) {
+  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
-  const skip = (page - 1) * limit;
-
-  const filter = { status: 'pending' };
+  const skip  = (page - 1) * limit;
 
   const [data, total] = await Promise.all([
-    Entry.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Entry.countDocuments(filter),
+    Concept.find({ status: 'pending' }).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('submittedBy', 'username').lean(),
+    Concept.countDocuments({ status: 'pending' }),
   ]);
 
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-async function approveEntry(req, res) {
-  const { id } = req.params;
+async function getVariantQueue(req, res) {
+  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const skip  = (page - 1) * limit;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+  const [data, total] = await Promise.all([
+    Variant.find({ status: 'pending' }).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('submittedBy', 'username').lean(),
+    Variant.countDocuments({ status: 'pending' }),
+  ]);
 
-  const entry = await Entry.findById(id);
-  if (!entry) return notFound(res);
-
-  if (entry.status !== 'pending') {
-    return badTransition(res, `Cannot approve entry with status '${entry.status}'. Entry must be pending.`);
-  }
-
-  entry.status = 'approved';
-  entry.reviewedBy = req.user.id;
-  await entry.save();
-
-  await new ModerationLog({ entry: entry._id, action: 'approved', performedBy: req.user.id }).save();
-
-  return res.status(200).json({ success: true, data: entry });
+  return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-async function rejectEntry(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const first = errors.array()[0];
-    return res.status(400).json({ success: false, error: { message: first.msg, field: first.path } });
-  }
+async function getStats(req, res) {
+  const [
+    pendingConcepts,  approvedConcepts,  rejectedConcepts,  publishedConcepts,
+    pendingVariants,  approvedVariants,  rejectedVariants,  publishedVariants,
+  ] = await Promise.all([
+    Concept.countDocuments({ status: 'pending' }),
+    Concept.countDocuments({ status: 'approved' }),
+    Concept.countDocuments({ status: 'rejected' }),
+    Concept.countDocuments({ status: 'published' }),
+    Variant.countDocuments({ status: 'pending' }),
+    Variant.countDocuments({ status: 'approved' }),
+    Variant.countDocuments({ status: 'rejected' }),
+    Variant.countDocuments({ status: 'published' }),
+  ]);
 
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
-
-  const entry = await Entry.findById(id);
-  if (!entry) return notFound(res);
-
-  if (entry.status !== 'pending') {
-    return badTransition(res, `Cannot reject entry with status '${entry.status}'. Entry must be pending.`);
-  }
-
-  const { note } = req.body;
-
-  entry.status = 'rejected';
-  entry.moderatorNote = note;
-  entry.reviewedBy = req.user.id;
-  await entry.save();
-
-  await new ModerationLog({ entry: entry._id, action: 'rejected', performedBy: req.user.id, note }).save();
-
-  return res.status(200).json({ success: true, data: entry });
-}
-
-async function publishEntry(req, res) {
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
-
-  const entry = await Entry.findById(id);
-  if (!entry) return notFound(res);
-
-  if (entry.status !== 'approved') {
-    return badTransition(res, `Cannot publish entry with status '${entry.status}'. Entry must be approved.`);
-  }
-
-  entry.status = 'published';
-  await entry.save();
-
-  await new ModerationLog({ entry: entry._id, action: 'published', performedBy: req.user.id }).save();
-
-  return res.status(200).json({ success: true, data: entry });
+  return res.status(200).json({
+    success: true,
+    data: {
+      pending:   pendingConcepts  + pendingVariants,
+      approved:  approvedConcepts + approvedVariants,
+      rejected:  rejectedConcepts + rejectedVariants,
+      published: publishedConcepts + publishedVariants,
+    },
+  });
 }
 
 async function getLog(req, res) {
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
-  const skip = (page - 1) * limit;
+  const skip  = (page - 1) * limit;
 
   const [data, total] = await Promise.all([
     ModerationLog.find()
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('entry', 'pashto')
       .populate('performedBy', 'username')
       .lean(),
     ModerationLog.countDocuments(),
@@ -122,4 +75,4 @@ async function getLog(req, res) {
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { getQueue, approveEntry, rejectEntry, publishEntry, getLog };
+module.exports = { getConceptQueue, getVariantQueue, getStats, getLog };
