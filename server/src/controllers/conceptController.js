@@ -70,7 +70,7 @@ async function listConcepts(req, res) {
     concepts.map(async (c) => {
       const firstVariant = await Variant.findOne(
         { concept: c._id, status: 'published' },
-        'pashto phonetic region definition'
+        'pashto phonetic region definition example'
       ).lean();
       return { ...c, firstVariant: firstVariant || null };
     })

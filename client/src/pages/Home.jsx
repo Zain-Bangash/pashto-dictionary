@@ -115,9 +115,15 @@ function ConceptCard({ entry }) {
         {/* English gloss */}
         <div className="h-px bg-white/[0.06]" />
 
-        <p dir="ltr" className="font-display italic text-gold text-xs sm:text-sm leading-relaxed min-w-0 line-clamp-3 text-left flex-1">
+        <p dir="ltr" className="font-display italic text-gold text-xs sm:text-sm leading-relaxed min-w-0 line-clamp-3 text-left">
           {entry.englishGloss}
         </p>
+
+        {firstVariant?.example && (
+          <p dir="ltr" className="font-ui text-warm/40 text-xs leading-relaxed min-w-0 line-clamp-2">
+            {firstVariant.example}
+          </p>
+        )}
 
       </div>
 
@@ -300,10 +306,12 @@ export default function Home() {
                     <p dir="ltr" className="font-display italic text-warm/85 text-base sm:text-lg lg:text-xl leading-relaxed min-w-0 text-left">
                       {wotd.englishGloss}
                     </p>
-                    {wotd.firstVariant?.definition && (
-                      <p dir="ltr" className="font-ui text-warm/60 text-sm leading-relaxed min-w-0 text-left">
-                        {wotd.firstVariant.definition}
-                      </p>
+                    {wotd.firstVariant?.example && (
+                      <div className="border-l-2 border-gold/30 pl-3">
+                        <p dir="ltr" className="font-ui text-warm/55 text-sm leading-relaxed min-w-0">
+                          {wotd.firstVariant.example}
+                        </p>
+                      </div>
                     )}
                     <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>
                       <Link
