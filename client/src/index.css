@@ -8,13 +8,15 @@
   --font-pashto:  "Noto Nastaliq Urdu", serif;
 
   /* Colours */
-  --color-charcoal: #0A0A0A;
-  --color-gold:     #e8c547;
-  --color-mint:     #00f5b4;
-  --color-cyan:     #00d4ff;
-  --color-violet:   #a78bfa;
-  --color-warm:     #fffef8;
-  --color-muted:    #555555;
+  --color-charcoal:   #13130e;
+  --color-gold:       #e8c547;
+  --color-mint:       #00f5b4;
+  --color-cyan:       #00d4ff;
+  --color-violet:     #a78bfa;
+  --color-warm:       #fffef8;
+  --color-muted:      #6a6a6a;
+  --color-terracotta: #c4775a;
+  --color-cloud:      #f0ede6;
 
   /* Shadows */
   --shadow-gold-glow: 0 16px 48px rgba(232,197,71,0.18);
@@ -23,8 +25,8 @@
   --shadow-mint-btn:  0 4px 20px rgba(0,245,180,0.3);
 
   /* Border radius */
-  --radius-card:  20px;
-  --radius-inner: 12px;
+  --radius-card:  24px;
+  --radius-inner: 16px;
 
   /* Animations */
   --animate-shimmer:      shimmer 6s linear infinite;
@@ -33,6 +35,7 @@
   --animate-wave-idle:    waveIdle 2.4s ease-in-out infinite;
   --animate-wave-active:  wave 1.2s ease-in-out infinite;
   --animate-slide-up:     slideUpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
+  --animate-fade-slide:   fadeSlideIn 0.4s ease both;
 
   /* Keyframes */
   @keyframes shimmer {
@@ -61,13 +64,22 @@
     50%  { background-position: 10px -8px; }
     75%  { background-position: -8px -12px; }
   }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0   rgba(196,119,90,0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(196,119,90,0); }
+    100% { box-shadow: 0 0 0 0   rgba(196,119,90,0); }
+  }
 }
 
 /* ─── Global resets ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  background: #0A0A0A;
+  background: #13130e;
   color: #fffef8;
   font-family: "DM Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -98,8 +110,18 @@ body {
   transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
               box-shadow 0.3s ease,
               border-color 0.3s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .bento-card:hover { transform: translateY(-5px) scale(1.012); }
+
+/* ─── Pashto word bloom on card hover ──────────────────────── */
+.pashto-bloom {
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), text-shadow 0.3s ease;
+}
+.bento-card:hover .pashto-bloom {
+  transform: scale(1.05);
+  text-shadow: 0 0 22px rgba(232,197,71,0.4);
+}
 .bento-card.gold-glow:hover {
   box-shadow: 0 16px 48px rgba(232,197,71,0.18);
   border-color: rgba(232,197,71,0.25);
@@ -114,8 +136,24 @@ body {
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #444;
+  color: rgba(255,254,248,0.7);
   font-family: "DM Sans", sans-serif;
+}
+
+/* ─── Listen button pulse-ring on hover ─────────────────────── */
+.listen-btn {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.listen-btn:hover {
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+/* ─── Search card terracotta focus glow ─────────────────────── */
+.search-card:focus-within {
+  border-color: rgba(196,119,90,0.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06),
+              0 0 0 1px rgba(196,119,90,0.18),
+              0 8px 28px rgba(196,119,90,0.12);
 }
 
 /* ─── Ghost watermark (CSS-generated — invisible to test queries) ── */

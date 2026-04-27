@@ -32,7 +32,7 @@ function AvatarStack() {
     <div className="flex items-center">
       {AVATAR_INITIALS.map((l, i) => (
         <div key={i}
-          className="rounded-full border-2 border-[#0a0a0a] flex items-center justify-center font-bold text-[#0a0a0a] text-[8px] w-6 h-6"
+          className="rounded-full border-2 border-charcoal flex items-center justify-center font-bold text-[#13130e] text-[8px] w-6 h-6"
           style={{ background: AVATAR_COLORS[i], marginLeft: i === 0 ? 0 : -6, zIndex: 5 - i }}
         >
           {l}
@@ -42,16 +42,21 @@ function AvatarStack() {
   );
 }
 
-// ─── Ambient blobs ─────────────────────────────────────────────
+// ─── Ambient background ────────────────────────────────────────
 function AmbientBackground() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      <div className="absolute rounded-full opacity-60"
-        style={{ width: '60vw', height: '60vw', top: '-20%', left: '-20%',
-          background: 'radial-gradient(circle, rgba(0,245,180,0.07) 0%, transparent 60%)' }} />
-      <div className="absolute rounded-full opacity-60"
-        style={{ width: '50vw', height: '50vw', bottom: '-10%', right: '-10%',
-          background: 'radial-gradient(circle, rgba(232,197,71,0.06) 0%, transparent 60%)' }} />
+      {/* Islamic diamond lattice — very faint, culturally resonant */}
+      <div className="absolute inset-0" style={{
+        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg stroke='rgba(255,255,255,0.022)' stroke-width='0.6' fill='none'%3E%3Cpath d='M28 3 L53 28 L28 53 L3 28 Z'/%3E%3Cpath d='M28 17 L39 28 L28 39 L17 28 Z'/%3E%3C/g%3E%3C/svg%3E\")",
+        backgroundSize: '56px 56px',
+      }} />
+      <div className="absolute rounded-full"
+        style={{ width: '65vw', height: '65vw', top: '-25%', left: '-20%',
+          background: 'radial-gradient(circle, rgba(196,119,90,0.07) 0%, transparent 55%)' }} />
+      <div className="absolute rounded-full"
+        style={{ width: '55vw', height: '55vw', bottom: '-15%', right: '-15%',
+          background: 'radial-gradient(circle, rgba(232,197,71,0.06) 0%, transparent 55%)' }} />
       <div className="grain-overlay" />
     </div>
   );
@@ -61,37 +66,49 @@ function AmbientBackground() {
 function WordCard({ entry }) {
   const [playing, setPlaying] = useState(false);
   return (
-    <button
-      onClick={() => setPlaying(p => !p)}
-      className="bento-card w-full text-left bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-2xl p-4 sm:p-5 flex flex-col gap-2 relative overflow-hidden group transition-all duration-200 hover:-translate-y-0.5 bento-enter"
+    <div
+      className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-2xl overflow-hidden flex flex-col h-full"
+      style={{ borderLeft: '2px solid rgba(196,119,90,0.5)' }}
     >
-      {/* Ghost watermark */}
-      <div aria-hidden="true"
-        className="absolute bottom-1 right-2 font-pashto text-white/[0.04] pointer-events-none select-none text-5xl sm:text-6xl leading-none"
-        style={{ direction: 'rtl' }}
-      >
-        {entry.pashto}
+      {/* Main content — grows to fill card height */}
+      <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
+
+        {/* Pashto word + POS badge */}
+        <div className="flex items-start justify-between gap-2">
+          <div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
+            {entry.pashto}
+          </div>
+          <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-2.5 uppercase tracking-wider">
+            {POS_SHORT[entry.partOfSpeech] || '—'}
+          </span>
+        </div>
+
+        {/* Phonetic — gold, matches hero */}
+        {entry.phonetic && (
+          <div className="font-display italic text-gold/80 text-sm leading-none">{entry.phonetic}</div>
+        )}
+
+        {/* Separator */}
+        <div className="h-px bg-white/[0.06]" />
+
+        {/* Definition — warm, matches hero */}
+        <p dir="ltr" className="font-display italic text-gold text-xs sm:text-sm leading-relaxed min-w-0 line-clamp-3 text-left flex-1">
+          {entry.definitions?.[0]?.text}
+        </p>
+
       </div>
 
-      <div dir="rtl" className="font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0 relative" style={{ lineHeight: 1.7 }}>
-        {entry.pashto}
+      {/* Footer strip */}
+      <div className="border-t border-white/[0.05] px-4 sm:px-5 py-2.5 flex items-center justify-end">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaying(p => !p); }}
+          className="listen-btn flex items-center gap-1.5 text-muted/70 hover:text-warm/80 transition-colors rounded-full border border-transparent hover:border-white/[0.08] px-2 py-1"
+        >
+          <Waveform color={playing ? '#c4775a' : '#444'} animated={playing} />
+          <span className="font-ui text-[9px] uppercase tracking-[0.1em]">{playing ? 'Playing' : 'Listen'}</span>
+        </button>
       </div>
-
-      {entry.phonetic && (
-        <div className="font-display italic text-muted text-xs sm:text-sm">{entry.phonetic}</div>
-      )}
-
-      <p className="font-ui text-muted text-xs leading-snug line-clamp-2 flex-1 relative min-w-0">
-        {entry.definitions?.[0]?.text}
-      </p>
-
-      <div className="flex items-center justify-between mt-1 relative">
-        <span className="font-ui text-muted border border-white/[0.1] rounded text-[9px] px-1.5 py-0.5">
-          {POS_SHORT[entry.partOfSpeech] || '—'}
-        </span>
-        <Waveform color={playing ? '#00f5b4' : '#333'} animated={playing} />
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -179,7 +196,7 @@ export default function Home() {
 
         {/* ── 1. Hero: Word of the Day ── */}
         <div
-          className="bento-card gold-glow bg-white/[0.04] backdrop-blur-[40px] border border-white/[0.08] rounded-2xl p-6 sm:p-8 lg:p-10 bento-enter"
+          className="bento-card gold-glow bg-white/[0.04] backdrop-blur-[40px] border border-white/[0.08] rounded-3xl p-6 sm:p-8 lg:p-10 bento-enter"
           style={{ animationDelay: '0.05s' }}
         >
           {/* Header row */}
@@ -195,81 +212,95 @@ export default function Home() {
           </div>
 
           {wotd ? (
-            /* Two-column on sm+: text left, big Pashto word right */
-            <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+            <div className="flex flex-col gap-6 sm:gap-8">
 
-              {/* Left: text content */}
-              <div className="flex-1 min-w-0 flex flex-col gap-4">
-                {/* Phonetic + POS + Listen */}
-                <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+              {/* ── Calligraphy banner: full-width Pashto word ── */}
+              <div className="text-center" style={{ animation: 'fadeSlideIn 0.6s ease both', animationDelay: '0.08s' }}>
+                <div
+                  dir="rtl"
+                  className="pashto-bloom font-pashto text-warm font-bold select-none inline-block"
+                  style={{
+                    fontSize: 'clamp(64px, 12vw, 160px)',
+                    lineHeight: 1.5,
+                    textShadow: '0 0 60px rgba(232,197,71,0.1), 0 0 120px rgba(196,119,90,0.08)',
+                  }}
+                >
+                  {wotd.pashto}
+                </div>
+                {/* Ornamental rule */}
+                <div className="flex items-center justify-center gap-3 mt-3">
+                  <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to left, rgba(232,197,71,0.3), transparent)' }} />
+                  <div className="w-1 h-1 rounded-full bg-gold/40" />
+                  <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to right, rgba(232,197,71,0.3), transparent)' }} />
+                </div>
+              </div>
+
+              {/* ── Dictionary entry row ── */}
+              <div className="flex flex-col sm:flex-row gap-5 sm:gap-10">
+
+                {/* Left: phonetic + meta */}
+                <div className="flex flex-col gap-3 sm:w-48 shrink-0" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.22s' }}>
                   {wotd.phonetic && (
-                    <span
-                      className="font-display italic text-gold text-2xl sm:text-3xl lg:text-4xl"
-                      style={{ textShadow: '0 0 24px rgba(232,197,71,0.5)' }}
+                    <div className="font-display italic text-gold leading-none"
+                      style={{ fontSize: 'clamp(22px, 3vw, 36px)', textShadow: '0 0 24px rgba(232,197,71,0.4)' }}
                     >
                       {wotd.phonetic}
-                    </span>
+                    </div>
                   )}
-                  {wotd.partOfSpeech && (
-                    <span className="font-ui text-muted border border-white/[0.1] rounded text-[10px] px-2 py-0.5 tracking-wide uppercase">
-                      {wotd.partOfSpeech}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => setWotdPlaying(p => !p)}
-                    className="flex items-center gap-1.5 border border-mint/30 rounded-full text-mint hover:bg-mint/10 transition-colors text-xs px-3 py-1.5"
-                  >
-                    <Waveform color="#00f5b4" animated={wotdPlaying} />
-                    <span className="font-ui">{wotdPlaying ? 'Playing…' : 'Listen'}</span>
-                  </button>
-                </div>
-
-                {/* Definition */}
-                <p className="font-ui text-warm/80 text-sm sm:text-base lg:text-lg leading-relaxed min-w-0">
-                  {wotd.definitions?.[0]?.text}
-                </p>
-
-                {/* Example */}
-                {wotd.definitions?.[0]?.example && (
-                  <div className="border-l-2 border-gold/50 pl-4">
-                    <p dir="rtl" className="font-pashto text-warm/60 text-sm min-w-0" style={{ lineHeight: 1.7 }}>
-                      {wotd.definitions[0].example}
-                    </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {wotd.partOfSpeech && (
+                      <span className="font-ui text-warm/70 border border-white/[0.1] rounded text-[10px] px-2 py-0.5 tracking-wide uppercase">
+                        {wotd.partOfSpeech}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setWotdPlaying(p => !p)}
+                      className="listen-btn flex items-center gap-1.5 border border-terracotta/35 rounded-full text-terracotta hover:bg-terracotta/10 text-xs px-3 py-1.5"
+                    >
+                      <Waveform color="#c4775a" animated={wotdPlaying} />
+                      <span className="font-ui">{wotdPlaying ? 'Playing…' : 'Listen'}</span>
+                    </button>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1">
-                  <Link
-                    to={`/entries/${wotd._id}`}
-                    className="font-ui font-semibold text-charcoal bg-gold rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:opacity-90 transition-opacity"
-                    style={{ boxShadow: '0 4px 20px rgba(232,197,71,0.3)' }}
-                  >
-                    Explore Word →
-                  </Link>
-                  <button className="font-ui text-warm border border-white/[0.12] rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:border-white/25 transition-colors">
-                    + Save Word
-                  </button>
                   {wotd.submittedBy?.username && (
-                    <div className="flex items-center gap-1.5 sm:ml-auto">
-                      <div className="w-5 h-5 rounded-full bg-mint flex items-center justify-center text-charcoal font-bold text-[8px] shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[8px] shrink-0"
+                        style={{ background: 'rgba(196,119,90,0.65)', color: '#fffef8' }}
+                      >
                         {wotd.submittedBy.username[0].toUpperCase()}
                       </div>
                       <span className="font-ui text-muted text-xs">by {wotd.submittedBy.username}</span>
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Right: large Pashto word — decorative */}
-              <div
-                dir="rtl"
-                className="font-pashto text-warm font-bold shrink-0 text-center sm:text-right
-                           text-6xl sm:text-7xl lg:text-8xl xl:text-9xl
-                           opacity-90 select-none"
-                style={{ lineHeight: 1.7, textShadow: '0 0 60px rgba(0,245,180,0.07)' }}
-              >
-                {wotd.pashto}
+                {/* Right: definition + example + actions */}
+                <div className="flex-1 min-w-0 flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.32s' }}>
+                  <p dir="ltr" className="font-display italic text-warm/85 text-base sm:text-lg lg:text-xl leading-relaxed min-w-0 text-left">
+                    {wotd.definitions?.[0]?.text}
+                  </p>
+
+                  {wotd.definitions?.[0]?.example && (
+                    <div className="border-l-2 border-gold/35 pl-4">
+                      <p dir="ltr" className="font-display italic text-warm/55 text-sm min-w-0 text-left" style={{ lineHeight: 1.6 }}>
+                        {wotd.definitions[0].example}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>
+                    <Link
+                      to={`/entries/${wotd._id}`}
+                      className="font-ui font-semibold text-warm bg-terracotta rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:opacity-90 transition-opacity"
+                      style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.35)' }}
+                    >
+                      Explore Word →
+                    </Link>
+                    <button className="font-ui text-warm/70 border border-white/[0.1] rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:border-white/20 hover:text-warm transition-all">
+                      + Save Word
+                    </button>
+                  </div>
+                </div>
+
               </div>
             </div>
           ) : (
@@ -279,7 +310,7 @@ export default function Home() {
 
         {/* ── 2. Search ── */}
         <div
-          className="bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-2xl p-4 sm:p-5 bento-enter"
+          className="search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter"
           style={{ animationDelay: '0.15s' }}
         >
           <form onSubmit={handleSearch} className="relative">
@@ -290,7 +321,7 @@ export default function Home() {
               ref={searchRef}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-16 py-3 text-warm font-ui text-sm outline-none focus:border-mint/50 transition-colors placeholder:text-muted/60"
+              className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-16 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
               placeholder="Search Pashto words…"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white/[0.06] border border-white/10 rounded px-1.5 py-0.5 font-ui text-muted text-[9px] pointer-events-none">
@@ -341,12 +372,12 @@ export default function Home() {
         {wordCards.length > 0 && (
           <div className="bento-enter" style={{ animationDelay: '0.25s' }}>
             <div className="flex items-center justify-between mb-3">
-              <span className="font-ui text-muted text-[10px] uppercase tracking-[0.14em]">Recent Words</span>
+              <span className="font-ui text-warm/70 text-[10px] uppercase tracking-[0.14em]">Recent Words</span>
               <Link to="/entries" className="font-ui text-mint hover:underline text-xs">View all →</Link>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch">
               {wordCards.map((entry, i) => (
-                <Link key={entry._id} to={`/entries/${entry._id}`} className="block" style={{ textDecoration: 'none', animationDelay: `${0.28 + i * 0.08}s` }}>
+                <Link key={entry._id} to={`/entries/${entry._id}`} className="block bento-enter" style={{ animationDelay: `${0.28 + i * 0.08}s` }}>
                   <WordCard entry={entry} />
                 </Link>
               ))}
@@ -358,7 +389,7 @@ export default function Home() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bento-enter" style={{ animationDelay: '0.45s' }}>
 
           {/* Community stats */}
-          <div className="bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-2xl p-5 sm:p-6 flex flex-col gap-4">
+          <div className="bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
             <h2 className="font-ui font-semibold text-muted text-[10px] uppercase tracking-[0.14em]">Community</h2>
             <div className="flex flex-col gap-3">
 
@@ -398,10 +429,10 @@ export default function Home() {
 
           {/* Contribute CTA */}
           <div
-            className="bento-card rounded-2xl p-5 sm:p-6 flex flex-col justify-between gap-4"
+            className="bento-card rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-4"
             style={{
-              background: 'linear-gradient(135deg, rgba(0,245,180,0.08) 0%, rgba(0,0,0,0.35) 100%)',
-              border: '1px solid rgba(0,245,180,0.12)',
+              background: 'linear-gradient(135deg, rgba(196,119,90,0.08) 0%, rgba(0,0,0,0.35) 100%)',
+              border: '1px solid rgba(196,119,90,0.15)',
             }}
           >
             <div className="flex flex-col gap-2">
@@ -410,14 +441,14 @@ export default function Home() {
                 Help grow the dictionary. Every contribution makes Pashto more accessible online.
               </p>
               <div className="flex items-center gap-1.5 mt-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-soft shrink-0" />
-                <span className="font-ui text-mint/70 text-xs">Others are contributing right now</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-terracotta animate-pulse-soft shrink-0" />
+                <span className="font-ui text-terracotta/70 text-xs">Others are contributing right now</span>
               </div>
             </div>
             <Link
               to={user ? '/submit' : '/register'}
-              className="flex items-center justify-center gap-2 w-full rounded-xl font-ui font-semibold text-charcoal bg-mint hover:opacity-90 transition-opacity text-sm py-3"
-              style={{ boxShadow: '0 4px 20px rgba(0,245,180,0.25)' }}
+              className="flex items-center justify-center gap-2 w-full rounded-xl font-ui font-semibold text-warm bg-terracotta hover:opacity-90 transition-opacity text-sm py-3"
+              style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.3)' }}
             >
               + Contribute a Word
             </Link>
