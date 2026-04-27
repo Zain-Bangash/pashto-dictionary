@@ -22,6 +22,10 @@ async function listEntries(req, res) {
   });
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function searchEntries(req, res) {
   const q = (req.query.q || '').trim();
 
@@ -32,16 +36,76 @@ async function searchEntries(req, res) {
     });
   }
 
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
-  const skip = (page - 1) * limit;
+  const page    = Math.max(1, parseInt(req.query.page,  10) || 1);
+  const limit   = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const skip    = (page - 1) * limit;
+  const escaped = escapeRegex(q);
+  const regex   = new RegExp(escaped, 'i');
 
-  const filter = { status: 'published', $text: { $search: q } };
+  // Match any entry where the query appears as a substring in any searchable field
+  const matchStage = {
+    $match: {
+      status: 'published',
+      $or: [
+        { pashto:                regex },
+        { phonetic:              regex },
+        { 'definitions.text':    regex },
+        { 'definitions.example': regex },
+      ],
+    },
+  };
 
-  const [data, total] = await Promise.all([
-    Entry.find(filter).skip(skip).limit(limit).lean(),
-    Entry.countDocuments(filter),
+  // Score by which field matched: pashto > phonetic > definition text > example
+  const scoreStage = {
+    $addFields: {
+      _score: {
+        $add: [
+          { $cond: [{ $regexMatch: { input: { $ifNull: ['$pashto',    ''] }, regex: escaped, options: 'i' } }, 4, 0] },
+          { $cond: [{ $regexMatch: { input: { $ifNull: ['$phonetic',  ''] }, regex: escaped, options: 'i' } }, 3, 0] },
+          {
+            $cond: [{
+              $gt: [{
+                $size: {
+                  $filter: {
+                    input: { $ifNull: ['$definitions', []] }, as: 'd',
+                    cond:  { $regexMatch: { input: { $ifNull: ['$$d.text',    ''] }, regex: escaped, options: 'i' } },
+                  },
+                },
+              }, 0],
+            }, 2, 0],
+          },
+          {
+            $cond: [{
+              $gt: [{
+                $size: {
+                  $filter: {
+                    input: { $ifNull: ['$definitions', []] }, as: 'd',
+                    cond:  { $regexMatch: { input: { $ifNull: ['$$d.example', ''] }, regex: escaped, options: 'i' } },
+                  },
+                },
+              }, 0],
+            }, 1, 0],
+          },
+        ],
+      },
+    },
+  };
+
+  const [data, countResult] = await Promise.all([
+    Entry.aggregate([
+      matchStage,
+      scoreStage,
+      { $sort: { _score: -1, pashto: 1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]),
+    Entry.aggregate([
+      matchStage,
+      { $count: 'total' },
+    ]),
   ]);
+
+  const total = countResult[0]?.total ?? 0;
 
   return res.status(200).json({
     success: true,

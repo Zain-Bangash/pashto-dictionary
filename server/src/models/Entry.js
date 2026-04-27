@@ -30,7 +30,6 @@ const entrySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-entrySchema.index({ pashto: 'text' });
 entrySchema.index({ status: 1 });
 
 module.exports = mongoose.model('Entry', entrySchema);
