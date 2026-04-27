@@ -65,9 +65,33 @@ function AmbientBackground() {
 // ─── Word card (recent words grid) ────────────────────────────
 function WordCard({ entry }) {
   const [playing, setPlaying] = useState(false);
+  const cardRef = useRef(null);
+
+  function onMouseMove(e) {
+    const el = cardRef.current;
+    if (!el) return;
+    const { left, top, width, height } = el.getBoundingClientRect();
+    const x = (e.clientX - left) / width  - 0.5;
+    const y = (e.clientY - top)  / height - 0.5;
+    el.style.transition = 'transform 0.08s ease, box-shadow 0.08s ease';
+    el.style.transform  = `perspective(700px) rotateX(${-y * 12}deg) rotateY(${x * 12}deg) scale(1.03)`;
+    el.style.boxShadow  = `${x * -12}px ${y * -12}px 28px rgba(232,197,71,0.1), inset 0 1px 0 rgba(255,255,255,0.08)`;
+  }
+
+  function onMouseLeave() {
+    const el = cardRef.current;
+    if (!el) return;
+    el.style.transition = 'transform 0.55s cubic-bezier(0.22,1,0.36,1), box-shadow 0.55s ease';
+    el.style.transform  = '';
+    el.style.boxShadow  = '';
+  }
+
   return (
     <div
-      className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-2xl overflow-hidden flex flex-col h-full"
+      ref={cardRef}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-[16px] overflow-hidden flex flex-col h-full"
       style={{ borderLeft: '2px solid rgba(196,119,90,0.5)' }}
     >
       {/* Main content — grows to fill card height */}
@@ -123,6 +147,7 @@ export default function Home() {
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
+  const [searchFocused,  setSearchFocused]  = useState(false);
   const [wotdPlaying,    setWotdPlaying]    = useState(false);
   const [activeFilter,   setActiveFilter]   = useState(null);
   const [recentSearches, setRecentSearches] = useState(() => {
@@ -192,11 +217,24 @@ export default function Home() {
     <div className="min-h-screen bg-charcoal">
       <AmbientBackground />
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
+      {/* Search spotlight dimmer */}
+      <div
+        className="fixed inset-0 transition-opacity duration-300"
+        style={{
+          zIndex: 15,
+          background: 'rgba(19,19,14,0.72)',
+          backdropFilter: 'blur(5px)',
+          opacity: searchFocused ? 1 : 0,
+          pointerEvents: searchFocused ? 'auto' : 'none',
+        }}
+        onClick={() => { setSearchFocused(false); searchRef.current?.blur(); }}
+      />
+
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
 
         {/* ── 1. Hero: Word of the Day ── */}
         <div
-          className="bento-card gold-glow bg-white/[0.04] backdrop-blur-[40px] border border-white/[0.08] rounded-3xl p-6 sm:p-8 lg:p-10 bento-enter"
+          className="bento-card gold-glow bg-white/[0.04] backdrop-blur-[40px] border border-white/[0.08] rounded-[48px] p-6 sm:p-8 lg:p-10 bento-enter"
           style={{ animationDelay: '0.05s' }}
         >
           {/* Header row */}
@@ -310,7 +348,7 @@ export default function Home() {
 
         {/* ── 2. Search ── */}
         <div
-          className="search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter"
+          className={`search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter transition-all${searchFocused ? ' relative z-[20]' : ''}`}
           style={{ animationDelay: '0.15s' }}
         >
           <form onSubmit={handleSearch} className="relative">
@@ -323,6 +361,8 @@ export default function Home() {
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-16 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
               placeholder="Search Pashto words…"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white/[0.06] border border-white/10 rounded px-1.5 py-0.5 font-ui text-muted text-[9px] pointer-events-none">
               <span>⌘</span><span>K</span>

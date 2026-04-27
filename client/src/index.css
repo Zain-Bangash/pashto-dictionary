@@ -69,9 +69,17 @@
     to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
   }
   @keyframes pulse-ring {
-    0%   { box-shadow: 0 0 0 0   rgba(196,119,90,0.55); }
+    0%   { box-shadow: 0 0 0 0    rgba(196,119,90,0.55); }
     70%  { box-shadow: 0 0 0 10px rgba(196,119,90,0); }
-    100% { box-shadow: 0 0 0 0   rgba(196,119,90,0); }
+    100% { box-shadow: 0 0 0 0    rgba(196,119,90,0); }
+  }
+  @keyframes floatingPathPulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+  }
+  @keyframes metalShimmer {
+    from { background-position: 200% center; }
+    to   { background-position: -200% center; }
   }
 }
 
@@ -116,11 +124,19 @@ body {
 
 /* ─── Pashto word bloom on card hover ──────────────────────── */
 .pashto-bloom {
-  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), text-shadow 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1),
+              -webkit-text-fill-color 0.2s ease;
 }
 .bento-card:hover .pashto-bloom {
   transform: scale(1.05);
-  text-shadow: 0 0 22px rgba(232,197,71,0.4);
+  background: linear-gradient(90deg,
+    #e8c547 0%, #fffef8 20%, #c4775a 38%,
+    #e8c547 55%, #fffef8 72%, #e8c547 100%);
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: metalShimmer 2.4s linear infinite;
 }
 .bento-card.gold-glow:hover {
   box-shadow: 0 16px 48px rgba(232,197,71,0.18);
