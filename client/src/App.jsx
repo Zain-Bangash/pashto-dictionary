@@ -6,8 +6,8 @@ import { setLogoutHandler } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-import Entries from './pages/Entries';
-import EntryDetail from './pages/EntryDetail';
+import Concepts from './pages/Concepts';
+import ConceptDetail from './pages/ConceptDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Submit from './pages/Submit';
@@ -15,7 +15,7 @@ import MySubmissions from './pages/MySubmissions';
 import DashboardLayout from './pages/dashboard/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import DashboardQueue from './pages/dashboard/DashboardQueue';
-import DashboardEntries from './pages/dashboard/DashboardEntries';
+import DashboardConcepts from './pages/dashboard/DashboardConcepts';
 import DashboardUsers from './pages/dashboard/DashboardUsers';
 import DashboardLog from './pages/dashboard/DashboardLog';
 
@@ -31,8 +31,8 @@ function AppRoutes() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/entries" element={<Entries />} />
-        <Route path="/entries/:id" element={<EntryDetail />} />
+        <Route path="/entries" element={<Concepts />} />
+        <Route path="/entries/:id" element={<ConceptDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -71,7 +71,7 @@ function AppRoutes() {
           path="/dashboard/entries"
           element={
             <DashboardLayout>
-              <DashboardEntries />
+              <DashboardConcepts />
             </DashboardLayout>
           }
         />

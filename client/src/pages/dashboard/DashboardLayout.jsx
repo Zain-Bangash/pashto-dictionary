@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 const NAV_ITEMS = [
   { to: '/dashboard',         label: 'Overview', roles: ['moderator', 'admin'] },
   { to: '/dashboard/queue',   label: 'Queue',    roles: ['moderator', 'admin'] },
-  { to: '/dashboard/entries', label: 'Entries',  roles: ['moderator', 'admin'] },
+  { to: '/dashboard/entries', label: 'Concepts', roles: ['moderator', 'admin'] },
   { to: '/dashboard/users',   label: 'Users',    roles: ['admin'] },
   { to: '/dashboard/log',     label: 'Log',      roles: ['admin'] },
 ];

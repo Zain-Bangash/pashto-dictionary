@@ -1,32 +1,31 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import EntryCard from '../components/EntryCard';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import SearchBar from '../components/SearchBar';
 import api from '../services/api';
 
-export default function Entries() {
+export default function Concepts() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const q = searchParams.get('q') ?? '';
+  const q    = searchParams.get('q') ?? '';
   const page = parseInt(searchParams.get('page') ?? '1', 10);
 
-  const [entries, setEntries] = useState([]);
-  const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [concepts, setConcepts] = useState([]);
+  const [meta, setMeta]         = useState({ page: 1, limit: 20, total: 0 });
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
 
-    const url = q
-      ? `/api/entries/search?q=${encodeURIComponent(q)}&page=${page}`
-      : `/api/entries?page=${page}`;
+    const params = new URLSearchParams({ page });
+    if (q) params.set('q', q);
+    const url = `/api/concepts?${params.toString()}`;
 
     api.get(url)
       .then((res) => {
-        setEntries(res.data.data);
+        setConcepts(res.data.data);
         setMeta(res.data.meta);
       })
       .catch(() => setError('Failed to load entries.'))
@@ -57,14 +56,14 @@ export default function Entries() {
 
         {loading && <p className="text-muted font-ui text-sm text-center py-20">Loading…</p>}
         {error && <p className="text-red-400 font-ui text-sm text-center py-20">{error}</p>}
-        {!loading && !error && entries.length === 0 && (
+        {!loading && !error && concepts.length === 0 && (
           <p className="text-muted font-ui text-sm text-center py-20">No entries found.</p>
         )}
-        {!loading && !error && entries.length > 0 && (
+        {!loading && !error && concepts.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {entries.map((entry) => (
-                <EntryCard key={entry._id} entry={entry} />
+              {concepts.map((concept) => (
+                <ConceptCard key={concept._id} concept={concept} />
               ))}
             </div>
             <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
@@ -72,5 +71,23 @@ export default function Entries() {
         )}
       </div>
     </div>
+  );
+}
+
+function ConceptCard({ concept }) {
+  const variantCount = concept.variantCount ?? 0;
+  return (
+    <Link
+      to={`/entries/${concept._id}`}
+      className="bento-card block bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5 no-underline"
+    >
+      <p className="text-warm text-xl font-display font-semibold leading-snug">{concept.englishGloss}</p>
+      {concept.partOfSpeech && (
+        <span className="meta-label mt-1 inline-block">{concept.partOfSpeech}</span>
+      )}
+      <p className="text-muted text-xs font-ui mt-2">
+        {variantCount} regional variant{variantCount !== 1 ? 's' : ''}
+      </p>
+    </Link>
   );
 }
