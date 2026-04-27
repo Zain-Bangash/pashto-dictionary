@@ -10,6 +10,7 @@ const moderationRouter = require('./routes/moderation');
 const usersRouter = require('./routes/users');
 const conceptsRouter = require('./routes/concepts');
 const variantsRouter = require('./routes/variants');
+const statsRouter    = require('./routes/stats');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/moderation', moderationRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/concepts', conceptsRouter);
 app.use('/api/variants', variantsRouter);
+app.use('/api/stats', statsRouter);
 
 app.use((err, _req, res, _next) => {
   logger.error(err.message);

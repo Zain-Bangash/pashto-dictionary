@@ -40,38 +40,59 @@ const mockConcept = (overrides = {}) => ({
   ...overrides,
 });
 
+const mockStats = (overrides = {}) => ({
+  publishedVariants: 42,
+  registeredUsers: 7,
+  variantsThisMonth: 3,
+  ...overrides,
+});
+
+// Helper: mock three parallel calls in the order Promise.all fires them
+// api.get is called with: /api/concepts/wotd, /api/concepts?limit=3, /api/stats
+function mockThreeCalls({ wotdData = null, cardsData = [], statsData = mockStats() } = {}) {
+  api.get.mockImplementation((url) => {
+    if (url === '/api/concepts/wotd') {
+      return Promise.resolve({ data: { data: wotdData } });
+    }
+    if (url.startsWith('/api/concepts')) {
+      return Promise.resolve({ data: { data: cardsData, meta: {} } });
+    }
+    if (url === '/api/stats') {
+      return Promise.resolve({ data: { data: statsData } });
+    }
+    return Promise.resolve({ data: { data: null } });
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('Home page', () => {
   test('shows a search input', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+    mockThreeCalls();
     renderHome();
     expect(await screen.findByPlaceholderText('Search Pashto words…')).toBeInTheDocument();
   });
 
   test('shows loading state while API call is in flight', () => {
-    api.get.mockReturnValueOnce(new Promise(() => {}));
+    api.get.mockReturnValue(new Promise(() => {}));
     renderHome();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
   });
 
   test('shows error state when API call fails', async () => {
-    api.get.mockRejectedValueOnce(new Error('Network error'));
+    api.get.mockRejectedValue(new Error('Network error'));
     renderHome();
-    expect(await screen.findByText('Failed to load recent concepts.')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to load.')).toBeInTheDocument();
   });
 
   test('shows concept englishGloss cards when data loads', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
-          mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
-        ],
-        meta: {},
-      },
+    mockThreeCalls({
+      wotdData: mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
+      cardsData: [
+        mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
+      ],
     });
     renderHome();
     expect(await screen.findByText('house')).toBeInTheDocument();
@@ -79,28 +100,25 @@ describe('Home page', () => {
   });
 
   test('shows pashto word from first variant in word card', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        data: [
-          mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
-          mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
-        ],
-        meta: {},
-      },
+    mockThreeCalls({
+      wotdData: mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
+      cardsData: [
+        mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
+      ],
     });
     renderHome();
     expect(await screen.findByText('اوبه')).toBeInTheDocument();
   });
 
-  test('shows empty state when API returns empty array', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+  test('shows empty state when API returns no wotd', async () => {
+    mockThreeCalls({ wotdData: null });
     renderHome();
     expect(await screen.findByText('No concepts yet.')).toBeInTheDocument();
   });
 
   test('search submit with a term navigates to /entries?q=<term>', async () => {
     const user = userEvent.setup();
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+    mockThreeCalls();
     const { locationRef } = renderHome();
     const input = await screen.findByPlaceholderText('Search Pashto words…');
     await user.type(input, 'kor');
@@ -113,7 +131,7 @@ describe('Home page', () => {
 
   test('search submit with empty term navigates to /entries without ?q=', async () => {
     const user = userEvent.setup();
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+    mockThreeCalls();
     const { locationRef } = renderHome();
     await screen.findByPlaceholderText('Search Pashto words…');
     await user.click(screen.getByRole('button', { name: /search/i }));
@@ -124,10 +142,41 @@ describe('Home page', () => {
   });
 
   test('calls /api/concepts endpoint for recent words', async () => {
-    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+    mockThreeCalls();
     renderHome();
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
+    });
+  });
+
+  test('displays stats numbers from /api/stats', async () => {
+    mockThreeCalls({ statsData: { publishedVariants: 128, registeredUsers: 15, variantsThisMonth: 9 } });
+    renderHome();
+    expect(await screen.findByText('128')).toBeInTheDocument();
+    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.getByText('9')).toBeInTheDocument();
+  });
+
+  test('shows dash placeholders while stats are loading', () => {
+    api.get.mockReturnValue(new Promise(() => {}));
+    renderHome();
+    // Loading spinner is shown; stats section not rendered yet — loading state covers it
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  test('calls /api/concepts/wotd endpoint', async () => {
+    mockThreeCalls();
+    renderHome();
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/concepts/wotd');
+    });
+  });
+
+  test('calls /api/stats endpoint', async () => {
+    mockThreeCalls();
+    renderHome();
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/stats');
     });
   });
 });

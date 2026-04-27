@@ -146,8 +146,9 @@ export default function Home() {
   const navigate  = useNavigate();
   const searchRef = useRef(null);
 
-  const [concepts,       setConcepts]       = useState([]);
-  const [total,          setTotal]          = useState(0);
+  const [wotd,           setWotd]           = useState(null);
+  const [conceptCards,   setConceptCards]   = useState([]);
+  const [stats,          setStats]          = useState(null);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
@@ -160,12 +161,17 @@ export default function Home() {
   });
 
   useEffect(() => {
-    api.get('/api/concepts?limit=4')
-      .then(res => {
-        setConcepts(res.data.data || []);
-        setTotal(res.data.meta?.total || 0);
+    Promise.all([
+      api.get('/api/concepts/wotd'),
+      api.get('/api/concepts?limit=3'),
+      api.get('/api/stats'),
+    ])
+      .then(([wotdRes, cardsRes, statsRes]) => {
+        setWotd(wotdRes.data.data);
+        setConceptCards(cardsRes.data.data || []);
+        setStats(statsRes.data.data);
       })
-      .catch(() => setError('Failed to load recent concepts.'))
+      .catch(() => setError('Failed to load.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -192,14 +198,6 @@ export default function Home() {
       navigate('/concepts');
     }
   }, [searchQuery, navigate, recentSearches]);
-
-  const wotd         = concepts[0] || null;
-  const conceptCards = concepts.slice(1, 4);
-
-  const thisMonthStart = new Date();
-  thisMonthStart.setDate(1);
-  thisMonthStart.setHours(0, 0, 0, 0);
-  const addedThisMonth = concepts.filter(e => new Date(e.createdAt) >= thisMonthStart).length;
 
   const heroDate = new Date().toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
@@ -423,7 +421,9 @@ export default function Home() {
                   <span>⚡</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xl text-gold leading-none">{total.toLocaleString()}</div>
+                  <div className="font-bold text-xl text-gold leading-none">
+                    {stats?.publishedVariants != null ? stats.publishedVariants.toLocaleString() : '—'}
+                  </div>
                   <div className="font-ui text-muted text-xs mt-0.5">Words published</div>
                 </div>
               </div>
@@ -432,11 +432,12 @@ export default function Home() {
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base" style={{ background: 'rgba(0,245,180,0.1)', border: '1px solid rgba(0,245,180,0.2)' }}>
                   <span>◎</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-xl text-mint leading-none">5</div>
+                <div className="min-w-0">
+                  <div className="font-bold text-xl text-mint leading-none">
+                    {stats?.registeredUsers != null ? stats.registeredUsers.toLocaleString() : '—'}
+                  </div>
                   <div className="font-ui text-muted text-xs mt-0.5">Contributors</div>
                 </div>
-                <AvatarStack />
               </div>
 
               <div className="flex items-center gap-3">
@@ -444,7 +445,9 @@ export default function Home() {
                   <span>+</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-xl leading-none" style={{ color: '#a78bfa' }}>{addedThisMonth}</div>
+                  <div className="font-bold text-xl leading-none" style={{ color: '#a78bfa' }}>
+                    {stats?.variantsThisMonth != null ? stats.variantsThisMonth.toLocaleString() : '—'}
+                  </div>
                   <div className="font-ui text-muted text-xs mt-0.5">Added this month</div>
                 </div>
               </div>

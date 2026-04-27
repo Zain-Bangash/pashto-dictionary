@@ -9,6 +9,7 @@ const {
   suggestConcepts,
   transitionConceptStatus,
   getMyConceptSubmissions,
+  getWotd,
 } = require('../controllers/conceptController');
 
 const router = Router();
@@ -27,6 +28,7 @@ const statusValidators = [
 ];
 
 // static paths must come before /:id
+router.get('/wotd', getWotd);
 router.get('/suggest', suggestConcepts);
 router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
 router.get('/', listConcepts);

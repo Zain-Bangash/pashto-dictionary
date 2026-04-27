@@ -161,6 +161,20 @@ async function transitionConceptStatus(req, res) {
   return res.status(200).json({ success: true, data: concept });
 }
 
+async function getWotd(req, res) {
+  const today = new Date();
+  const seed  = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  const total = await Concept.countDocuments({ status: 'published' });
+  if (total === 0) return res.status(200).json({ success: true, data: null });
+  const index   = seed % total;
+  const concept = await Concept.findOne({ status: 'published' }).skip(index).lean();
+  const firstVariant = await Variant.findOne(
+    { concept: concept._id, status: 'published' },
+    'pashto phonetic region definition example'
+  ).lean();
+  return res.status(200).json({ success: true, data: { ...concept, firstVariant: firstVariant || null } });
+}
+
 async function getMyConceptSubmissions(req, res) {
   const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
@@ -176,4 +190,4 @@ async function getMyConceptSubmissions(req, res) {
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, transitionConceptStatus, getMyConceptSubmissions };
+module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd };
