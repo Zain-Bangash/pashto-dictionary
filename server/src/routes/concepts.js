@@ -1,0 +1,37 @@
+const { Router } = require('express');
+const { body } = require('express-validator');
+const { verifyToken } = require('../middleware/auth');
+const { requireModeratorOrAdmin } = require('../middleware/requireRole');
+const {
+  createConcept,
+  listConcepts,
+  getConcept,
+  suggestConcepts,
+  transitionConceptStatus,
+  getMyConceptSubmissions,
+} = require('../controllers/conceptController');
+
+const router = Router();
+
+const PART_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
+
+const createValidators = [
+  body('englishGloss').trim().notEmpty().withMessage('englishGloss is required'),
+  body('partOfSpeech').isIn(PART_OF_SPEECH).withMessage(`partOfSpeech must be one of: ${PART_OF_SPEECH.join(', ')}`),
+];
+
+const statusValidators = [
+  body('status')
+    .isIn(['approved', 'rejected', 'published'])
+    .withMessage('status must be approved, rejected, or published'),
+];
+
+// static paths must come before /:id
+router.get('/suggest', suggestConcepts);
+router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
+router.get('/', listConcepts);
+router.get('/:id', getConcept);
+router.post('/', verifyToken, createValidators, createConcept);
+router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
+
+module.exports = router;
