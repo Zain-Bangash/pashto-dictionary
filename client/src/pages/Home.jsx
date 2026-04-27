@@ -144,7 +144,6 @@ function ConceptCard({ entry }) {
 export default function Home() {
   const { user }  = useAuth();
   const navigate  = useNavigate();
-  const searchRef = useRef(null);
 
   const [wotd,           setWotd]           = useState(null);
   const [conceptCards,   setConceptCards]   = useState([]);
@@ -152,9 +151,7 @@ export default function Home() {
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
-  const [searchFocused,  setSearchFocused]  = useState(false);
   const [wotdPlaying,    setWotdPlaying]    = useState(false);
-  const [activeFilter,   setActiveFilter]   = useState(null);
   const [recentSearches, setRecentSearches] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pashto_recent') || '[]'); }
     catch { return []; }
@@ -173,17 +170,6 @@ export default function Home() {
       })
       .catch(() => setError('Failed to load.'))
       .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const handleSearch = useCallback((e) => {
@@ -219,25 +205,47 @@ export default function Home() {
     <div className="min-h-screen bg-charcoal">
       <AmbientBackground />
 
-      {/* Search spotlight dimmer */}
-      <div
-        className="fixed inset-0 transition-opacity duration-300"
-        style={{
-          zIndex: 15,
-          background: 'rgba(19,19,14,0.72)',
-          backdropFilter: 'blur(5px)',
-          opacity: searchFocused ? 1 : 0,
-          pointerEvents: searchFocused ? 'auto' : 'none',
-        }}
-        onClick={() => { setSearchFocused(false); searchRef.current?.blur(); }}
-      />
-
       <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
 
-        {/* ── 1. Hero: Word of the Day ── */}
+        {/* ── 1. Search ── */}
+        <div
+          className="search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter"
+          style={{ animationDelay: '0.05s' }}
+        >
+          <form onSubmit={handleSearch} className="relative">
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-4 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
+              placeholder="Search Pashto words…"
+            />
+            <button type="submit" className="sr-only">Search</button>
+          </form>
+
+          {recentSearches.length > 0 && (
+            <div className="flex items-center gap-2 mt-3">
+              <span className="font-ui text-muted/60 text-[9px] uppercase tracking-widest hidden sm:block">Recent:</span>
+              {recentSearches.map(s => (
+                <button
+                  key={s}
+                  onClick={() => navigate(`/concepts?q=${encodeURIComponent(s)}`)}
+                  className="font-ui text-muted hover:text-warm transition-colors text-xs flex items-center gap-1"
+                >
+                  <span className="w-1 h-1 rounded-full bg-mint/50 shrink-0" />
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── 2. Hero: Word of the Day ── */}
         <div
           className="bento-card gold-glow bg-white/[0.04] backdrop-blur-[40px] border border-white/[0.08] rounded-[48px] p-6 sm:p-8 lg:p-10 bento-enter"
-          style={{ animationDelay: '0.05s' }}
+          style={{ animationDelay: '0.15s' }}
         >
           {/* Header row */}
           <div className="flex items-center justify-between mb-5 sm:mb-7">
@@ -329,71 +337,9 @@ export default function Home() {
           )}
         </div>
 
-        {/* ── 2. Search ── */}
-        <div
-          className={`search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter transition-all${searchFocused ? ' relative z-[20]' : ''}`}
-          style={{ animationDelay: '0.15s' }}
-        >
-          <form onSubmit={handleSearch} className="relative">
-            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              ref={searchRef}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-16 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
-              placeholder="Search Pashto words…"
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white/[0.06] border border-white/10 rounded px-1.5 py-0.5 font-ui text-muted text-[9px] pointer-events-none">
-              <span>⌘</span><span>K</span>
-            </div>
-            <button type="submit" className="sr-only">Search</button>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            {['All', 'Nouns', 'Verbs', 'Phrases', 'A–Z'].map(f => (
-              <button
-                key={f}
-                onClick={() => {
-                  setActiveFilter(activeFilter === f ? null : f);
-                  if (f !== 'All') navigate(`/concepts?q=${encodeURIComponent(f.toLowerCase())}`);
-                  else navigate('/concepts');
-                }}
-                className="font-ui rounded-full text-xs px-3 py-1.5 transition-all"
-                style={{
-                  background: activeFilter === f ? 'rgba(0,245,180,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${activeFilter === f ? 'rgba(0,245,180,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                  color: activeFilter === f ? '#00f5b4' : '#666',
-                }}
-              >
-                {f}
-              </button>
-            ))}
-
-            {recentSearches.length > 0 && (
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="font-ui text-muted/60 text-[9px] uppercase tracking-widest hidden sm:block">Recent:</span>
-                {recentSearches.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => navigate(`/concepts?q=${encodeURIComponent(s)}`)}
-                    className="font-ui text-muted hover:text-warm transition-colors text-xs flex items-center gap-1"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-mint/50 shrink-0" />
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ── 3. Recent words ── */}
         {conceptCards.length > 0 && (
-          <div className="bento-enter" style={{ animationDelay: '0.25s' }}>
+          <div className="bento-enter" style={{ animationDelay: '0.28s' }}>
             <div className="flex items-center justify-between mb-3">
               <span className="font-ui text-warm/70 text-[10px] uppercase tracking-[0.14em]">Recent Words</span>
               <Link to="/concepts" className="font-ui text-mint hover:underline text-xs">View all →</Link>
