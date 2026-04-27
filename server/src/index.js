@@ -6,9 +6,10 @@ const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
-const entriesRouter = require('./routes/entries');
 const moderationRouter = require('./routes/moderation');
 const usersRouter = require('./routes/users');
+const conceptsRouter = require('./routes/concepts');
+const variantsRouter = require('./routes/variants');
 
 const app = express();
 
@@ -17,9 +18,10 @@ app.use(express.json());
 
 app.use('/api', healthRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/entries', entriesRouter);
 app.use('/api/moderation', moderationRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/concepts', conceptsRouter);
+app.use('/api/variants', variantsRouter);
 
 app.use((err, _req, res, _next) => {
   logger.error(err.message);
