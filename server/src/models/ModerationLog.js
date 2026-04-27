@@ -1,10 +1,14 @@
 const mongoose = require('mongoose');
 
 const moderationLogSchema = new mongoose.Schema({
-  entry: { type: mongoose.Schema.Types.ObjectId, ref: 'Entry', required: true },
+  // Legacy field kept for existing Entry log records
+  entry: { type: mongoose.Schema.Types.ObjectId, ref: 'Entry' },
+  // New polymorphic target fields
+  targetModel: { type: String, enum: ['Concept', 'Variant'] },
+  targetId:    { type: mongoose.Schema.Types.ObjectId },
   action: {
     type: String,
-    enum: ['submitted', 'approved', 'rejected', 'published'],
+    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted'],
     required: true,
   },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
