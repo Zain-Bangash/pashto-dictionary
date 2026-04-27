@@ -61,10 +61,20 @@ async function listConcepts(req, res) {
     filter.$text = { $search: q };
   }
 
-  const [data, total] = await Promise.all([
+  const [concepts, total] = await Promise.all([
     Concept.find(filter).skip(skip).limit(limit).lean(),
     Concept.countDocuments(filter),
   ]);
+
+  const data = await Promise.all(
+    concepts.map(async (c) => {
+      const firstVariant = await Variant.findOne(
+        { concept: c._id, status: 'published' },
+        'pashto phonetic region definition'
+      ).lean();
+      return { ...c, firstVariant: firstVariant || null };
+    })
+  );
 
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
