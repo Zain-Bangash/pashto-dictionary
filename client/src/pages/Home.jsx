@@ -161,7 +161,7 @@ export default function Home() {
         setEntries(res.data.data || []);
         setTotal(res.data.meta?.total || 0);
       })
-      .catch(() => setError('Failed to load entries.'))
+      .catch(() => setError('Failed to load recent entries.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -342,7 +342,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <p className="font-ui text-muted text-sm text-center py-8">No word of the day yet.</p>
+            <p className="font-ui text-muted text-sm text-center py-8">No entries yet.</p>
           )}
         </div>
 
