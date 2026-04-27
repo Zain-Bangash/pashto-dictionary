@@ -62,10 +62,12 @@ function AmbientBackground() {
   );
 }
 
-// ─── Word card (recent words grid) ────────────────────────────
+// ─── Word card (recent concepts grid) ─────────────────────────
 function WordCard({ entry }) {
   const [playing, setPlaying] = useState(false);
   const cardRef = useRef(null);
+  // entry is a Concept; first published variant provides pashto word
+  const firstVariant = entry.variants?.[0] ?? null;
 
   function onMouseMove(e) {
     const el = cardRef.current;
@@ -94,35 +96,31 @@ function WordCard({ entry }) {
       className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-[16px] overflow-hidden flex flex-col h-full"
       style={{ borderLeft: '2px solid rgba(196,119,90,0.5)' }}
     >
-      {/* Main content — grows to fill card height */}
       <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
 
-        {/* Pashto word + POS badge */}
+        {/* Pashto word from first variant + POS badge */}
         <div className="flex items-start justify-between gap-2">
-          <div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
-            {entry.pashto}
-          </div>
+          {firstVariant ? (
+            <div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
+              {firstVariant.pashto}
+            </div>
+          ) : (
+            <div className="font-display text-warm font-bold text-lg min-w-0">{entry.englishGloss}</div>
+          )}
           <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-2.5 uppercase tracking-wider">
             {POS_SHORT[entry.partOfSpeech] || '—'}
           </span>
         </div>
 
-        {/* Phonetic — gold, matches hero */}
-        {entry.phonetic && (
-          <div className="font-display italic text-gold/80 text-sm leading-none">{entry.phonetic}</div>
-        )}
-
-        {/* Separator */}
+        {/* English gloss */}
         <div className="h-px bg-white/[0.06]" />
 
-        {/* Definition — warm, matches hero */}
         <p dir="ltr" className="font-display italic text-gold text-xs sm:text-sm leading-relaxed min-w-0 line-clamp-3 text-left flex-1">
-          {entry.definitions?.[0]?.text}
+          {entry.englishGloss}
         </p>
 
       </div>
 
-      {/* Footer strip */}
       <div className="border-t border-white/[0.05] px-4 sm:px-5 py-2.5 flex items-center justify-end">
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaying(p => !p); }}
@@ -156,7 +154,7 @@ export default function Home() {
   });
 
   useEffect(() => {
-    api.get('/api/entries?status=published&limit=4')
+    api.get('/api/concepts?limit=4')
       .then(res => {
         setEntries(res.data.data || []);
         setTotal(res.data.meta?.total || 0);
@@ -252,93 +250,75 @@ export default function Home() {
           {wotd ? (
             <div className="flex flex-col gap-6 sm:gap-8">
 
-              {/* ── Calligraphy banner: full-width Pashto word ── */}
-              <div className="text-center" style={{ animation: 'fadeSlideIn 0.6s ease both', animationDelay: '0.08s' }}>
-                <div
-                  dir="rtl"
-                  className="pashto-bloom font-pashto text-warm font-bold select-none inline-block"
-                  style={{
-                    fontSize: 'clamp(64px, 12vw, 160px)',
-                    lineHeight: 1.5,
-                    textShadow: '0 0 60px rgba(232,197,71,0.1), 0 0 120px rgba(196,119,90,0.08)',
-                  }}
-                >
-                  {wotd.pashto}
-                </div>
-                {/* Ornamental rule */}
-                <div className="flex items-center justify-center gap-3 mt-3">
-                  <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to left, rgba(232,197,71,0.3), transparent)' }} />
-                  <div className="w-1 h-1 rounded-full bg-gold/40" />
-                  <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to right, rgba(232,197,71,0.3), transparent)' }} />
-                </div>
-              </div>
-
-              {/* ── Dictionary entry row ── */}
-              <div className="flex flex-col sm:flex-row gap-5 sm:gap-10">
-
-                {/* Left: phonetic + meta */}
-                <div className="flex flex-col gap-3 sm:w-48 shrink-0" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.22s' }}>
-                  {wotd.phonetic && (
-                    <div className="font-display italic text-gold leading-none"
-                      style={{ fontSize: 'clamp(22px, 3vw, 36px)', textShadow: '0 0 24px rgba(232,197,71,0.4)' }}
+              {/* ── Concept English gloss + first variant pashto ── */}
+              <div className="flex flex-col gap-6 sm:gap-8">
+                <div className="text-center" style={{ animation: 'fadeSlideIn 0.6s ease both', animationDelay: '0.08s' }}>
+                  {wotd.variants?.[0] ? (
+                    <div
+                      dir="rtl"
+                      className="pashto-bloom font-pashto text-warm font-bold select-none inline-block"
+                      style={{
+                        fontSize: 'clamp(64px, 12vw, 160px)',
+                        lineHeight: 1.5,
+                        textShadow: '0 0 60px rgba(232,197,71,0.1), 0 0 120px rgba(196,119,90,0.08)',
+                      }}
                     >
-                      {wotd.phonetic}
+                      {wotd.variants[0].pashto}
+                    </div>
+                  ) : (
+                    <div
+                      className="font-display text-warm font-bold select-none inline-block"
+                      style={{ fontSize: 'clamp(40px, 8vw, 100px)', lineHeight: 1.3 }}
+                    >
+                      {wotd.englishGloss}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center justify-center gap-3 mt-3">
+                    <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to left, rgba(232,197,71,0.3), transparent)' }} />
+                    <div className="w-1 h-1 rounded-full bg-gold/40" />
+                    <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to right, rgba(232,197,71,0.3), transparent)' }} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-5 sm:gap-10">
+                  <div className="flex flex-col gap-3 sm:w-48 shrink-0" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.22s' }}>
                     {wotd.partOfSpeech && (
-                      <span className="font-ui text-warm/70 border border-white/[0.1] rounded text-[10px] px-2 py-0.5 tracking-wide uppercase">
+                      <span className="font-ui text-warm/70 border border-white/[0.1] rounded text-[10px] px-2 py-0.5 tracking-wide uppercase self-start">
                         {wotd.partOfSpeech}
                       </span>
                     )}
                     <button
                       onClick={() => setWotdPlaying(p => !p)}
-                      className="listen-btn flex items-center gap-1.5 border border-terracotta/35 rounded-full text-terracotta hover:bg-terracotta/10 text-xs px-3 py-1.5"
+                      className="listen-btn flex items-center gap-1.5 border border-terracotta/35 rounded-full text-terracotta hover:bg-terracotta/10 text-xs px-3 py-1.5 self-start"
                     >
                       <Waveform color="#c4775a" animated={wotdPlaying} />
                       <span className="font-ui">{wotdPlaying ? 'Playing…' : 'Listen'}</span>
                     </button>
+                    {wotd.variants?.length > 0 && (
+                      <p className="font-ui text-muted text-xs">{wotd.variants.length} regional variant{wotd.variants.length !== 1 ? 's' : ''}</p>
+                    )}
                   </div>
-                  {wotd.submittedBy?.username && (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[8px] shrink-0"
-                        style={{ background: 'rgba(196,119,90,0.65)', color: '#fffef8' }}
-                      >
-                        {wotd.submittedBy.username[0].toUpperCase()}
-                      </div>
-                      <span className="font-ui text-muted text-xs">by {wotd.submittedBy.username}</span>
-                    </div>
-                  )}
-                </div>
 
-                {/* Right: definition + example + actions */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.32s' }}>
-                  <p dir="ltr" className="font-display italic text-warm/85 text-base sm:text-lg lg:text-xl leading-relaxed min-w-0 text-left">
-                    {wotd.definitions?.[0]?.text}
-                  </p>
-
-                  {wotd.definitions?.[0]?.example && (
-                    <div className="border-l-2 border-gold/35 pl-4">
-                      <p dir="ltr" className="font-display italic text-warm/55 text-sm min-w-0 text-left" style={{ lineHeight: 1.6 }}>
-                        {wotd.definitions[0].example}
+                  <div className="flex-1 min-w-0 flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.32s' }}>
+                    <p dir="ltr" className="font-display italic text-warm/85 text-base sm:text-lg lg:text-xl leading-relaxed min-w-0 text-left">
+                      {wotd.englishGloss}
+                    </p>
+                    {wotd.variants?.[0]?.definition && (
+                      <p dir="ltr" className="font-ui text-warm/60 text-sm leading-relaxed min-w-0 text-left">
+                        {wotd.variants[0].definition}
                       </p>
+                    )}
+                    <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>
+                      <Link
+                        to={`/entries/${wotd._id}`}
+                        className="font-ui font-semibold text-warm bg-terracotta rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:opacity-90 transition-opacity"
+                        style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.35)' }}
+                      >
+                        Explore Word →
+                      </Link>
                     </div>
-                  )}
-
-                  <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>
-                    <Link
-                      to={`/entries/${wotd._id}`}
-                      className="font-ui font-semibold text-warm bg-terracotta rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:opacity-90 transition-opacity"
-                      style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.35)' }}
-                    >
-                      Explore Word →
-                    </Link>
-                    <button className="font-ui text-warm/70 border border-white/[0.1] rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:border-white/20 hover:text-warm transition-all">
-                      + Save Word
-                    </button>
                   </div>
                 </div>
-
               </div>
             </div>
           ) : (
