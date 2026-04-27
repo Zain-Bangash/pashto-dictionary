@@ -151,7 +151,9 @@ export default function Home() {
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
+  const [searchFocused,  setSearchFocused]  = useState(false);
   const [wotdPlaying,    setWotdPlaying]    = useState(false);
+  const searchRef = useRef(null);
   const [recentSearches, setRecentSearches] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pashto_recent') || '[]'); }
     catch { return []; }
@@ -203,13 +205,25 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-charcoal">
+      {/* Search spotlight dimmer */}
+      <div
+        className="fixed inset-0 transition-opacity duration-300 pointer-events-none"
+        style={{
+          zIndex: 15,
+          background: 'rgba(19,19,14,0.72)',
+          backdropFilter: 'blur(5px)',
+          opacity: searchFocused ? 1 : 0,
+          pointerEvents: searchFocused ? 'auto' : 'none',
+        }}
+        onClick={() => { setSearchFocused(false); searchRef.current?.blur(); }}
+      />
       <AmbientBackground />
 
       <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
 
         {/* ── 1. Search ── */}
         <div
-          className="search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter"
+          className={`search-card bento-card bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl p-4 sm:p-5 bento-enter transition-all${searchFocused ? ' relative z-[20]' : ''}`}
           style={{ animationDelay: '0.05s' }}
         >
           <form onSubmit={handleSearch} className="relative">
@@ -217,10 +231,13 @@ export default function Home() {
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
             <input
+              ref={searchRef}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-4 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
               placeholder="Search Pashto words…"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
             />
             <button type="submit" className="sr-only">Search</button>
           </form>
