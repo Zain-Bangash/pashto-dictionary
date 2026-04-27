@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
-const Entry = require('../models/Entry');
+const Concept = require('../models/Concept');
+const Variant = require('../models/Variant');
 const User = require('../models/User');
 const ModerationLog = require('../models/ModerationLog');
 
@@ -25,86 +26,144 @@ afterEach(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Entry model
+// Concept model
 // ---------------------------------------------------------------------------
 
-describe('Entry model', () => {
-  const validEntry = () => ({ pashto: 'کور' });
+describe('Concept model', () => {
+  const validConcept = () => ({ englishGloss: 'house', partOfSpeech: 'noun' });
 
-  test('saves with only the required pashto field', async () => {
-    const entry = await new Entry(validEntry()).save();
-    expect(entry._id).toBeDefined();
+  test('saves with required fields', async () => {
+    const concept = await new Concept(validConcept()).save();
+    expect(concept._id).toBeDefined();
   });
 
-  test('rejects when pashto is missing', async () => {
-    await expect(new Entry({}).save()).rejects.toThrow(/pashto/i);
+  test('rejects when englishGloss is missing', async () => {
+    await expect(new Concept({ partOfSpeech: 'noun' }).save()).rejects.toThrow(/englishGloss/i);
+  });
+
+  test('rejects when partOfSpeech is missing', async () => {
+    await expect(new Concept({ englishGloss: 'house' }).save()).rejects.toThrow(/partOfSpeech/i);
   });
 
   test('defaults status to "pending"', async () => {
-    const entry = await new Entry(validEntry()).save();
-    expect(entry.status).toBe('pending');
+    const concept = await new Concept(validConcept()).save();
+    expect(concept.status).toBe('pending');
   });
 
   test('rejects an invalid status enum value', async () => {
-    const entry = new Entry({ pashto: 'کور', status: 'limbo' });
-    await expect(entry.save()).rejects.toThrow(/status/i);
+    const concept = new Concept({ ...validConcept(), status: 'limbo' });
+    await expect(concept.save()).rejects.toThrow(/status/i);
   });
 
   test('rejects an invalid partOfSpeech enum value', async () => {
-    const entry = new Entry({ pashto: 'کور', partOfSpeech: 'interjection' });
-    await expect(entry.save()).rejects.toThrow(/partOfSpeech/i);
+    const concept = new Concept({ englishGloss: 'house', partOfSpeech: 'emoji' });
+    await expect(concept.save()).rejects.toThrow(/partOfSpeech/i);
   });
 
-  test('rejects an invalid region enum value', async () => {
-    const entry = new Entry({ pashto: 'کور', region: 'Kandahar' });
-    await expect(entry.save()).rejects.toThrow(/region/i);
-  });
-
-  test('accepts all valid region values', async () => {
-    const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
-    for (const region of regions) {
-      const entry = await new Entry({ pashto: 'کور', region }).save();
-      expect(entry.region).toBe(region);
-      await Entry.deleteOne({ _id: entry._id });
-    }
-  });
-
-  test('accepts every valid partOfSpeech value', async () => {
+  test('accepts all valid partOfSpeech values', async () => {
     const values = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
     for (const pos of values) {
-      const entry = await new Entry({ pashto: 'کور', partOfSpeech: pos }).save();
-      expect(entry.partOfSpeech).toBe(pos);
-      await Entry.deleteOne({ _id: entry._id });
+      const concept = await new Concept({ englishGloss: 'house', partOfSpeech: pos }).save();
+      expect(concept.partOfSpeech).toBe(pos);
+      await Concept.deleteOne({ _id: concept._id });
     }
-  });
-
-  test('stores a definition sub-document with required text', async () => {
-    const entry = await new Entry({
-      pashto: 'کور',
-      definitions: [{ text: 'house', example: 'زه کور ته ځم' }],
-    }).save();
-    expect(entry.definitions[0].text).toBe('house');
-    expect(entry.definitions[0].example).toBe('زه کور ته ځم');
-  });
-
-  test('rejects a definition sub-document missing text', async () => {
-    const entry = new Entry({ pashto: 'کور', definitions: [{ example: 'only example' }] });
-    await expect(entry.save()).rejects.toThrow(/definitions.*text|text.*required/i);
-  });
-
-  test('sets createdAt and updatedAt timestamps', async () => {
-    const entry = await new Entry(validEntry()).save();
-    expect(entry.createdAt).toBeInstanceOf(Date);
-    expect(entry.updatedAt).toBeInstanceOf(Date);
   });
 
   test('accepts all valid status enum values', async () => {
     const statuses = ['pending', 'approved', 'rejected', 'published'];
     for (const status of statuses) {
-      const entry = await new Entry({ pashto: 'کور', status }).save();
-      expect(entry.status).toBe(status);
-      await Entry.deleteOne({ _id: entry._id });
+      const concept = await new Concept({ ...validConcept(), status }).save();
+      expect(concept.status).toBe(status);
+      await Concept.deleteOne({ _id: concept._id });
     }
+  });
+
+  test('sets createdAt and updatedAt timestamps', async () => {
+    const concept = await new Concept(validConcept()).save();
+    expect(concept.createdAt).toBeInstanceOf(Date);
+    expect(concept.updatedAt).toBeInstanceOf(Date);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Variant model
+// ---------------------------------------------------------------------------
+
+describe('Variant model', () => {
+  let conceptId;
+
+  beforeEach(async () => {
+    const concept = await new Concept({ englishGloss: 'house', partOfSpeech: 'noun' }).save();
+    conceptId = concept._id;
+  });
+
+  const validVariant = () => ({
+    concept: conceptId,
+    pashto: 'کور',
+    region: 'Kohat',
+    definition: 'a dwelling place',
+  });
+
+  test('saves with required fields', async () => {
+    const variant = await new Variant(validVariant()).save();
+    expect(variant._id).toBeDefined();
+  });
+
+  test('rejects when pashto is missing', async () => {
+    const { pashto: _p, ...data } = validVariant();
+    await expect(new Variant(data).save()).rejects.toThrow(/pashto/i);
+  });
+
+  test('rejects when region is missing', async () => {
+    const { region: _r, ...data } = validVariant();
+    await expect(new Variant(data).save()).rejects.toThrow(/region/i);
+  });
+
+  test('rejects when definition is missing', async () => {
+    const { definition: _d, ...data } = validVariant();
+    await expect(new Variant(data).save()).rejects.toThrow(/definition/i);
+  });
+
+  test('rejects when concept ref is missing', async () => {
+    const { concept: _c, ...data } = validVariant();
+    await expect(new Variant(data).save()).rejects.toThrow(/concept/i);
+  });
+
+  test('rejects an invalid region enum value', async () => {
+    const variant = new Variant({ ...validVariant(), region: 'Kandahar' });
+    await expect(variant.save()).rejects.toThrow(/region/i);
+  });
+
+  test('accepts all valid region values', async () => {
+    const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+    let counter = 0;
+    for (const region of regions) {
+      const variant = await new Variant({ ...validVariant(), region, pashto: `کور${counter++}` }).save();
+      expect(variant.region).toBe(region);
+      await Variant.deleteOne({ _id: variant._id });
+    }
+  });
+
+  test('defaults status to "pending"', async () => {
+    const variant = await new Variant(validVariant()).save();
+    expect(variant.status).toBe('pending');
+  });
+
+  test('rejects an invalid status enum value', async () => {
+    const variant = new Variant({ ...validVariant(), status: 'limbo' });
+    await expect(variant.save()).rejects.toThrow(/status/i);
+  });
+
+  test('sets createdAt and updatedAt timestamps', async () => {
+    const variant = await new Variant(validVariant()).save();
+    expect(variant.createdAt).toBeInstanceOf(Date);
+    expect(variant.updatedAt).toBeInstanceOf(Date);
+  });
+
+  test('stores optional phonetic and example fields', async () => {
+    const variant = await new Variant({ ...validVariant(), phonetic: 'kor', example: 'دا کور دی' }).save();
+    expect(variant.phonetic).toBe('kor');
+    expect(variant.example).toBe('دا کور دی');
   });
 });
 
@@ -185,12 +244,12 @@ describe('User model', () => {
 // ---------------------------------------------------------------------------
 
 describe('ModerationLog model', () => {
-  let entryId;
+  let conceptId;
   let userId;
 
   beforeEach(async () => {
-    const entry = await new Entry({ pashto: 'کور' }).save();
-    entryId = entry._id;
+    const concept = await new Concept({ englishGloss: 'house', partOfSpeech: 'noun' }).save();
+    conceptId = concept._id;
     const user = await new User({
       username: 'loguser',
       email: 'loguser@example.com',
@@ -200,7 +259,8 @@ describe('ModerationLog model', () => {
   });
 
   const validLog = () => ({
-    entry: entryId,
+    targetModel: 'Concept',
+    targetId: conceptId,
     action: 'submitted',
     performedBy: userId,
   });
@@ -208,11 +268,6 @@ describe('ModerationLog model', () => {
   test('saves with all required fields', async () => {
     const log = await new ModerationLog(validLog()).save();
     expect(log._id).toBeDefined();
-  });
-
-  test('rejects when entry is missing', async () => {
-    const { entry: _e, ...data } = validLog();
-    await expect(new ModerationLog(data).save()).rejects.toThrow(/entry/i);
   });
 
   test('rejects when action is missing', async () => {
@@ -231,7 +286,7 @@ describe('ModerationLog model', () => {
   });
 
   test('accepts all valid action enum values', async () => {
-    const actions = ['submitted', 'approved', 'rejected', 'published'];
+    const actions = ['submitted', 'approved', 'rejected', 'published', 'resubmitted'];
     for (const action of actions) {
       const log = await new ModerationLog({ ...validLog(), action }).save();
       expect(log.action).toBe(action);
@@ -249,5 +304,11 @@ describe('ModerationLog model', () => {
   test('stores an optional note', async () => {
     const log = await new ModerationLog({ ...validLog(), note: 'Looks good' }).save();
     expect(log.note).toBe('Looks good');
+  });
+
+  test('stores targetModel and targetId correctly', async () => {
+    const log = await new ModerationLog(validLog()).save();
+    expect(log.targetModel).toBe('Concept');
+    expect(log.targetId.toString()).toBe(conceptId.toString());
   });
 });

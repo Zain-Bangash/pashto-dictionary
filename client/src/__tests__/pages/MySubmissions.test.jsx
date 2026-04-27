@@ -22,15 +22,36 @@ const renderMySubmissions = (initialEntries = ['/my-submissions']) =>
     </MemoryRouter>
   );
 
-const mockEntry = (overrides = {}) => ({
-  _id: 'entry1',
-  pashto: 'کور',
-  definitions: [{ text: 'house' }],
+const mockConcept = (overrides = {}) => ({
+  _id: 'concept1',
+  englishGloss: 'house',
   partOfSpeech: 'noun',
   status: 'pending',
   createdAt: '2024-01-01T00:00:00.000Z',
   ...overrides,
 });
+
+const mockVariant = (overrides = {}) => ({
+  _id: 'variant1',
+  pashto: 'کور',
+  definition: 'a dwelling place',
+  region: 'Kohat',
+  status: 'pending',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+function mockBothEmpty() {
+  api.get
+    .mockResolvedValueOnce({ data: { success: true, data: [] } })
+    .mockResolvedValueOnce({ data: { success: true, data: [] } });
+}
+
+function mockWithData(concepts = [], variants = []) {
+  api.get
+    .mockResolvedValueOnce({ data: { success: true, data: concepts } })
+    .mockResolvedValueOnce({ data: { success: true, data: variants } });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,86 +59,95 @@ beforeEach(() => {
 
 describe('MySubmissions page', () => {
   it('shows a loading state while fetching submissions', () => {
-    api.get.mockReturnValueOnce(new Promise(() => {}));
+    api.get.mockReturnValue(new Promise(() => {}));
     renderMySubmissions();
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
   it('shows an error state when the API call fails', async () => {
-    api.get.mockRejectedValueOnce(new Error('Network error'));
+    api.get.mockRejectedValue(new Error('Network error'));
     renderMySubmissions();
     expect(await screen.findByText(/failed to load/i)).toBeInTheDocument();
   });
 
   it('shows an empty state message when there are no submissions', async () => {
-    api.get.mockResolvedValueOnce({ data: { success: true, data: [] } });
+    mockBothEmpty();
     renderMySubmissions();
     expect(await screen.findByText(/no submissions/i)).toBeInTheDocument();
   });
 
-  it('renders the pashto word for each submission', async () => {
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [mockEntry({ pashto: 'کور' }), mockEntry({ _id: 'entry2', pashto: 'اوبه' })] },
-    });
+  it('renders the englishGloss for each submitted concept', async () => {
+    mockWithData(
+      [mockConcept({ englishGloss: 'house' }), mockConcept({ _id: 'concept2', englishGloss: 'water' })],
+      []
+    );
+    renderMySubmissions();
+    expect(await screen.findByText('house')).toBeInTheDocument();
+    expect(screen.getByText('water')).toBeInTheDocument();
+  });
+
+  it('renders the pashto word for each submitted variant', async () => {
+    mockWithData(
+      [],
+      [mockVariant({ pashto: 'کور' }), mockVariant({ _id: 'v2', pashto: 'اوبه' })]
+    );
     renderMySubmissions();
     expect(await screen.findByText('کور')).toBeInTheDocument();
     expect(screen.getByText('اوبه')).toBeInTheDocument();
   });
 
-  it('renders a "pending" status badge for pending entries', async () => {
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [mockEntry({ status: 'pending' })] },
-    });
+  it('renders a "pending" status badge for pending items', async () => {
+    mockWithData([mockConcept({ status: 'pending' })], []);
     renderMySubmissions();
     expect(await screen.findByText(/pending/i)).toBeInTheDocument();
   });
 
-  it('renders an "approved" status badge for approved entries', async () => {
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [mockEntry({ status: 'approved' })] },
-    });
+  it('renders an "approved" status badge for approved items', async () => {
+    mockWithData([mockConcept({ status: 'approved' })], []);
     renderMySubmissions();
     expect(await screen.findByText(/approved/i)).toBeInTheDocument();
   });
 
-  it('renders a "rejected" status badge for rejected entries', async () => {
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [mockEntry({ status: 'rejected', moderatorNote: 'Duplicate entry' })] },
-    });
+  it('renders a "rejected" status badge for rejected items', async () => {
+    mockWithData([mockConcept({ status: 'rejected', moderatorNote: 'Duplicate entry' })], []);
     renderMySubmissions();
     expect(await screen.findByText(/rejected/i)).toBeInTheDocument();
   });
 
-  it('renders a "published" status badge for published entries', async () => {
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [mockEntry({ status: 'published' })] },
-    });
+  it('renders a "published" status badge for published items', async () => {
+    mockWithData([mockConcept({ status: 'published' })], []);
     renderMySubmissions();
     expect(await screen.findByText(/published/i)).toBeInTheDocument();
   });
 
-  it('shows the moderator note when an entry is rejected', async () => {
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ status: 'rejected', moderatorNote: 'Duplicate entry' })],
-      },
-    });
+  it('shows the moderator note when a concept is rejected', async () => {
+    mockWithData(
+      [mockConcept({ status: 'rejected', moderatorNote: 'Duplicate entry' })],
+      []
+    );
     renderMySubmissions();
     expect(await screen.findByText(/duplicate entry/i)).toBeInTheDocument();
   });
 
-  it('calls the API endpoint scoped to the current user submissions', async () => {
-    api.get.mockResolvedValueOnce({ data: { success: true, data: [] } });
+  it('shows the moderator note when a variant is rejected', async () => {
+    mockWithData(
+      [],
+      [mockVariant({ status: 'rejected', moderatorNote: 'Wrong spelling' })]
+    );
+    renderMySubmissions();
+    expect(await screen.findByText(/wrong spelling/i)).toBeInTheDocument();
+  });
+
+  it('calls /api/concepts/my-submissions and /api/variants/my-submissions', async () => {
+    mockBothEmpty();
     renderMySubmissions();
     await screen.findByText(/no submissions/i);
-    expect(api.get).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/entries\/my-submissions|\/api\/entries\?submittedBy=/)
-    );
+    expect(api.get).toHaveBeenCalledWith('/api/concepts/my-submissions');
+    expect(api.get).toHaveBeenCalledWith('/api/variants/my-submissions');
   });
 
   it('has a link or button to submit a new entry', async () => {
-    api.get.mockResolvedValueOnce({ data: { success: true, data: [] } });
+    mockBothEmpty();
     renderMySubmissions();
     await screen.findByText(/no submissions/i);
     expect(

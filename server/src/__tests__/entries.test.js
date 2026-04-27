@@ -8,13 +8,16 @@ const jwt = require('jsonwebtoken');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 require('express-async-errors');
-const entriesRouter = require('../routes/entries');
-const Entry = require('../models/Entry');
+const conceptsRouter = require('../routes/concepts');
+const variantsRouter = require('../routes/variants');
+const Concept = require('../models/Concept');
+const Variant = require('../models/Variant');
 const ModerationLog = require('../models/ModerationLog');
 
 const app = express();
 app.use(express.json());
-app.use('/api/entries', entriesRouter);
+app.use('/api/concepts', conceptsRouter);
+app.use('/api/variants', variantsRouter);
 app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({
     success: false,
@@ -53,12 +56,12 @@ afterEach(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/entries
+// GET /api/concepts
 // ---------------------------------------------------------------------------
 
-describe('GET /api/entries', () => {
-  test('returns 200 with empty data when no published entries exist', async () => {
-    const res = await request.get('/api/entries');
+describe('GET /api/concepts', () => {
+  test('returns 200 with empty data when no published concepts exist', async () => {
+    const res = await request.get('/api/concepts');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual([]);
@@ -66,215 +69,179 @@ describe('GET /api/entries', () => {
     expect(res.body.meta.total).toBe(0);
   });
 
-  test('returns only published entries', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'سپی', status: 'pending' },
-      { pashto: 'اوبه', status: 'approved' },
+  test('returns only published concepts by default', async () => {
+    await Concept.create([
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'pending' },
+      { englishGloss: 'water', partOfSpeech: 'noun', status: 'approved' },
     ]);
-    const res = await request.get('/api/entries');
+    const res = await request.get('/api/concepts');
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0].pashto).toBe('کور');
+    expect(res.body.data[0].englishGloss).toBe('house');
   });
 
   test('returns correct meta with page and limit', async () => {
-    const res = await request.get('/api/entries?page=2&limit=10');
+    const res = await request.get('/api/concepts?page=2&limit=10');
     expect(res.status).toBe(200);
     expect(res.body.meta.page).toBe(2);
     expect(res.body.meta.limit).toBe(10);
   });
 
   test('caps limit at 50', async () => {
-    const res = await request.get('/api/entries?limit=100');
+    const res = await request.get('/api/concepts?limit=100');
     expect(res.status).toBe(200);
     expect(res.body.meta.limit).toBe(50);
   });
 
   test('defaults page to 1 and limit to 20', async () => {
-    const res = await request.get('/api/entries');
+    const res = await request.get('/api/concepts');
     expect(res.body.meta.page).toBe(1);
     expect(res.body.meta.limit).toBe(20);
   });
 
   test('response matches envelope shape', async () => {
-    const res = await request.get('/api/entries');
+    const res = await request.get('/api/concepts');
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body).toHaveProperty('meta');
   });
+
+  test('returns pending concepts when status=pending filter is used', async () => {
+    await Concept.create([
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'pending' },
+    ]);
+    const res = await request.get('/api/concepts?status=pending');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].englishGloss).toBe('dog');
+  });
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/entries/search
+// GET /api/concepts/suggest
 // ---------------------------------------------------------------------------
 
-describe('GET /api/entries/search', () => {
+describe('GET /api/concepts/suggest', () => {
   test('returns 400 when q is missing', async () => {
-    const res = await request.get('/api/entries/search');
+    const res = await request.get('/api/concepts/suggest');
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
-    expect(res.body.error.message).toBe('Search query is required');
   });
 
-  test('returns 400 when q is empty string', async () => {
-    const res = await request.get('/api/entries/search?q=');
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error.message).toBe('Search query is required');
-  });
-
-  test('returns 200 with results when q is provided', async () => {
-    await Entry.create({ pashto: 'کور', status: 'published' });
-    const res = await request.get('/api/entries/search?q=کور');
+  test('returns up to 5 matching concepts', async () => {
+    await Concept.create([
+      { englishGloss: 'house',   partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'house2',  partOfSpeech: 'noun', status: 'pending' },
+      { englishGloss: 'water',   partOfSpeech: 'noun', status: 'published' },
+    ]);
+    const res = await request.get('/api/concepts/suggest?q=house');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.meta).toBeDefined();
-  });
-
-  test('does not return non-published entries in search', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'کور', status: 'pending' },
-    ]);
-    const res = await request.get('/api/entries/search?q=کور');
-    expect(res.status).toBe(200);
-    const statuses = res.body.data.map((e) => e.status);
-    expect(statuses.every((s) => s === 'published')).toBe(true);
+    const glosses = res.body.data.map((c) => c.englishGloss);
+    expect(glosses).toContain('house');
   });
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/entries/:id
+// GET /api/concepts/:id
 // ---------------------------------------------------------------------------
 
-describe('GET /api/entries/:id', () => {
+describe('GET /api/concepts/:id', () => {
   test('returns 400 for invalid ObjectId', async () => {
-    const res = await request.get('/api/entries/not-an-id');
+    const res = await request.get('/api/concepts/not-an-id');
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
-    expect(res.body.error.message).toBeDefined();
   });
 
-  test('returns 404 when entry does not exist', async () => {
+  test('returns 404 when concept does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const res = await request.get(`/api/entries/${fakeId}`);
+    const res = await request.get(`/api/concepts/${fakeId}`);
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 404 when entry exists but is not published', async () => {
-    const entry = await Entry.create({ pashto: 'کور', status: 'pending' });
-    const res = await request.get(`/api/entries/${entry._id}`);
+  test('returns 404 when concept exists but is not published', async () => {
+    const concept = await Concept.create({ englishGloss: 'dog', partOfSpeech: 'noun', status: 'pending' });
+    const res = await request.get(`/api/concepts/${concept._id}`);
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 200 with entry when published', async () => {
-    const entry = await Entry.create({ pashto: 'کور', status: 'published' });
-    const res = await request.get(`/api/entries/${entry._id}`);
+  test('returns 200 with concept and variants when published', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
+    const res = await request.get(`/api/concepts/${concept._id}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.pashto).toBe('کور');
+    expect(res.body.data.englishGloss).toBe('house');
+    expect(Array.isArray(res.body.data.variants)).toBe(true);
   });
 
   test('response uses envelope shape', async () => {
-    const entry = await Entry.create({ pashto: 'کور', status: 'published' });
-    const res = await request.get(`/api/entries/${entry._id}`);
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
+    const res = await request.get(`/api/concepts/${concept._id}`);
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
   });
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/entries
+// POST /api/concepts
 // ---------------------------------------------------------------------------
 
-describe('POST /api/entries', () => {
-  const valid = () => ({
-    pashto: 'کور',
-    definitions: [{ text: 'house' }],
-  });
+describe('POST /api/concepts', () => {
+  const valid = () => ({ englishGloss: 'house', partOfSpeech: 'noun' });
 
   test('returns 401 when no token provided', async () => {
-    const res = await request.post('/api/entries').send(valid());
+    const res = await request.post('/api/concepts').send(valid());
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 400 when pashto is missing', async () => {
+  test('returns 400 when englishGloss is missing', async () => {
     const token = makeToken();
-    const { pashto: _p, ...body } = valid();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(body);
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ partOfSpeech: 'noun' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 400 when definitions array is empty', async () => {
+  test('returns 400 when partOfSpeech is missing', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...valid(), definitions: [] });
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 400 when definitions is missing', async () => {
+  test('returns 400 when partOfSpeech is invalid', async () => {
     const token = makeToken();
-    const { definitions: _d, ...body } = valid();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(body);
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house', partOfSpeech: 'emoji' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
-  test('returns 400 when a definition is missing text', async () => {
+  test('returns 201 with created concept on valid input', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...valid(), definitions: [{ example: 'only example' }] });
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-  });
-
-  test('returns 201 with created entry on valid input', async () => {
-    const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.pashto).toBe('کور');
+    expect(res.body.data.englishGloss).toBe('house');
   });
 
   test('sets status to pending on creation', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('pending');
   });
 
   test('creates a ModerationLog entry with action "submitted"', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
-    const log = await ModerationLog.findOne({ entry: res.body.data._id });
+    const log = await ModerationLog.findOne({ targetId: res.body.data._id, targetModel: 'Concept' });
     expect(log).not.toBeNull();
     expect(log.action).toBe('submitted');
   });
@@ -282,265 +249,197 @@ describe('POST /api/entries', () => {
   test('sets submittedBy from the token user id', async () => {
     const userId = new mongoose.Types.ObjectId().toString();
     const token = makeToken({ id: userId });
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.data.submittedBy).toBe(userId);
   });
 
   test('response uses envelope shape', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
   });
-
-  test('accepts optional fields phonetic, region, partOfSpeech', async () => {
-    const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        ...valid(),
-        phonetic: 'kor',
-        region: 'Kohat',
-        partOfSpeech: 'noun',
-      });
-    expect(res.status).toBe(201);
-    expect(res.body.data.phonetic).toBe('kor');
-    expect(res.body.data.region).toBe('Kohat');
-    expect(res.body.data.partOfSpeech).toBe('noun');
-  });
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/entries — additional edge cases
+// POST /api/variants
 // ---------------------------------------------------------------------------
 
-describe('GET /api/entries — edge cases', () => {
-  test('page=0 is clamped to 1', async () => {
-    const res = await request.get('/api/entries?page=0');
-    expect(res.status).toBe(200);
-    expect(res.body.meta.page).toBe(1);
+describe('POST /api/variants', () => {
+  let conceptId;
+
+  beforeEach(async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
+    conceptId = concept._id.toString();
   });
 
-  test('page=-1 is clamped to 1', async () => {
-    const res = await request.get('/api/entries?page=-1');
-    expect(res.status).toBe(200);
-    expect(res.body.meta.page).toBe(1);
-  });
-
-  test('limit=0 falls back to default of 20 (falsy parseInt coerces to default)', async () => {
-    // parseInt('0') === 0 which is falsy, so `0 || 20` evaluates to 20
-    const res = await request.get('/api/entries?limit=0');
-    expect(res.status).toBe(200);
-    expect(res.body.meta.limit).toBe(20);
-  });
-
-  test('rejected entries are excluded from listing', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'سپی', status: 'rejected' },
-    ]);
-    const res = await request.get('/api/entries');
-    expect(res.status).toBe(200);
-    const statuses = res.body.data.map((e) => e.status);
-    expect(statuses.every((s) => s === 'published')).toBe(true);
-    expect(res.body.data).toHaveLength(1);
-  });
-
-  test('meta.total reflects only published count', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'سپی', status: 'pending' },
-      { pashto: 'اوبه', status: 'approved' },
-      { pashto: 'ښار', status: 'rejected' },
-    ]);
-    const res = await request.get('/api/entries');
-    expect(res.status).toBe(200);
-    expect(res.body.meta.total).toBe(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/entries/search — additional edge cases
-// ---------------------------------------------------------------------------
-
-describe('GET /api/entries/search — additional edge cases', () => {
-  test('whitespace-only q returns 400', async () => {
-    const res = await request.get('/api/entries/search?q=%20%20%20');
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error.message).toBe('Search query is required');
-  });
-
-  test('approved entries are excluded from search results', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'کور', status: 'approved' },
-    ]);
-    const res = await request.get('/api/entries/search?q=کور');
-    expect(res.status).toBe(200);
-    const statuses = res.body.data.map((e) => e.status);
-    expect(statuses.every((s) => s === 'published')).toBe(true);
-  });
-
-  test('rejected entries are excluded from search results', async () => {
-    await Entry.create([
-      { pashto: 'کور', status: 'published' },
-      { pashto: 'کور', status: 'rejected' },
-    ]);
-    const res = await request.get('/api/entries/search?q=کور');
-    expect(res.status).toBe(200);
-    const statuses = res.body.data.map((e) => e.status);
-    expect(statuses.every((s) => s === 'published')).toBe(true);
-  });
-
-  test('search response has meta with page, limit, total', async () => {
-    await Entry.create({ pashto: 'کور', status: 'published' });
-    const res = await request.get('/api/entries/search?q=کور');
-    expect(res.status).toBe(200);
-    expect(res.body.meta).toHaveProperty('page');
-    expect(res.body.meta).toHaveProperty('limit');
-    expect(res.body.meta).toHaveProperty('total');
-  });
-
-  test('search caps limit at 50', async () => {
-    const res = await request.get('/api/entries/search?q=کور&limit=200');
-    expect(res.status).toBe(200);
-    expect(res.body.meta.limit).toBe(50);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/entries/:id — additional status cases
-// ---------------------------------------------------------------------------
-
-describe('GET /api/entries/:id — non-published statuses', () => {
-  test('approved entry returns 404', async () => {
-    const entry = await Entry.create({ pashto: 'کور', status: 'approved' });
-    const res = await request.get(`/api/entries/${entry._id}`);
-    expect(res.status).toBe(404);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error.message).toBeDefined();
-  });
-
-  test('rejected entry returns 404', async () => {
-    const entry = await Entry.create({ pashto: 'کور', status: 'rejected' });
-    const res = await request.get(`/api/entries/${entry._id}`);
-    expect(res.status).toBe(404);
-    expect(res.body.success).toBe(false);
-  });
-
-  test('400 error response has success:false and error.message', async () => {
-    const res = await request.get('/api/entries/not-valid-id');
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toBeDefined();
-    expect(res.body.error.message).toBe('Invalid entry id');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/entries — additional validation and ModerationLog cases
-// ---------------------------------------------------------------------------
-
-describe('POST /api/entries — additional validation', () => {
   const valid = () => ({
+    conceptId,
     pashto: 'کور',
-    definitions: [{ text: 'house' }],
+    region: 'Kohat',
+    definition: 'a dwelling place',
   });
 
-  test('invalid partOfSpeech enum value returns 400', async () => {
+  test('returns 401 when no token provided', async () => {
+    const res = await request.post('/api/variants').send(valid());
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 400 when pashto is missing', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...valid(), partOfSpeech: 'emoji' });
+    const { pashto: _p, ...body } = valid();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
-  test('invalid region value returns 400', async () => {
+  test('returns 400 when region is missing', async () => {
     const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...valid(), region: 'Kandahar' });
+    const { region: _r, ...body } = valid();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
+  });
+
+  test('returns 400 when definition is missing', async () => {
+    const token = makeToken();
+    const { definition: _d, ...body } = valid();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 400 when region is invalid', async () => {
+    const token = makeToken();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send({ ...valid(), region: 'Kandahar' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 201 with created variant on valid input', async () => {
+    const token = makeToken();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.pashto).toBe('کور');
+  });
+
+  test('sets status to pending on creation', async () => {
+    const token = makeToken();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
+    expect(res.status).toBe(201);
+    expect(res.body.data.status).toBe('pending');
+  });
+
+  test('returns 409 when pashto word already exists', async () => {
+    const token = makeToken();
+    await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
+    expect(res.status).toBe(409);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('creates a ModerationLog entry with action "submitted"', async () => {
+    const token = makeToken();
+    const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
+    expect(res.status).toBe(201);
+    const log = await ModerationLog.findOne({ targetId: res.body.data._id, targetModel: 'Variant' });
+    expect(log).not.toBeNull();
+    expect(log.action).toBe('submitted');
   });
 
   test('accepts all valid region values', async () => {
     const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+    let pashtoCounter = 0;
     for (const region of regions) {
       const token = makeToken();
-      const res = await request
-        .post('/api/entries')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ ...valid(), region });
+      const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send({
+        ...valid(), region, pashto: `کور${pashtoCounter++}`,
+      });
       expect(res.status).toBe(201);
       expect(res.body.data.region).toBe(region);
     }
   });
+});
 
-  test('returns 400 when second definition in array is missing text', async () => {
-    const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...valid(), definitions: [{ text: 'house' }, { example: 'only example' }] });
+// ---------------------------------------------------------------------------
+// PATCH /api/concepts/:id/status
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/concepts/:id/status', () => {
+  test('returns 401 with no token', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await request.patch(`/api/concepts/${fakeId}/status`).send({ status: 'approved' });
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 403 for user role', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'user' });
+    const res = await request.patch(`/api/concepts/${fakeId}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
+    expect(res.status).toBe(403);
+  });
+
+  test('returns 400 for invalid ObjectId', async () => {
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch('/api/concepts/bad-id/status').set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 200 and approves a pending concept', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+
+  test('returns 400 when rejecting without moderatorNote', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'rejected' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
-  test('validation error response includes error.field', async () => {
-    const token = makeToken();
-    const { pashto: _p, ...body } = valid();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(body);
-    expect(res.status).toBe(400);
-    expect(res.body.error.field).toBeDefined();
+  test('returns 200 and rejects with a note', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'rejected', moderatorNote: 'Not accurate' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('rejected');
+    expect(res.body.data.moderatorNote).toBe('Not accurate');
   });
 
-  test('ModerationLog performedBy matches token user id', async () => {
-    const userId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ id: userId });
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
-    expect(res.status).toBe(201);
-    const log = await ModerationLog.findOne({ entry: res.body.data._id });
+  test('returns 403 when non-admin tries to publish', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
+    expect(res.status).toBe(403);
+  });
+
+  test('admin can publish an approved concept', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
+    const token = makeToken({ role: 'admin' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('published');
+  });
+
+  test('writes ModerationLog on status transition', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
+    const log = await ModerationLog.findOne({ targetId: concept._id, targetModel: 'Concept', action: 'approved' });
     expect(log).not.toBeNull();
-    expect(log.performedBy.toString()).toBe(userId);
   });
 
-  test('ModerationLog entry field references the created entry id', async () => {
-    const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send(valid());
-    expect(res.status).toBe(201);
-    const log = await ModerationLog.findOne({ entry: res.body.data._id });
-    expect(log).not.toBeNull();
-    expect(log.entry.toString()).toBe(res.body.data._id);
-  });
-
-  test('returns 400 when pashto is whitespace only', async () => {
-    const token = makeToken();
-    const res = await request
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ pashto: '   ', definitions: [{ text: 'house' }] });
+  test('returns 400 for invalid status transition', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
   });
 });

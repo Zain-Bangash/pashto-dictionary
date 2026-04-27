@@ -3,8 +3,8 @@
  *
  * Tests for:
  *  - /dashboard          summary stats page
- *  - /dashboard/queue    moderation queue with approve/reject actions
- *  - /dashboard/entries  all entries with status filter
+ *  - /dashboard/queue    moderation queue with approve/reject actions (Concepts + Variants tabs)
+ *  - /dashboard/entries  all concepts with status filter
  *  - /dashboard/users    user list (admin only)
  *  - /dashboard/log      moderation audit log (admin only)
  *  - DashboardLayout     role-based nav items
@@ -19,7 +19,7 @@ import api from '../../services/api';
 import DashboardLayout from '../../pages/dashboard/DashboardLayout';
 import DashboardHome from '../../pages/dashboard/DashboardHome';
 import DashboardQueue from '../../pages/dashboard/DashboardQueue';
-import DashboardEntries from '../../pages/dashboard/DashboardEntries';
+import DashboardConcepts from '../../pages/dashboard/DashboardConcepts';
 import DashboardUsers from '../../pages/dashboard/DashboardUsers';
 import DashboardLog from '../../pages/dashboard/DashboardLog';
 
@@ -51,11 +51,21 @@ const asModerator = () =>
 const asAdmin = () =>
   mockUseAuth.mockReturnValue({ user: { _id: 'u3', role: 'admin' }, token: 'tok' });
 
-const mockEntry = (overrides = {}) => ({
+const mockConcept = (overrides = {}) => ({
   _id: 'e1',
-  pashto: 'کور',
-  definitions: [{ text: 'house' }],
+  englishGloss: 'house',
   partOfSpeech: 'noun',
+  status: 'pending',
+  submittedBy: { username: 'testuser' },
+  createdAt: '2024-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const mockVariant = (overrides = {}) => ({
+  _id: 'v1',
+  pashto: 'کور',
+  definition: 'a dwelling place',
+  region: 'Kohat',
   status: 'pending',
   submittedBy: { username: 'testuser' },
   createdAt: '2024-01-01T00:00:00.000Z',
@@ -80,6 +90,19 @@ const mockLogEntry = (overrides = {}) => ({
   timestamp: '2024-01-01T00:00:00.000Z',
   ...overrides,
 });
+
+// Helper: queue page mocks two API calls (concepts queue + variants queue)
+function mockQueueBothEmpty() {
+  api.get
+    .mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } })
+    .mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } });
+}
+
+function mockQueueWithConcepts(concepts = [], variants = []) {
+  api.get
+    .mockResolvedValueOnce({ data: { success: true, data: concepts, meta: { page: 1, limit: 20, total: concepts.length } } })
+    .mockResolvedValueOnce({ data: { success: true, data: variants, meta: { page: 1, limit: 20, total: variants.length } } });
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -106,10 +129,10 @@ describe('DashboardLayout — role-based navigation', () => {
     expect(screen.getByRole('link', { name: /queue/i })).toBeInTheDocument();
   });
 
-  it('renders the entries nav link for a moderator', () => {
+  it('renders the concepts nav link for a moderator', () => {
     asModerator();
     renderLayout();
-    expect(screen.getByRole('link', { name: /entries/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /concepts/i })).toBeInTheDocument();
   });
 
   it('does NOT render the users nav link for a moderator', () => {
@@ -264,148 +287,107 @@ describe('DashboardQueue page — moderation queue', () => {
 
   it('shows a loading state while fetching the queue', () => {
     asModerator();
-    api.get.mockReturnValueOnce(new Promise(() => {}));
+    api.get.mockReturnValue(new Promise(() => {}));
     renderQueue();
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
   it('shows an error state when the queue API call fails', async () => {
     asModerator();
-    api.get.mockRejectedValueOnce(new Error('Network error'));
+    api.get.mockRejectedValue(new Error('Network error'));
     renderQueue();
     expect(await screen.findByText(/error|failed/i)).toBeInTheDocument();
   });
 
-  it('shows an empty state when there are no pending entries', async () => {
+  it('shows an empty state when there are no pending items', async () => {
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } },
-    });
+    mockQueueBothEmpty();
     renderQueue();
     expect(await screen.findByText(/no entries|empty|nothing/i)).toBeInTheDocument();
   });
 
-  it('renders the pashto word for each pending entry', async () => {
+  it('renders concept englishGloss in the concepts tab', async () => {
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ pashto: 'کور' }), mockEntry({ _id: 'e2', pashto: 'اوبه' })],
-        meta: { page: 1, limit: 20, total: 2 },
-      },
-    });
+    mockQueueWithConcepts(
+      [mockConcept({ englishGloss: 'house' }), mockConcept({ _id: 'e2', englishGloss: 'water' })],
+      []
+    );
     renderQueue();
-    expect(await screen.findByText('کور')).toBeInTheDocument();
-    expect(screen.getByText('اوبه')).toBeInTheDocument();
+    expect(await screen.findByText('house')).toBeInTheDocument();
+    expect(screen.getByText('water')).toBeInTheDocument();
   });
 
-  it('renders an Approve button for each pending entry', async () => {
+  it('renders an Approve button for each pending item', async () => {
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry()],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept()], []);
     renderQueue();
     expect(
       await screen.findByRole('button', { name: /approve/i })
     ).toBeInTheDocument();
   });
 
-  it('renders a Reject button for each pending entry', async () => {
+  it('renders a Reject button for each pending item', async () => {
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry()],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept()], []);
     renderQueue();
     expect(
       await screen.findByRole('button', { name: /reject/i })
     ).toBeInTheDocument();
   });
 
-  it('calls PATCH /api/moderation/:id/approve when Approve is clicked', async () => {
+  it('calls PATCH /api/concepts/:id/status when Approve is clicked in concepts tab', async () => {
     const user = userEvent.setup();
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ _id: 'entry123' })],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept({ _id: 'concept123' })], []);
     api.patch.mockResolvedValueOnce({
-      data: { success: true, data: { _id: 'entry123', status: 'approved' } },
+      data: { success: true, data: { _id: 'concept123', status: 'approved' } },
     });
     renderQueue();
     await user.click(await screen.findByRole('button', { name: /approve/i }));
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/moderation\/entry123\/approve/),
+        expect.stringMatching(/\/api\/concepts\/concept123\/status/),
         expect.anything()
       );
     });
   });
 
-  it('calls PATCH /api/moderation/:id/reject when Reject is clicked', async () => {
+  it('calls PATCH /api/concepts/:id/status when Reject is clicked in concepts tab', async () => {
     const user = userEvent.setup();
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ _id: 'entry456' })],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept({ _id: 'concept456' })], []);
     api.patch.mockResolvedValueOnce({
-      data: { success: true, data: { _id: 'entry456', status: 'rejected' } },
+      data: { success: true, data: { _id: 'concept456', status: 'rejected' } },
     });
     renderQueue();
     await user.click(await screen.findByRole('button', { name: /reject/i }));
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/moderation\/entry456\/reject/),
+        expect.stringMatching(/\/api\/concepts\/concept456\/status/),
         expect.anything()
       );
     });
   });
 
-  it('removes an entry from the queue after it is approved', async () => {
+  it('removes an item from the queue after it is approved', async () => {
     const user = userEvent.setup();
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ _id: 'entry789', pashto: 'لرګی' })],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept({ _id: 'concept789', englishGloss: 'fire' })], []);
     api.patch.mockResolvedValueOnce({
-      data: { success: true, data: { _id: 'entry789', status: 'approved' } },
+      data: { success: true, data: { _id: 'concept789', status: 'approved' } },
     });
     renderQueue();
-    await screen.findByText('لرګی');
+    await screen.findByText('fire');
     await user.click(screen.getByRole('button', { name: /approve/i }));
     await waitFor(() => {
-      expect(screen.queryByText('لرګی')).not.toBeInTheDocument();
+      expect(screen.queryByText('fire')).not.toBeInTheDocument();
     });
   });
 
   it('shows an error message when the approve action fails', async () => {
     const user = userEvent.setup();
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry()],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept()], []);
     api.patch.mockRejectedValueOnce({
       response: { data: { success: false, error: { message: 'Action failed' } } },
     });
@@ -414,28 +396,23 @@ describe('DashboardQueue page — moderation queue', () => {
     expect(await screen.findByText(/action failed|error/i)).toBeInTheDocument();
   });
 
-  it('calls GET /api/moderation/queue to fetch entries', async () => {
+  it('calls /api/moderation/concepts/queue and /api/moderation/variants/queue to fetch queue', async () => {
     asModerator();
-    api.get.mockResolvedValueOnce({
-      data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } },
-    });
+    mockQueueBothEmpty();
     renderQueue();
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/moderation\/queue/)
+        expect.stringMatching(/\/api\/moderation\/concepts\/queue/)
+      );
+      expect(api.get).toHaveBeenCalledWith(
+        expect.stringMatching(/\/api\/moderation\/variants\/queue/)
       );
     });
   });
 
-  it('renders a Publish button for an admin user', async () => {
+  it('renders a Publish button for an admin user viewing approved items', async () => {
     asAdmin();
-    api.get.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: [mockEntry({ status: 'approved' })],
-        meta: { page: 1, limit: 20, total: 1 },
-      },
-    });
+    mockQueueWithConcepts([mockConcept({ status: 'approved' })], []);
     render(
       <MemoryRouter initialEntries={['/dashboard/queue']}>
         <DashboardQueue />
@@ -451,11 +428,11 @@ describe('DashboardQueue page — moderation queue', () => {
 // 5.  Dashboard entries page  /dashboard/entries
 // ===========================================================================
 
-describe('DashboardEntries page — all entries with status filter', () => {
+describe('DashboardConcepts page — all concepts with status filter', () => {
   const renderEntries = () => {
     return render(
       <MemoryRouter initialEntries={['/dashboard/entries']}>
-        <DashboardEntries />
+        <DashboardConcepts />
       </MemoryRouter>
     );
   };
@@ -474,21 +451,21 @@ describe('DashboardEntries page — all entries with status filter', () => {
     expect(await screen.findByText(/error|failed/i)).toBeInTheDocument();
   });
 
-  it('renders entries returned by the API', async () => {
+  it('renders concepts returned by the API', async () => {
     asModerator();
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
         data: [
-          mockEntry({ pashto: 'کور', status: 'pending' }),
-          mockEntry({ _id: 'e2', pashto: 'اوبه', status: 'published' }),
+          mockConcept({ englishGloss: 'house', status: 'pending' }),
+          mockConcept({ _id: 'e2', englishGloss: 'water', status: 'published' }),
         ],
         meta: { page: 1, limit: 20, total: 2 },
       },
     });
     renderEntries();
-    expect(await screen.findByText('کور')).toBeInTheDocument();
-    expect(screen.getByText('اوبه')).toBeInTheDocument();
+    expect(await screen.findByText('house')).toBeInTheDocument();
+    expect(screen.getByText('water')).toBeInTheDocument();
   });
 
   it('renders a status filter control (select or set of buttons)', async () => {
@@ -510,7 +487,6 @@ describe('DashboardEntries page — all entries with status filter', () => {
   it('re-fetches entries when the status filter changes', async () => {
     const user = userEvent.setup();
     asModerator();
-    // First call — all entries
     api.get.mockResolvedValue({
       data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } },
     });
@@ -535,7 +511,7 @@ describe('DashboardEntries page — all entries with status filter', () => {
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
-        data: [mockEntry({ status: 'pending' })],
+        data: [mockConcept({ status: 'pending' })],
         meta: { page: 1, limit: 20, total: 1 },
       },
     });
@@ -615,7 +591,6 @@ describe('DashboardUsers page — user list (admin only)', () => {
       </MemoryRouter>
     );
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
-    // Should be redirected — users list should NOT render
     expect(screen.getByText('Dashboard home')).toBeInTheDocument();
   });
 

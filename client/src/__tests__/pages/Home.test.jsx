@@ -30,6 +30,16 @@ const renderHome = (initialEntries = ['/']) => {
   return { ...utils, locationRef };
 };
 
+const mockConcept = (overrides = {}) => ({
+  _id: '1',
+  englishGloss: 'house',
+  partOfSpeech: 'noun',
+  status: 'published',
+  variants: [{ _id: 'v1', pashto: 'کور', definition: 'a dwelling place', region: 'Kohat' }],
+  createdAt: new Date().toISOString(),
+  ...overrides,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -53,19 +63,33 @@ describe('Home page', () => {
     expect(await screen.findByText('Failed to load recent entries.')).toBeInTheDocument();
   });
 
-  test('shows EntryCard components when data loads', async () => {
+  test('shows concept englishGloss cards when data loads', async () => {
     api.get.mockResolvedValueOnce({
       data: {
         data: [
-          { _id: '1', pashto: 'کور', definitions: [{ text: 'house' }] },
-          { _id: '2', pashto: 'اوبه', definitions: [{ text: 'water' }] },
+          mockConcept({ _id: '1', englishGloss: 'house', variants: [{ _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' }] }),
+          mockConcept({ _id: '2', englishGloss: 'water', variants: [{ _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' }] }),
         ],
         meta: {},
       },
     });
     renderHome();
-    expect(await screen.findByText('کور')).toBeInTheDocument();
-    expect(screen.getByText('اوبه')).toBeInTheDocument();
+    expect(await screen.findByText('house')).toBeInTheDocument();
+    expect(screen.getByText('water')).toBeInTheDocument();
+  });
+
+  test('shows pashto word from first variant in word card', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          mockConcept({ _id: '1', englishGloss: 'house', variants: [{ _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' }] }),
+          mockConcept({ _id: '2', englishGloss: 'water', variants: [{ _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' }] }),
+        ],
+        meta: {},
+      },
+    });
+    renderHome();
+    expect(await screen.findByText('اوبه')).toBeInTheDocument();
   });
 
   test('shows empty state when API returns empty array', async () => {
@@ -96,6 +120,14 @@ describe('Home page', () => {
     await waitFor(() => {
       expect(locationRef.current?.pathname).toBe('/entries');
       expect(locationRef.current?.search).toBe('');
+    });
+  });
+
+  test('calls /api/concepts endpoint for recent words', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
+    renderHome();
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
     });
   });
 });

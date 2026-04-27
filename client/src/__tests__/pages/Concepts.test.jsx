@@ -1,18 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi, beforeEach } from 'vitest';
-import Entries from '../../pages/Entries';
+import Concepts from '../../pages/Concepts';
 import api from '../../services/api';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn() },
 }));
 
-const renderEntries = (initialEntries = ['/entries']) =>
+const renderConcepts = (initialEntries = ['/entries']) =>
   render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
-        <Route path="/entries" element={<Entries />} />
+        <Route path="/entries" element={<Concepts />} />
       </Routes>
     </MemoryRouter>
   );
@@ -24,70 +24,71 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Entries page', () => {
+describe('Concepts page', () => {
   test('shows loading state while fetching', () => {
     api.get.mockReturnValueOnce(new Promise(() => {}));
-    renderEntries();
+    renderConcepts();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
   });
 
   test('shows error state when API call fails', async () => {
     api.get.mockRejectedValueOnce(new Error('Network error'));
-    renderEntries();
+    renderConcepts();
     expect(await screen.findByText('Failed to load entries.')).toBeInTheDocument();
   });
 
   test('shows "No entries found" when data is empty', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
-    renderEntries();
+    renderConcepts();
     expect(await screen.findByText('No entries found.')).toBeInTheDocument();
   });
 
-  test('renders EntryCards when data loads', async () => {
+  test('renders concept cards when data loads', async () => {
     api.get.mockResolvedValueOnce({
       data: {
         data: [
-          { _id: '1', pashto: 'کور', definitions: [{ text: 'house' }] },
-          { _id: '2', pashto: 'اوبه', definitions: [{ text: 'water' }] },
+          { _id: '1', englishGloss: 'house', partOfSpeech: 'noun', variantCount: 2 },
+          { _id: '2', englishGloss: 'water', partOfSpeech: 'noun', variantCount: 1 },
         ],
         meta: mockMetaWithEntries,
       },
     });
-    renderEntries();
-    expect(await screen.findByText('کور')).toBeInTheDocument();
-    expect(screen.getByText('اوبه')).toBeInTheDocument();
+    renderConcepts();
+    expect(await screen.findByText('house')).toBeInTheDocument();
+    expect(screen.getByText('water')).toBeInTheDocument();
   });
 
-  test('uses search endpoint when ?q= param is present', async () => {
+  test('uses /api/concepts endpoint with query when ?q= param is present', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
-    renderEntries(['/entries?q=house']);
+    renderConcepts(['/entries?q=house']);
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/entries/search?q='));
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('q=house'));
     });
   });
 
-  test('uses list endpoint when no ?q= param', async () => {
+  test('uses /api/concepts endpoint when no ?q= param', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
-    renderEntries(['/entries']);
+    renderConcepts(['/entries']);
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/entries?page='));
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
     });
   });
 
   test('renders Pagination when data loads with entries', async () => {
     api.get.mockResolvedValueOnce({
       data: {
-        data: [{ _id: '1', pashto: 'کور', definitions: [{ text: 'house' }] }],
+        data: [{ _id: '1', englishGloss: 'house', partOfSpeech: 'noun', variantCount: 0 }],
         meta: { page: 1, limit: 20, total: 1 },
       },
     });
-    renderEntries();
+    renderConcepts();
     expect(await screen.findByText(/Page 1 of/)).toBeInTheDocument();
   });
 
   test('does not render Pagination when data is empty', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
-    renderEntries();
+    renderConcepts();
     await screen.findByText('No entries found.');
     expect(screen.queryByRole('button', { name: /previous/i })).not.toBeInTheDocument();
   });
