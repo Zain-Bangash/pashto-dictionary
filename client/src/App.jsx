@@ -31,8 +31,8 @@ function AppRoutes() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/entries" element={<Concepts />} />
-        <Route path="/entries/:id" element={<ConceptDetail />} />
+        <Route path="/concepts" element={<Concepts />} />
+        <Route path="/concepts/:id" element={<ConceptDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -68,7 +68,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/dashboard/entries"
+          path="/dashboard/concepts"
           element={
             <DashboardLayout>
               <DashboardConcepts />

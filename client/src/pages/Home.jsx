@@ -62,12 +62,12 @@ function AmbientBackground() {
   );
 }
 
-// ─── Word card (recent concepts grid) ─────────────────────────
-function WordCard({ entry }) {
+// ─── Concept card (recent concepts grid) ──────────────────────
+function ConceptCard({ entry }) {
   const [playing, setPlaying] = useState(false);
   const cardRef = useRef(null);
-  // entry is a Concept; first published variant provides pashto word
-  const firstVariant = entry.variants?.[0] ?? null;
+  // entry is a Concept; firstVariant is pre-populated by the list API
+  const firstVariant = entry.firstVariant ?? null;
 
   function onMouseMove(e) {
     const el = cardRef.current;
@@ -140,7 +140,7 @@ export default function Home() {
   const navigate  = useNavigate();
   const searchRef = useRef(null);
 
-  const [entries,        setEntries]        = useState([]);
+  const [concepts,       setConcepts]       = useState([]);
   const [total,          setTotal]          = useState(0);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
@@ -156,10 +156,10 @@ export default function Home() {
   useEffect(() => {
     api.get('/api/concepts?limit=4')
       .then(res => {
-        setEntries(res.data.data || []);
+        setConcepts(res.data.data || []);
         setTotal(res.data.meta?.total || 0);
       })
-      .catch(() => setError('Failed to load recent entries.'))
+      .catch(() => setError('Failed to load recent concepts.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -181,19 +181,19 @@ export default function Home() {
       const updated = [q, ...recentSearches.filter(s => s !== q)].slice(0, 3);
       setRecentSearches(updated);
       try { localStorage.setItem('pashto_recent', JSON.stringify(updated)); } catch {}
-      navigate(`/entries?q=${encodeURIComponent(q)}`);
+      navigate(`/concepts?q=${encodeURIComponent(q)}`);
     } else {
-      navigate('/entries');
+      navigate('/concepts');
     }
   }, [searchQuery, navigate, recentSearches]);
 
-  const wotd      = entries[0] || null;
-  const wordCards = entries.slice(1, 4);
+  const wotd         = concepts[0] || null;
+  const conceptCards = concepts.slice(1, 4);
 
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
   thisMonthStart.setHours(0, 0, 0, 0);
-  const addedThisMonth = entries.filter(e => new Date(e.createdAt) >= thisMonthStart).length;
+  const addedThisMonth = concepts.filter(e => new Date(e.createdAt) >= thisMonthStart).length;
 
   const heroDate = new Date().toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
@@ -253,7 +253,7 @@ export default function Home() {
               {/* ── Concept English gloss + first variant pashto ── */}
               <div className="flex flex-col gap-6 sm:gap-8">
                 <div className="text-center" style={{ animation: 'fadeSlideIn 0.6s ease both', animationDelay: '0.08s' }}>
-                  {wotd.variants?.[0] ? (
+                  {wotd.firstVariant ? (
                     <div
                       dir="rtl"
                       className="pashto-bloom font-pashto text-warm font-bold select-none inline-block"
@@ -263,7 +263,7 @@ export default function Home() {
                         textShadow: '0 0 60px rgba(232,197,71,0.1), 0 0 120px rgba(196,119,90,0.08)',
                       }}
                     >
-                      {wotd.variants[0].pashto}
+                      {wotd.firstVariant.pashto}
                     </div>
                   ) : (
                     <div
@@ -294,23 +294,20 @@ export default function Home() {
                       <Waveform color="#c4775a" animated={wotdPlaying} />
                       <span className="font-ui">{wotdPlaying ? 'Playing…' : 'Listen'}</span>
                     </button>
-                    {wotd.variants?.length > 0 && (
-                      <p className="font-ui text-muted text-xs">{wotd.variants.length} regional variant{wotd.variants.length !== 1 ? 's' : ''}</p>
-                    )}
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.32s' }}>
                     <p dir="ltr" className="font-display italic text-warm/85 text-base sm:text-lg lg:text-xl leading-relaxed min-w-0 text-left">
                       {wotd.englishGloss}
                     </p>
-                    {wotd.variants?.[0]?.definition && (
+                    {wotd.firstVariant?.definition && (
                       <p dir="ltr" className="font-ui text-warm/60 text-sm leading-relaxed min-w-0 text-left">
-                        {wotd.variants[0].definition}
+                        {wotd.firstVariant.definition}
                       </p>
                     )}
                     <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>
                       <Link
-                        to={`/entries/${wotd._id}`}
+                        to={`/concepts/${wotd._id}`}
                         className="font-ui font-semibold text-warm bg-terracotta rounded-xl text-xs sm:text-sm px-4 sm:px-5 py-2.5 hover:opacity-90 transition-opacity"
                         style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.35)' }}
                       >
@@ -322,7 +319,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <p className="font-ui text-muted text-sm text-center py-8">No entries yet.</p>
+            <p className="font-ui text-muted text-sm text-center py-8">No concepts yet.</p>
           )}
         </div>
 
@@ -356,8 +353,8 @@ export default function Home() {
                 key={f}
                 onClick={() => {
                   setActiveFilter(activeFilter === f ? null : f);
-                  if (f !== 'All') navigate(`/entries?q=${encodeURIComponent(f.toLowerCase())}`);
-                  else navigate('/entries');
+                  if (f !== 'All') navigate(`/concepts?q=${encodeURIComponent(f.toLowerCase())}`);
+                  else navigate('/concepts');
                 }}
                 className="font-ui rounded-full text-xs px-3 py-1.5 transition-all"
                 style={{
@@ -376,7 +373,7 @@ export default function Home() {
                 {recentSearches.map(s => (
                   <button
                     key={s}
-                    onClick={() => navigate(`/entries?q=${encodeURIComponent(s)}`)}
+                    onClick={() => navigate(`/concepts?q=${encodeURIComponent(s)}`)}
                     className="font-ui text-muted hover:text-warm transition-colors text-xs flex items-center gap-1"
                   >
                     <span className="w-1 h-1 rounded-full bg-mint/50 shrink-0" />
@@ -389,16 +386,16 @@ export default function Home() {
         </div>
 
         {/* ── 3. Recent words ── */}
-        {wordCards.length > 0 && (
+        {conceptCards.length > 0 && (
           <div className="bento-enter" style={{ animationDelay: '0.25s' }}>
             <div className="flex items-center justify-between mb-3">
               <span className="font-ui text-warm/70 text-[10px] uppercase tracking-[0.14em]">Recent Words</span>
-              <Link to="/entries" className="font-ui text-mint hover:underline text-xs">View all →</Link>
+              <Link to="/concepts" className="font-ui text-mint hover:underline text-xs">View all →</Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch">
-              {wordCards.map((entry, i) => (
-                <Link key={entry._id} to={`/entries/${entry._id}`} className="block bento-enter" style={{ animationDelay: `${0.28 + i * 0.08}s` }}>
-                  <WordCard entry={entry} />
+              {conceptCards.map((entry, i) => (
+                <Link key={entry._id} to={`/concepts/${entry._id}`} className="block bento-enter" style={{ animationDelay: `${0.28 + i * 0.08}s` }}>
+                  <ConceptCard entry={entry} />
                 </Link>
               ))}
             </div>

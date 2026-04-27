@@ -23,7 +23,7 @@ const renderHome = (initialEntries = ['/']) => {
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/entries" element={<LocationCapture />} />
+        <Route path="/concepts" element={<LocationCapture />} />
       </Routes>
     </MemoryRouter>
   );
@@ -35,7 +35,7 @@ const mockConcept = (overrides = {}) => ({
   englishGloss: 'house',
   partOfSpeech: 'noun',
   status: 'published',
-  variants: [{ _id: 'v1', pashto: 'کور', definition: 'a dwelling place', region: 'Kohat' }],
+  firstVariant: { _id: 'v1', pashto: 'کور', definition: 'a dwelling place', region: 'Kohat' },
   createdAt: new Date().toISOString(),
   ...overrides,
 });
@@ -60,15 +60,15 @@ describe('Home page', () => {
   test('shows error state when API call fails', async () => {
     api.get.mockRejectedValueOnce(new Error('Network error'));
     renderHome();
-    expect(await screen.findByText('Failed to load recent entries.')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to load recent concepts.')).toBeInTheDocument();
   });
 
   test('shows concept englishGloss cards when data loads', async () => {
     api.get.mockResolvedValueOnce({
       data: {
         data: [
-          mockConcept({ _id: '1', englishGloss: 'house', variants: [{ _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' }] }),
-          mockConcept({ _id: '2', englishGloss: 'water', variants: [{ _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' }] }),
+          mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
+          mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
         ],
         meta: {},
       },
@@ -82,8 +82,8 @@ describe('Home page', () => {
     api.get.mockResolvedValueOnce({
       data: {
         data: [
-          mockConcept({ _id: '1', englishGloss: 'house', variants: [{ _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' }] }),
-          mockConcept({ _id: '2', englishGloss: 'water', variants: [{ _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' }] }),
+          mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', definition: 'dwelling', region: 'Kohat' } }),
+          mockConcept({ _id: '2', englishGloss: 'water', firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } }),
         ],
         meta: {},
       },
@@ -95,7 +95,7 @@ describe('Home page', () => {
   test('shows empty state when API returns empty array', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: {} } });
     renderHome();
-    expect(await screen.findByText('No entries yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No concepts yet.')).toBeInTheDocument();
   });
 
   test('search submit with a term navigates to /entries?q=<term>', async () => {
@@ -106,7 +106,7 @@ describe('Home page', () => {
     await user.type(input, 'kor');
     await user.click(screen.getByRole('button', { name: /search/i }));
     await waitFor(() => {
-      expect(locationRef.current?.pathname).toBe('/entries');
+      expect(locationRef.current?.pathname).toBe('/concepts');
       expect(locationRef.current?.search).toContain('q=kor');
     });
   });
@@ -118,7 +118,7 @@ describe('Home page', () => {
     await screen.findByPlaceholderText('Search Pashto words…');
     await user.click(screen.getByRole('button', { name: /search/i }));
     await waitFor(() => {
-      expect(locationRef.current?.pathname).toBe('/entries');
+      expect(locationRef.current?.pathname).toBe('/concepts');
       expect(locationRef.current?.search).toBe('');
     });
   });

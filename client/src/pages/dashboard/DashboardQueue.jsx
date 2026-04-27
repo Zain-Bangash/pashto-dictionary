@@ -73,7 +73,7 @@ export default function DashboardQueue() {
       )}
 
       {items.length === 0 ? (
-        <p className="text-muted font-ui text-sm">No entries in the queue.</p>
+        <p className="text-muted font-ui text-sm">Nothing in the queue.</p>
       ) : (
         <ul className="space-y-3">
           {items.map((item) => (

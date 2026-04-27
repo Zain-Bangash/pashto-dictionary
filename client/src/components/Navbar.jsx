@@ -57,9 +57,9 @@ export default function Navbar() {
 
         {/* Centre nav */}
         <div className="flex items-center gap-0.5">
-          <NavLink to="/entries">Browse</NavLink>
-          <NavLink to="/entries">Community</NavLink>
-          <NavLink to="/entries">About</NavLink>
+          <NavLink to="/concepts">Browse</NavLink>
+          <NavLink to="/concepts">Community</NavLink>
+          <NavLink to="/concepts">About</NavLink>
         </div>
 
         {/* Right side */}

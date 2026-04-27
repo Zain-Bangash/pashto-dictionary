@@ -34,13 +34,13 @@ describe('Concepts page', () => {
   test('shows error state when API call fails', async () => {
     api.get.mockRejectedValueOnce(new Error('Network error'));
     renderConcepts();
-    expect(await screen.findByText('Failed to load entries.')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to load concepts.')).toBeInTheDocument();
   });
 
   test('shows "No entries found" when data is empty', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
     renderConcepts();
-    expect(await screen.findByText('No entries found.')).toBeInTheDocument();
+    expect(await screen.findByText('No concepts found.')).toBeInTheDocument();
   });
 
   test('renders concept cards when data loads', async () => {
@@ -89,7 +89,7 @@ describe('Concepts page', () => {
   test('does not render Pagination when data is empty', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
     renderConcepts();
-    await screen.findByText('No entries found.');
+    await screen.findByText('No concepts found.');
     expect(screen.queryByRole('button', { name: /previous/i })).not.toBeInTheDocument();
   });
 });

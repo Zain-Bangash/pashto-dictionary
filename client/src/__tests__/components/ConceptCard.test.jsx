@@ -51,6 +51,6 @@ describe('ConceptCard', () => {
   test('contains a link to /entries/:id', () => {
     renderCard(baseConcept);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/entries/abc123');
+    expect(link).toHaveAttribute('href', '/concepts/abc123');
   });
 });

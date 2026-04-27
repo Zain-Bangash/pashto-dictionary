@@ -36,7 +36,7 @@ export default function DashboardConcepts() {
         setConcepts(res.data.data);
       })
       .catch(() => {
-        setError('Failed to load entries');
+        setError('Failed to load concepts');
       })
       .finally(() => setLoading(false));
   };
@@ -75,7 +75,7 @@ export default function DashboardConcepts() {
         </select>
       </div>
       {concepts.length === 0 ? (
-        <p className="text-muted font-ui text-sm">No entries found.</p>
+        <p className="text-muted font-ui text-sm">No concepts found.</p>
       ) : (
         <ul className="space-y-3">
           {concepts.map((concept) => {

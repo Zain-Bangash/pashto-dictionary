@@ -28,20 +28,20 @@ export default function Concepts() {
         setConcepts(res.data.data);
         setMeta(res.data.meta);
       })
-      .catch(() => setError('Failed to load entries.'))
+      .catch(() => setError('Failed to load concepts.'))
       .finally(() => setLoading(false));
   }, [q, page]);
 
   function handleSearch(newQ) {
-    if (newQ) navigate(`/entries?q=${encodeURIComponent(newQ)}`);
-    else navigate('/entries');
+    if (newQ) navigate(`/concepts?q=${encodeURIComponent(newQ)}`);
+    else navigate('/concepts');
   }
 
   function handlePageChange(newPage) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     params.set('page', String(newPage));
-    navigate(`/entries?${params.toString()}`);
+    navigate(`/concepts?${params.toString()}`);
   }
 
   const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
@@ -57,7 +57,7 @@ export default function Concepts() {
         {loading && <p className="text-muted font-ui text-sm text-center py-20">Loading…</p>}
         {error && <p className="text-red-400 font-ui text-sm text-center py-20">{error}</p>}
         {!loading && !error && concepts.length === 0 && (
-          <p className="text-muted font-ui text-sm text-center py-20">No entries found.</p>
+          <p className="text-muted font-ui text-sm text-center py-20">No concepts found.</p>
         )}
         {!loading && !error && concepts.length > 0 && (
           <>
@@ -78,7 +78,7 @@ function ConceptCard({ concept }) {
   const variantCount = concept.variantCount ?? 0;
   return (
     <Link
-      to={`/entries/${concept._id}`}
+      to={`/concepts/${concept._id}`}
       className="bento-card block bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5 no-underline"
     >
       <p className="text-warm text-xl font-display font-semibold leading-snug">{concept.englishGloss}</p>

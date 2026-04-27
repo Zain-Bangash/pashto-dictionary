@@ -5,7 +5,7 @@ export default function ConceptCard({ concept }) {
 
   return (
     <Link
-      to={`/entries/${concept._id}`}
+      to={`/concepts/${concept._id}`}
       className="bento-card block bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5 no-underline"
     >
       <p className="text-warm text-xl font-display font-semibold leading-snug">{concept.englishGloss}</p>

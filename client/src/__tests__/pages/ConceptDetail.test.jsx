@@ -10,9 +10,9 @@ vi.mock('../../services/api', () => ({
 
 const renderDetail = (id = 'abc123') =>
   render(
-    <MemoryRouter initialEntries={[`/entries/${id}`]}>
+    <MemoryRouter initialEntries={[`/concepts/${id}`]}>
       <Routes>
-        <Route path="/entries/:id" element={<ConceptDetail />} />
+        <Route path="/concepts/:id" element={<ConceptDetail />} />
       </Routes>
     </MemoryRouter>
   );
@@ -121,7 +121,7 @@ describe('ConceptDetail page', () => {
     api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
     renderDetail();
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('link', { name: /back to entries/i })).toHaveAttribute('href', '/entries');
+    expect(screen.getByRole('link', { name: /back to concepts/i })).toHaveAttribute('href', '/concepts');
   });
 
   test('calls /api/concepts/:id endpoint', async () => {

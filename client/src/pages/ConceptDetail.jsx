@@ -21,8 +21,8 @@ export default function ConceptDetail() {
   return (
     <div className="min-h-screen bg-charcoal">
       <div className="max-w-2xl mx-auto px-5 py-10">
-        <Link to="/entries" className="inline-flex items-center gap-1.5 text-sm font-ui text-muted hover:text-warm transition-colors mb-8">
-          ← Back to entries
+        <Link to="/concepts" className="inline-flex items-center gap-1.5 text-sm font-ui text-muted hover:text-warm transition-colors mb-8">
+          ← Back to concepts
         </Link>
 
         {loading && <p className="text-muted font-ui text-sm">Loading…</p>}
