@@ -66,6 +66,12 @@ This approach prioritises transparency while preserving linguistic diversity.
 
 ---
 
+## Engineering Decisions
+
+For a detailed walkthrough of the architectural decisions, data model evolution, and engineering challenges — including the shift from a flat Entry model to the Concept/Variant design, the ranked search implementation, and the moderation state machine — see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
 ## Vision
 
 The long-term goal of this project is to preserve and revitalise the Pashto dialect by enabling structured documentation, contribution, and learning.
