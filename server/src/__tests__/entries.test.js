@@ -365,6 +365,98 @@ describe('POST /api/variants', () => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/concepts/search
+// ---------------------------------------------------------------------------
+
+describe('GET /api/concepts/search', () => {
+  test('returns 400 when q is missing', async () => {
+    const res = await request.get('/api/concepts/search');
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toBe('Query is required');
+  });
+
+  test('returns empty data when no concepts match', async () => {
+    const res = await request.get('/api/concepts/search?q=zzznomatch');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.meta.total).toBe(0);
+  });
+
+  test('returns concepts matching englishGloss substring', async () => {
+    await Concept.create([
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'water', partOfSpeech: 'noun', status: 'published' },
+    ]);
+    const res = await request.get('/api/concepts/search?q=hou');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].englishGloss).toBe('house');
+  });
+
+  test('ranks exact match above prefix above substring', async () => {
+    await Concept.create([
+      { englishGloss: 'ahouseb',  partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'house',    partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'housecat', partOfSpeech: 'noun', status: 'published' },
+    ]);
+    const res = await request.get('/api/concepts/search?q=house');
+    expect(res.status).toBe(200);
+    const glosses = res.body.data.map((c) => c.englishGloss);
+    expect(glosses[0]).toBe('house');
+    expect(glosses[1]).toBe('housecat');
+    expect(glosses[2]).toBe('ahouseb');
+  });
+
+  test('does not return unpublished concepts', async () => {
+    await Concept.create([
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' },
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' },
+    ]);
+    const res = await request.get('/api/concepts/search?q=house');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  test('includes variantCount in results', async () => {
+    const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
+    await Variant.create([
+      { concept: concept._id, pashto: 'کور', region: 'Kohat',   definition: 'dwelling', status: 'published' },
+      { concept: concept._id, pashto: 'کور۲', region: 'Hangu',  definition: 'dwelling', status: 'published' },
+      { concept: concept._id, pashto: 'کور۳', region: 'Tirah',  definition: 'dwelling', status: 'pending' },
+    ]);
+    const res = await request.get('/api/concepts/search?q=house');
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].variantCount).toBe(2);
+  });
+
+  test('returns concepts matched via variant phonetic field', async () => {
+    const concept = await Concept.create({ englishGloss: 'mountain', partOfSpeech: 'noun', status: 'published' });
+    await Variant.create({
+      concept: concept._id,
+      pashto: 'غر',
+      phonetic: 'ghar',
+      region: 'Kohat',
+      definition: 'a large hill',
+      status: 'published',
+    });
+    const res = await request.get('/api/concepts/search?q=ghar');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].englishGloss).toBe('mountain');
+  });
+
+  test('response uses standard envelope shape', async () => {
+    const res = await request.get('/api/concepts/search?q=house');
+    expect(res.body).toHaveProperty('success', true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body).toHaveProperty('meta');
+    expect(res.body.meta).toMatchObject({ page: expect.any(Number), limit: expect.any(Number), total: expect.any(Number) });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/concepts/:id/status
 // ---------------------------------------------------------------------------
 

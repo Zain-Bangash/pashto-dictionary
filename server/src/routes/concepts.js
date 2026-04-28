@@ -7,6 +7,7 @@ const {
   listConcepts,
   getConcept,
   suggestConcepts,
+  searchConcepts,
   transitionConceptStatus,
   getMyConceptSubmissions,
   getWotd,
@@ -28,11 +29,12 @@ const statusValidators = [
 ];
 
 // static paths must come before /:id
-router.get('/wotd', getWotd);
-router.get('/suggest', suggestConcepts);
+router.get('/wotd',           getWotd);
+router.get('/suggest',        suggestConcepts);
+router.get('/search',         searchConcepts);
 router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
-router.get('/', listConcepts);
-router.get('/:id', getConcept);
+router.get('/',               listConcepts);
+router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
 
