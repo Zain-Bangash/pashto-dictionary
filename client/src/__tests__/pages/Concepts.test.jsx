@@ -58,21 +58,34 @@ describe('Concepts page', () => {
     expect(screen.getByText('water')).toBeInTheDocument();
   });
 
-  test('uses /api/concepts endpoint with query when ?q= param is present', async () => {
+  test('uses /api/concepts/search endpoint when ?q= param is present', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
     renderConcepts(['/entries?q=house']);
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts/search'));
       expect(api.get).toHaveBeenCalledWith(expect.stringContaining('q=house'));
     });
   });
 
-  test('uses /api/concepts endpoint when no ?q= param', async () => {
+  test('uses /api/concepts endpoint (not /search) when no ?q= param', async () => {
     api.get.mockResolvedValueOnce({ data: { data: [], meta: mockMeta } });
     renderConcepts(['/entries']);
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/api/concepts'));
+      const calledUrl = api.get.mock.calls[0][0];
+      expect(calledUrl).toContain('/api/concepts');
+      expect(calledUrl).not.toContain('/search');
     });
+  });
+
+  test('renders variantCount from concept data', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [{ _id: '1', englishGloss: 'river', partOfSpeech: 'noun', variantCount: 3 }],
+        meta: { page: 1, limit: 20, total: 1 },
+      },
+    });
+    renderConcepts();
+    expect(await screen.findByText('3 regional variants')).toBeInTheDocument();
   });
 
   test('renders Pagination when data loads with entries', async () => {

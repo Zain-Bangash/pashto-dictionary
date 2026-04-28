@@ -21,7 +21,9 @@ export default function Concepts() {
 
     const params = new URLSearchParams({ page });
     if (q) params.set('q', q);
-    const url = `/api/concepts?${params.toString()}`;
+    const url = q
+      ? `/api/concepts/search?${params.toString()}`
+      : `/api/concepts?${params.toString()}`;
 
     api.get(url)
       .then((res) => {
