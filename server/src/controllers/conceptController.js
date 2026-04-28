@@ -10,6 +10,10 @@ const VALID_TRANSITIONS = {
   rejected: ['pending'],
 };
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function invalidId(res) {
   return res.status(400).json({ success: false, error: { message: 'Invalid concept id' } });
 }
@@ -68,11 +72,14 @@ async function listConcepts(req, res) {
 
   const data = await Promise.all(
     concepts.map(async (c) => {
-      const firstVariant = await Variant.findOne(
-        { concept: c._id, status: 'published' },
-        'pashto phonetic region definition example'
-      ).lean();
-      return { ...c, firstVariant: firstVariant || null };
+      const [firstVariant, variantCount] = await Promise.all([
+        Variant.findOne(
+          { concept: c._id, status: 'published' },
+          'pashto phonetic region definition example'
+        ).lean(),
+        Variant.countDocuments({ concept: c._id, status: 'published' }),
+      ]);
+      return { ...c, firstVariant: firstVariant || null, variantCount };
     })
   );
 
@@ -99,7 +106,7 @@ async function suggestConcepts(req, res) {
     return res.status(400).json({ success: false, error: { message: 'Query is required' } });
   }
 
-  const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const regex = new RegExp(escapeRegex(q), 'i');
 
   const data = await Concept.find({
     englishGloss: regex,
@@ -109,6 +116,71 @@ async function suggestConcepts(req, res) {
     .lean();
 
   return res.status(200).json({ success: true, data });
+}
+
+async function searchConcepts(req, res) {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.status(400).json({ success: false, error: { message: 'Query is required' } });
+  }
+
+  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+  const ql    = q.toLowerCase();
+  const regex = new RegExp(escapeRegex(q), 'i');
+
+  function scoreText(text) {
+    const t = (text || '').toLowerCase();
+    if (t === ql)          return 3;
+    if (t.startsWith(ql)) return 2;
+    return 1;
+  }
+
+  const [glossMatches, phoneticVariants] = await Promise.all([
+    Concept.find({ englishGloss: regex, status: 'published' }, '_id englishGloss').lean(),
+    Variant.find({ phonetic: regex, status: 'published' }, 'concept phonetic').lean(),
+  ]);
+
+  const scoreMap = new Map();
+
+  for (const c of glossMatches) {
+    const id = c._id.toString();
+    scoreMap.set(id, Math.max(scoreMap.get(id) ?? 0, scoreText(c.englishGloss)));
+  }
+
+  for (const v of phoneticVariants) {
+    const id = v.concept.toString();
+    scoreMap.set(id, Math.max(scoreMap.get(id) ?? 0, scoreText(v.phonetic)));
+  }
+
+  if (scoreMap.size === 0) {
+    return res.status(200).json({ success: true, data: [], meta: { page, limit, total: 0 } });
+  }
+
+  const unionIds = Array.from(scoreMap.keys());
+  const concepts = await Concept.find({ _id: { $in: unionIds }, status: 'published' }).lean();
+
+  const enriched = await Promise.all(
+    concepts.map(async (c) => {
+      const id = c._id.toString();
+      const [firstVariant, variantCount] = await Promise.all([
+        Variant.findOne(
+          { concept: c._id, status: 'published' },
+          'pashto phonetic region definition example'
+        ).lean(),
+        Variant.countDocuments({ concept: c._id, status: 'published' }),
+      ]);
+      return { ...c, firstVariant: firstVariant || null, variantCount, _score: scoreMap.get(id) };
+    })
+  );
+
+  enriched.sort((a, b) => b._score - a._score);
+
+  const total    = enriched.length;
+  const pageData = enriched.slice((page - 1) * limit, page * limit).map(({ _score, ...rest }) => rest);
+
+  return res.status(200).json({ success: true, data: pageData, meta: { page, limit, total } });
 }
 
 async function transitionConceptStatus(req, res) {
@@ -190,4 +262,4 @@ async function getMyConceptSubmissions(req, res) {
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd };
+module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd };

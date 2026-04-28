@@ -26,6 +26,7 @@ const variantSchema = new mongoose.Schema(
 
 variantSchema.index({ status: 1 });
 variantSchema.index({ concept: 1 });
+variantSchema.index({ phonetic: 1 });
 variantSchema.index({ pashto: 'text' });
 
 module.exports = mongoose.model('Variant', variantSchema);
