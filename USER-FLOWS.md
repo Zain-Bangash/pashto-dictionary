@@ -40,6 +40,8 @@ As a user I should not be able to submit a concept whose English gloss already e
 
 As a user I should not be able to submit a variant with the same Pashto word and region under the same concept — the server rejects it with a clear message. However, the same Pashto word from a different region is allowed.
 
+As a user, in Step 2 of the Submit form, I can optionally add a note to the moderators — such as a book reference, page number, or link — to help them verify the word. This note is visible to moderators and admins in the moderation queue but is not shown on the public concept detail page.
+
 As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published).
 
 ---

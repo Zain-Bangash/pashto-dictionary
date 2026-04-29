@@ -11,7 +11,8 @@ const variantSchema = new mongoose.Schema(
       required: true,
     },
     definition: { type: String, required: true, trim: true },
-    example:    { type: String, trim: true },
+    example:        { type: String, trim: true },
+    submissionNote: { type: String, trim: true, maxlength: 500 },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],

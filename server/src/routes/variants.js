@@ -21,10 +21,12 @@ const createValidators = [
   body('pashto').trim().notEmpty().withMessage('pashto is required'),
   body('region').isIn(REGIONS).withMessage(`region must be one of: ${REGIONS.join(', ')}`),
   body('definition').trim().notEmpty().withMessage('definition is required'),
+  body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
 ];
 
 const updateValidators = [
   body('region').optional().isIn(REGIONS).withMessage(`region must be one of: ${REGIONS.join(', ')}`),
+  body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
 ];
 
 const statusValidators = [

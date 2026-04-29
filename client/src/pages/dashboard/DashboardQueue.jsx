@@ -148,6 +148,12 @@ export default function DashboardQueue() {
                           </span>
                         </p>
                       )}
+                      {item.submissionNote && (
+                        <div className="mt-1 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-[10px]">
+                          <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider mb-1">Submitter note</p>
+                          <p className="text-xs font-ui text-muted/80 break-words">{item.submissionNote}</p>
+                        </div>
+                      )}
                     </>
                   )}
                   <p className="text-xs font-ui text-muted/60">

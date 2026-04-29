@@ -25,7 +25,7 @@ async function createVariant(req, res) {
     return res.status(400).json({ success: false, error: { message: first.msg, field: first.path } });
   }
 
-  const { conceptId, pashto, phonetic, region, definition, example } = req.body;
+  const { conceptId, pashto, phonetic, region, definition, example, submissionNote } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(conceptId)) {
     return res.status(400).json({ success: false, error: { message: 'Invalid conceptId', field: 'conceptId' } });
@@ -51,6 +51,7 @@ async function createVariant(req, res) {
     region,
     definition,
     example,
+    submissionNote,
     submittedBy: req.user.id,
     status: 'pending',
   }).save();
@@ -125,7 +126,7 @@ async function updateVariant(req, res) {
     });
   }
 
-  const { pashto, phonetic, region, definition, example } = req.body;
+  const { pashto, phonetic, region, definition, example, submissionNote } = req.body;
 
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
@@ -139,11 +140,12 @@ async function updateVariant(req, res) {
     }
   }
 
-  if (pashto !== undefined)    variant.pashto     = pashto;
-  if (phonetic !== undefined)  variant.phonetic   = phonetic;
-  if (region !== undefined)    variant.region     = region;
-  if (definition !== undefined) variant.definition = definition;
-  if (example !== undefined)   variant.example    = example;
+  if (pashto !== undefined)          variant.pashto         = pashto;
+  if (phonetic !== undefined)        variant.phonetic       = phonetic;
+  if (region !== undefined)          variant.region         = region;
+  if (definition !== undefined)      variant.definition     = definition;
+  if (example !== undefined)         variant.example        = example;
+  if (submissionNote !== undefined)  variant.submissionNote = submissionNote;
   variant.status = 'pending';
   variant.moderatorNote = undefined;
   await variant.save();

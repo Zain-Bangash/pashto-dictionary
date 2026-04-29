@@ -30,11 +30,12 @@ export default function Submit() {
   const [creatingNew, setCreatingNew]     = useState(false);
 
   // Step 2 — variant details
-  const [pashto, setPashto]       = useState('');
-  const [phonetic, setPhonetic]   = useState('');
-  const [region, setRegion]       = useState('');
-  const [definition, setDefinition] = useState('');
-  const [example, setExample]     = useState('');
+  const [pashto, setPashto]               = useState('');
+  const [phonetic, setPhonetic]           = useState('');
+  const [region, setRegion]               = useState('');
+  const [definition, setDefinition]       = useState('');
+  const [example, setExample]             = useState('');
+  const [submissionNote, setSubmissionNote] = useState('');
 
   const [errors, setErrors]     = useState({});
   const [apiError, setApiError] = useState('');
@@ -118,7 +119,7 @@ export default function Submit() {
         conceptId = res.data.data._id;
       }
 
-      await createVariant({ conceptId, pashto, phonetic, region, definition, example });
+      await createVariant({ conceptId, pashto, phonetic, region, definition, example, submissionNote });
       navigate('/my-submissions');
     } catch (err) {
       const message = err?.response?.data?.error?.message ?? 'Submission failed';
@@ -304,6 +305,20 @@ export default function Submit() {
                   onChange={(e) => setExample(e.target.value)}
                   className={inputClass}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="submissionNote" className={labelClass}>Note to moderators (optional)</label>
+                <textarea
+                  id="submissionNote"
+                  value={submissionNote}
+                  onChange={(e) => setSubmissionNote(e.target.value)}
+                  className={`${inputClass} resize-none`}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Add a reference, source, or link that supports this word…"
+                />
+                <p className="text-muted font-ui text-xs mt-1">{submissionNote.length}/500</p>
               </div>
 
               <button
