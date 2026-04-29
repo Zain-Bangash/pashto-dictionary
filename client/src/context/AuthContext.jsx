@@ -1,12 +1,24 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const storedToken = localStorage.getItem('token');
+  const [token, setToken]           = useState(() => localStorage.getItem('token'));
+  const [user, setUser]             = useState(null);
+  const [initializing, setInitializing] = useState(!!localStorage.getItem('token'));
 
-  const [token, setToken] = useState(storedToken ?? null);
-  const [user, setUser] = useState(null);
+  useEffect(() => {
+    if (!token) { setInitializing(false); return; }
+    api.get('/api/auth/me')
+      .then((res) => setUser(res.data.data.user))
+      .catch(() => {
+        // Token expired or invalid — clear it
+        localStorage.removeItem('token');
+        setToken(null);
+      })
+      .finally(() => setInitializing(false));
+  }, []); // intentionally runs once on mount only
 
   function login(userData, jwt) {
     setUser(userData);
@@ -21,7 +33,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, initializing }}>
       {children}
     </AuthContext.Provider>
   );

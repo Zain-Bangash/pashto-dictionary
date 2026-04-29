@@ -10,9 +10,10 @@ const NAV_ITEMS = [
 ];
 
 export default function DashboardLayout({ children }) {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
   const { pathname } = useLocation();
 
+  if (initializing) return null;
   if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
     return <Navigate to="/login" replace />;
   }

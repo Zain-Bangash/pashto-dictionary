@@ -91,11 +91,10 @@ async function login(req, res) {
   });
 }
 
-function me(req, res) {
-  return res.status(200).json({
-    success: true,
-    data: { user: req.user },
-  });
+async function me(req, res) {
+  const user = await User.findById(req.user.id).lean();
+  if (!user) return res.status(404).json({ success: false, error: { message: 'User not found' } });
+  return res.status(200).json({ success: true, data: { user: safeUser(user) } });
 }
 
 async function updateProfile(req, res) {
