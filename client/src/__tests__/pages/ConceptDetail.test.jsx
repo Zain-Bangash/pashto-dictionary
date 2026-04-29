@@ -8,6 +8,10 @@ vi.mock('../../services/api', () => ({
   default: { get: vi.fn() },
 }));
 
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ user: null }),
+}));
+
 const renderDetail = (id = 'abc123') =>
   render(
     <MemoryRouter initialEntries={[`/concepts/${id}`]}>

@@ -36,11 +36,11 @@ async function createVariant(req, res) {
     return res.status(404).json({ success: false, error: { message: 'Concept not found' } });
   }
 
-  const duplicate = await Variant.findOne({ pashto });
+  const duplicate = await Variant.findOne({ pashto, concept: conceptId, region });
   if (duplicate) {
     return res.status(409).json({
       success: false,
-      error: { message: 'This Pashto word already exists. Consider adding it as a variant of the existing concept.' },
+      error: { message: 'This word already exists for that concept in this region. Try a different region, or check if your word belongs to a different concept.' },
     });
   }
 
@@ -127,12 +127,14 @@ async function updateVariant(req, res) {
 
   const { pashto, phonetic, region, definition, example } = req.body;
 
-  if (pashto && pashto !== variant.pashto) {
-    const duplicate = await Variant.findOne({ pashto, _id: { $ne: id } });
+  const effectivePashto  = pashto  ?? variant.pashto;
+  const effectiveRegion  = region  ?? variant.region;
+  if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
+    const duplicate = await Variant.findOne({ pashto: effectivePashto, concept: variant.concept, region: effectiveRegion, _id: { $ne: id } });
     if (duplicate) {
       return res.status(409).json({
         success: false,
-        error: { message: 'This Pashto word already exists. Consider adding it as a variant of the existing concept.' },
+        error: { message: 'This word already exists for that concept in this region.' },
       });
     }
   }

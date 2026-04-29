@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { suggestConcepts, createConcept, createVariant } from '../services/api';
 
 const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
@@ -18,6 +18,7 @@ function useDebounce(fn, delay) {
 
 export default function Submit() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Step 1 — concept selection / creation
   const [step, setStep]                   = useState(1);
@@ -50,6 +51,23 @@ export default function Submit() {
   }, []);
 
   const debouncedFetch = useDebounce(fetchSuggestions, 300);
+
+  useEffect(() => {
+    const conceptId   = searchParams.get('conceptId');
+    const pashtoParam = searchParams.get('pashto');
+    const phoneticParam = searchParams.get('phonetic');
+    if (conceptId && pashtoParam) {
+      api.get(`/api/concepts/${conceptId}`)
+        .then((res) => {
+          setSelectedConcept(res.data.data);
+          setGlossQuery(res.data.data.englishGloss);
+          setPashto(pashtoParam);
+          if (phoneticParam) setPhonetic(phoneticParam);
+          setStep(2);
+        })
+        .catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleGlossChange(e) {
     const val = e.target.value;

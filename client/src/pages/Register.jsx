@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -11,6 +13,8 @@ export default function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [region, setRegion] = useState('');
+  const [village, setVillage] = useState('');
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +38,7 @@ export default function Register() {
     setApiError('');
     setLoading(true);
     try {
-      const res = await api.post('/api/auth/register', { username, email, password });
+      const res = await api.post('/api/auth/register', { username, email, password, ...(region && { region }), ...(village.trim() && { village: village.trim() }) });
       const { token, user } = res.data.data;
       login(user, token);
       navigate(location.state?.from?.pathname || '/');
@@ -91,6 +95,37 @@ export default function Register() {
               className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all"
             />
             {errors.password && <p className="text-red-400 text-xs font-ui mt-1">{errors.password}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="region" className="block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider">
+              Region <span className="normal-case text-muted/50">(optional)</span>
+            </label>
+            <select
+              id="region"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all appearance-none"
+            >
+              <option value="" className="bg-charcoal">Select your region…</option>
+              {REGIONS.map((r) => (
+                <option key={r} value={r} className="bg-charcoal">{r}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="village" className="block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider">
+              Village/City <span className="normal-case text-muted/50">(optional)</span>
+            </label>
+            <input
+              id="village"
+              type="text"
+              value={village}
+              onChange={(e) => setVillage(e.target.value)}
+              className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all"
+              placeholder="e.g. Doaba, Hangu city…"
+            />
           </div>
 
           <button

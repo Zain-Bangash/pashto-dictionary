@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'moderator', 'admin'],
       default: 'user',
     },
+    region:  { type: String, enum: ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'] },
+    village: { type: String, trim: true },
   },
   { timestamps: true }
 );
