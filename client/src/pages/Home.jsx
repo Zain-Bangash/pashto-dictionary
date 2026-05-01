@@ -91,6 +91,7 @@ function ConceptCard({ entry }) {
   return (
     <div
       ref={cardRef}
+      data-testid="card"
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
       className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-[16px] overflow-hidden flex flex-col h-full"
@@ -101,7 +102,7 @@ function ConceptCard({ entry }) {
         {/* Pashto word from first variant + POS badge */}
         <div className="flex items-start justify-between gap-2">
           {firstVariant ? (
-            <div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
+            <div dir="rtl" data-testid="card-pashto" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
               {firstVariant.pashto}
             </div>
           ) : (
@@ -286,6 +287,7 @@ export default function Home() {
                     <div
                       dir="rtl"
                       className="pashto-bloom font-pashto text-warm font-bold select-none inline-block"
+                      data-testid="wotd-gloss"
                       style={{
                         fontSize: 'clamp(64px, 12vw, 160px)',
                         lineHeight: 1.5,
