@@ -31,12 +31,32 @@ async function createConcept(req, res) {
 
   const { englishGloss, partOfSpeech } = req.body;
 
-  const concept = await new Concept({
-    englishGloss,
-    partOfSpeech,
-    submittedBy: req.user.id,
-    status: 'pending',
-  }).save();
+  const normalizedGloss = englishGloss.toLowerCase().trim();
+  const existing = await Concept.findOne({ normalizedGloss, isDeleted: { $ne: true } });
+  if (existing) {
+    return res.status(409).json({
+      success: false,
+      error: { message: 'A concept with this English gloss already exists' },
+    });
+  }
+
+  let concept;
+  try {
+    concept = await new Concept({
+      englishGloss,
+      partOfSpeech,
+      submittedBy: req.user.id,
+      status: 'pending',
+    }).save();
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: { message: 'A concept with this English gloss already exists' },
+      });
+    }
+    throw err;
+  }
 
   await new ModerationLog({
     targetModel: 'Concept',
@@ -200,6 +220,19 @@ async function transitionConceptStatus(req, res) {
   if (!concept) return notFound(res);
 
   const { status, moderatorNote } = req.body;
+
+  if (
+    req.user.role === 'moderator' &&
+    (status === 'approved' || status === 'rejected') &&
+    concept.submittedBy &&
+    concept.submittedBy.equals(req.user.id)
+  ) {
+    return res.status(403).json({
+      success: false,
+      error: { message: 'Moderators cannot approve or reject their own submissions' },
+    });
+  }
+
   const allowed = VALID_TRANSITIONS[concept.status] || [];
 
   if (!allowed.includes(status)) {

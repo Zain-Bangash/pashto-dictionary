@@ -36,25 +36,42 @@ async function createVariant(req, res) {
     return res.status(404).json({ success: false, error: { message: 'Concept not found' } });
   }
 
-  const duplicate = await Variant.findOne({ pashto, concept: conceptId, region });
+  const normalizedPashto = pashto.trim().normalize('NFC');
+  const duplicate = await Variant.findOne({
+    normalizedPashto,
+    concept: conceptId,
+    region,
+    isDeleted: { $ne: true },
+  });
   if (duplicate) {
     return res.status(409).json({
       success: false,
-      error: { message: 'This word already exists for that concept in this region. Try a different region, or check if your word belongs to a different concept.' },
+      error: { message: 'This Pashto word already exists for this concept and region' },
     });
   }
 
-  const variant = await new Variant({
-    concept: conceptId,
-    pashto,
-    phonetic,
-    region,
-    definition,
-    example,
-    submissionNote,
-    submittedBy: req.user.id,
-    status: 'pending',
-  }).save();
+  let variant;
+  try {
+    variant = await new Variant({
+      concept: conceptId,
+      pashto,
+      phonetic,
+      region,
+      definition,
+      example,
+      submissionNote,
+      submittedBy: req.user.id,
+      status: 'pending',
+    }).save();
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: { message: 'This Pashto word already exists for this concept and region' },
+      });
+    }
+    throw err;
+  }
 
   await new ModerationLog({
     targetModel: 'Variant',
@@ -131,7 +148,14 @@ async function updateVariant(req, res) {
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
   if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
-    const duplicate = await Variant.findOne({ pashto: effectivePashto, concept: variant.concept, region: effectiveRegion, _id: { $ne: id } });
+    const normalizedPashto = effectivePashto.trim().normalize('NFC');
+    const duplicate = await Variant.findOne({
+      normalizedPashto,
+      concept: variant.concept,
+      region: effectiveRegion,
+      isDeleted: { $ne: true },
+      _id: { $ne: variant._id },
+    });
     if (duplicate) {
       return res.status(409).json({
         success: false,
@@ -174,6 +198,19 @@ async function transitionVariantStatus(req, res) {
   if (!variant) return notFound(res);
 
   const { status, moderatorNote } = req.body;
+
+  if (
+    req.user.role === 'moderator' &&
+    (status === 'approved' || status === 'rejected') &&
+    variant.submittedBy &&
+    variant.submittedBy.equals(req.user.id)
+  ) {
+    return res.status(403).json({
+      success: false,
+      error: { message: 'Moderators cannot approve or reject their own submissions' },
+    });
+  }
+
   const allowed = VALID_TRANSITIONS[variant.status] || [];
 
   if (!allowed.includes(status)) {
