@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const { verifyToken } = require('../middleware/auth');
-const { requireModeratorOrAdmin } = require('../middleware/requireRole');
+const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
 const {
   createConcept,
   listConcepts,
@@ -11,6 +11,7 @@ const {
   transitionConceptStatus,
   getMyConceptSubmissions,
   getWotd,
+  deleteConcept,
 } = require('../controllers/conceptController');
 
 const router = Router();
@@ -37,5 +38,6 @@ router.get('/',               listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
+router.delete('/:id', verifyToken, requireRole('admin'), deleteConcept);
 
 module.exports = router;

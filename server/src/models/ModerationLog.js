@@ -8,7 +8,7 @@ const moderationLogSchema = new mongoose.Schema({
   targetId:    { type: mongoose.Schema.Types.ObjectId },
   action: {
     type: String,
-    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated'],
+    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted'],
     required: true,
   },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

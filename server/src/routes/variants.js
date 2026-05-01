@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const { verifyToken } = require('../middleware/auth');
-const { requireModeratorOrAdmin } = require('../middleware/requireRole');
+const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
 const {
   createVariant,
   listVariants,
@@ -10,6 +10,7 @@ const {
   transitionVariantStatus,
   searchVariants,
   getMyVariantSubmissions,
+  deleteVariant,
 } = require('../controllers/variantController');
 
 const router = Router();
@@ -43,5 +44,6 @@ router.get('/:id', getVariant);
 router.post('/', verifyToken, createValidators, createVariant);
 router.patch('/:id', verifyToken, updateValidators, updateVariant);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionVariantStatus);
+router.delete('/:id', verifyToken, requireRole('admin'), deleteVariant);
 
 module.exports = router;

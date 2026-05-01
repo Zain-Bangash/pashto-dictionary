@@ -15,10 +15,10 @@ async function getConceptQueue(req, res) {
   const status  = allowed.includes(req.query.status) ? req.query.status : 'pending';
 
   const [data, total, pendingCount, approvedCount] = await Promise.all([
-    Concept.find({ status }).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('submittedBy', 'username region village').lean(),
-    Concept.countDocuments({ status }),
-    Concept.countDocuments({ status: 'pending' }),
-    isAdmin ? Concept.countDocuments({ status: 'approved' }) : Promise.resolve(0),
+    Concept.find({ status, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('submittedBy', 'username region village').lean(),
+    Concept.countDocuments({ status, isDeleted: { $ne: true } }),
+    Concept.countDocuments({ status: 'pending', isDeleted: { $ne: true } }),
+    isAdmin ? Concept.countDocuments({ status: 'approved', isDeleted: { $ne: true } }) : Promise.resolve(0),
   ]);
 
   return res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
@@ -34,13 +34,13 @@ async function getVariantQueue(req, res) {
   const status  = allowed.includes(req.query.status) ? req.query.status : 'pending';
 
   const [data, total, pendingCount, approvedCount] = await Promise.all([
-    Variant.find({ status }).sort({ createdAt: -1 }).skip(skip).limit(limit)
+    Variant.find({ status, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).skip(skip).limit(limit)
       .populate('submittedBy', 'username region village')
       .populate('concept', 'englishGloss status')
       .lean(),
-    Variant.countDocuments({ status }),
-    Variant.countDocuments({ status: 'pending' }),
-    isAdmin ? Variant.countDocuments({ status: 'approved' }) : Promise.resolve(0),
+    Variant.countDocuments({ status, isDeleted: { $ne: true } }),
+    Variant.countDocuments({ status: 'pending', isDeleted: { $ne: true } }),
+    isAdmin ? Variant.countDocuments({ status: 'approved', isDeleted: { $ne: true } }) : Promise.resolve(0),
   ]);
 
   return res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
@@ -51,14 +51,14 @@ async function getStats(req, res) {
     pendingConcepts,  approvedConcepts,  rejectedConcepts,  publishedConcepts,
     pendingVariants,  approvedVariants,  rejectedVariants,  publishedVariants,
   ] = await Promise.all([
-    Concept.countDocuments({ status: 'pending' }),
-    Concept.countDocuments({ status: 'approved' }),
-    Concept.countDocuments({ status: 'rejected' }),
-    Concept.countDocuments({ status: 'published' }),
-    Variant.countDocuments({ status: 'pending' }),
-    Variant.countDocuments({ status: 'approved' }),
-    Variant.countDocuments({ status: 'rejected' }),
-    Variant.countDocuments({ status: 'published' }),
+    Concept.countDocuments({ status: 'pending',   isDeleted: { $ne: true } }),
+    Concept.countDocuments({ status: 'approved',  isDeleted: { $ne: true } }),
+    Concept.countDocuments({ status: 'rejected',  isDeleted: { $ne: true } }),
+    Concept.countDocuments({ status: 'published', isDeleted: { $ne: true } }),
+    Variant.countDocuments({ status: 'pending',   isDeleted: { $ne: true } }),
+    Variant.countDocuments({ status: 'approved',  isDeleted: { $ne: true } }),
+    Variant.countDocuments({ status: 'rejected',  isDeleted: { $ne: true } }),
+    Variant.countDocuments({ status: 'published', isDeleted: { $ne: true } }),
   ]);
 
   return res.status(200).json({

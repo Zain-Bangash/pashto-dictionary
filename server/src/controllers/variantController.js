@@ -71,7 +71,7 @@ async function listVariants(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = {};
+  const filter = { isDeleted: { $ne: true } };
   if (req.query.status)    filter.status    = req.query.status;
   if (req.query.region)    filter.region    = req.query.region;
   if (req.query.conceptId && mongoose.Types.ObjectId.isValid(req.query.conceptId)) {
@@ -90,7 +90,7 @@ async function getVariant(req, res) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
 
-  const variant = await Variant.findById(id).populate('concept', 'englishGloss partOfSpeech').lean();
+  const variant = await Variant.findOne({ _id: id, isDeleted: { $ne: true } }).populate('concept', 'englishGloss partOfSpeech').lean();
   if (!variant) return notFound(res);
 
   if (variant.status !== 'published') {
@@ -112,7 +112,7 @@ async function updateVariant(req, res) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
 
-  const variant = await Variant.findById(id);
+  const variant = await Variant.findOne({ _id: id, isDeleted: { $ne: true } });
   if (!variant) return notFound(res);
 
   if (variant.submittedBy.toString() !== req.user.id) {
@@ -221,7 +221,7 @@ async function searchVariants(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = { status: 'published', $text: { $search: q } };
+  const filter = { status: 'published', isDeleted: { $ne: true }, $text: { $search: q } };
   if (req.query.region) filter.region = req.query.region;
 
   const [data, total] = await Promise.all([
@@ -237,7 +237,7 @@ async function getMyVariantSubmissions(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = { submittedBy: req.user.id };
+  const filter = { submittedBy: req.user.id, isDeleted: { $ne: true } };
 
   const [data, total] = await Promise.all([
     Variant.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('concept', 'englishGloss').lean(),
@@ -247,4 +247,26 @@ async function getMyVariantSubmissions(req, res) {
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions };
+async function deleteVariant(req, res) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+
+  const variant = await Variant.findById(id);
+  if (!variant) return notFound(res);
+
+  variant.isDeleted = true;
+  variant.deletedAt = new Date();
+  variant.deletedBy = req.user.id;
+  await variant.save();
+
+  await new ModerationLog({
+    targetModel: 'Variant',
+    targetId: variant._id,
+    action: 'deleted',
+    performedBy: req.user.id,
+  }).save();
+
+  return res.status(200).json({ success: true, data: variant });
+}
+
+module.exports = { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions, deleteVariant };

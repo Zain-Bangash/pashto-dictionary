@@ -65,6 +65,8 @@ async function listConcepts(req, res) {
     filter.$text = { $search: q };
   }
 
+  filter.isDeleted = { $ne: true };
+
   const [concepts, total] = await Promise.all([
     Concept.find(filter).skip(skip).limit(limit).lean(),
     Concept.countDocuments(filter),
@@ -91,10 +93,10 @@ async function getConcept(req, res) {
 
   if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
 
-  const concept = await Concept.findOne({ _id: id, status: 'published' }).lean();
+  const concept = await Concept.findOne({ _id: id, status: 'published', isDeleted: { $ne: true } }).lean();
   if (!concept) return notFound(res);
 
-  const variants = await Variant.find({ concept: id, status: 'published' }).lean();
+  const variants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }).lean();
 
   return res.status(200).json({ success: true, data: { ...concept, variants } });
 }
@@ -111,6 +113,7 @@ async function suggestConcepts(req, res) {
   const data = await Concept.find({
     englishGloss: regex,
     status: { $in: ['pending', 'approved', 'published'] },
+    isDeleted: { $ne: true },
   })
     .limit(5)
     .lean();
@@ -138,8 +141,8 @@ async function searchConcepts(req, res) {
   }
 
   const [glossMatches, phoneticVariants] = await Promise.all([
-    Concept.find({ englishGloss: regex, status: 'published' }, '_id englishGloss').lean(),
-    Variant.find({ phonetic: regex, status: 'published' }, 'concept phonetic').lean(),
+    Concept.find({ englishGloss: regex, status: 'published', isDeleted: { $ne: true } }, '_id englishGloss').lean(),
+    Variant.find({ phonetic: regex, status: 'published', isDeleted: { $ne: true } }, 'concept phonetic').lean(),
   ]);
 
   const scoreMap = new Map();
@@ -159,7 +162,7 @@ async function searchConcepts(req, res) {
   }
 
   const unionIds = Array.from(scoreMap.keys());
-  const concepts = await Concept.find({ _id: { $in: unionIds }, status: 'published' }).lean();
+  const concepts = await Concept.find({ _id: { $in: unionIds }, status: 'published', isDeleted: { $ne: true } }).lean();
 
   const enriched = await Promise.all(
     concepts.map(async (c) => {
@@ -236,10 +239,10 @@ async function transitionConceptStatus(req, res) {
 async function getWotd(req, res) {
   const today = new Date();
   const seed  = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-  const total = await Concept.countDocuments({ status: 'published' });
+  const total = await Concept.countDocuments({ status: 'published', isDeleted: { $ne: true } });
   if (total === 0) return res.status(200).json({ success: true, data: null });
   const index   = seed % total;
-  const concept = await Concept.findOne({ status: 'published' }).skip(index).lean();
+  const concept = await Concept.findOne({ status: 'published', isDeleted: { $ne: true } }).skip(index).lean();
   const firstVariant = await Variant.findOne(
     { concept: concept._id, status: 'published' },
     'pashto phonetic region definition example'
@@ -252,7 +255,7 @@ async function getMyConceptSubmissions(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = { submittedBy: req.user.id };
+  const filter = { submittedBy: req.user.id, isDeleted: { $ne: true } };
 
   const [data, total] = await Promise.all([
     Concept.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -262,4 +265,26 @@ async function getMyConceptSubmissions(req, res) {
   return res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd };
+async function deleteConcept(req, res) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+
+  const concept = await Concept.findById(id);
+  if (!concept) return notFound(res);
+
+  concept.isDeleted  = true;
+  concept.deletedAt  = new Date();
+  concept.deletedBy  = req.user.id;
+  await concept.save();
+
+  await new ModerationLog({
+    targetModel: 'Concept',
+    targetId: concept._id,
+    action: 'deleted',
+    performedBy: req.user.id,
+  }).save();
+
+  return res.status(200).json({ success: true, data: concept });
+}
+
+module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept };

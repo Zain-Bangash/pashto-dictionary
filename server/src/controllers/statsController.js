@@ -6,9 +6,9 @@ async function getStats(req, res) {
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [publishedVariants, registeredUsers, variantsThisMonth] = await Promise.all([
-    Variant.countDocuments({ status: 'published' }),
+    Variant.countDocuments({ status: 'published', isDeleted: { $ne: true } }),
     User.countDocuments({}),
-    Variant.countDocuments({ status: 'published', createdAt: { $gte: firstOfMonth } }),
+    Variant.countDocuments({ status: 'published', isDeleted: { $ne: true }, createdAt: { $gte: firstOfMonth } }),
   ]);
 
   return res.status(200).json({

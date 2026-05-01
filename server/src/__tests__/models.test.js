@@ -240,6 +240,136 @@ describe('User model', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Concept model — Phase 1 additions (normalizedGloss, soft-delete fields)
+// ---------------------------------------------------------------------------
+
+describe('Concept model — normalizedGloss pre-save hook', () => {
+  test('normalizedGloss is automatically set on save from englishGloss (lowercase + trim)', async () => {
+    const concept = await new Concept({ englishGloss: '  House  ', partOfSpeech: 'noun' }).save();
+    expect(concept.normalizedGloss).toBe('house');
+  });
+
+  test('normalizedGloss updates when englishGloss changes and the doc is saved again', async () => {
+    const concept = await new Concept({ englishGloss: 'Water', partOfSpeech: 'noun' }).save();
+    expect(concept.normalizedGloss).toBe('water');
+
+    concept.englishGloss = '  River  ';
+    await concept.save();
+    expect(concept.normalizedGloss).toBe('river');
+  });
+});
+
+describe('Concept model — isDeleted soft-delete field', () => {
+  test('isDeleted defaults to false on a new Concept', async () => {
+    const concept = await new Concept({ englishGloss: 'tree', partOfSpeech: 'noun' }).save();
+    expect(concept.isDeleted).toBe(false);
+  });
+});
+
+describe('Concept model — normalizedGloss unique index with partial filter', () => {
+  test('saving two active Concepts with the same englishGloss throws E11000', async () => {
+    await new Concept({ englishGloss: 'fire', partOfSpeech: 'noun' }).save();
+    await expect(
+      new Concept({ englishGloss: 'fire', partOfSpeech: 'verb' }).save()
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
+  test('saving a soft-deleted and an active Concept with the same normalizedGloss does NOT throw', async () => {
+    await new Concept({ englishGloss: 'stone', partOfSpeech: 'noun', isDeleted: true }).save();
+    await expect(
+      new Concept({ englishGloss: 'stone', partOfSpeech: 'noun' }).save()
+    ).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Variant model — Phase 1 additions (normalizedPashto, normalizedPhonetic, soft-delete)
+// ---------------------------------------------------------------------------
+
+describe('Variant model — normalizedPashto pre-save hook', () => {
+  let conceptId;
+
+  beforeEach(async () => {
+    const concept = await new Concept({ englishGloss: 'road', partOfSpeech: 'noun' }).save();
+    conceptId = concept._id;
+  });
+
+  const baseVariant = () => ({
+    concept: conceptId,
+    pashto: '  لار  ',
+    region: 'Kohat',
+    definition: 'a road or path',
+  });
+
+  test('normalizedPashto is automatically set on save — trim + NFC, no lowercasing', async () => {
+    const variant = await new Variant(baseVariant()).save();
+    // trim is applied; NFC normalization; Arabic script is caseless so value matches NFC of trimmed input
+    expect(variant.normalizedPashto).toBe('لار'.normalize('NFC'));
+  });
+
+  test('normalizedPhonetic is automatically set on save — lowercase + trim', async () => {
+    const variant = await new Variant({ ...baseVariant(), phonetic: '  Laar  ' }).save();
+    expect(variant.normalizedPhonetic).toBe('laar');
+  });
+
+  test('normalizedPhonetic is empty or undefined when phonetic is not provided', async () => {
+    const variant = await new Variant(baseVariant()).save();
+    // phonetic not supplied — normalizedPhonetic should be absent or empty
+    expect(variant.normalizedPhonetic == null || variant.normalizedPhonetic === '').toBe(true);
+  });
+});
+
+describe('Variant model — isDeleted soft-delete field', () => {
+  let conceptId;
+
+  beforeEach(async () => {
+    const concept = await new Concept({ englishGloss: 'sky', partOfSpeech: 'noun' }).save();
+    conceptId = concept._id;
+  });
+
+  test('isDeleted defaults to false on a new Variant', async () => {
+    const variant = await new Variant({
+      concept: conceptId,
+      pashto: 'اسمان',
+      region: 'Kohat',
+      definition: 'the sky',
+    }).save();
+    expect(variant.isDeleted).toBe(false);
+  });
+});
+
+describe('Variant model — compound unique index with partial filter', () => {
+  let conceptId;
+
+  beforeEach(async () => {
+    const concept = await new Concept({ englishGloss: 'sun', partOfSpeech: 'noun' }).save();
+    conceptId = concept._id;
+  });
+
+  const baseVariant = (overrides = {}) => ({
+    concept: conceptId,
+    pashto: 'لمر',
+    region: 'Kohat',
+    definition: 'the sun',
+    ...overrides,
+  });
+
+  test('saving two active Variants with the same concept + pashto + region throws E11000', async () => {
+    await new Variant(baseVariant()).save();
+    await expect(
+      new Variant(baseVariant()).save()
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
+  test('saving a soft-deleted and an active Variant with the same concept + pashto + region does NOT throw', async () => {
+    await new Variant(baseVariant({ isDeleted: true })).save();
+    await expect(
+      new Variant(baseVariant()).save()
+    ).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ModerationLog model
 // ---------------------------------------------------------------------------
 
@@ -281,12 +411,12 @@ describe('ModerationLog model', () => {
   });
 
   test('rejects an invalid action enum value', async () => {
-    const log = new ModerationLog({ ...validLog(), action: 'deleted' });
+    const log = new ModerationLog({ ...validLog(), action: 'frobnicated' });
     await expect(log.save()).rejects.toThrow(/action/i);
   });
 
   test('accepts all valid action enum values', async () => {
-    const actions = ['submitted', 'approved', 'rejected', 'published', 'resubmitted'];
+    const actions = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'deleted'];
     for (const action of actions) {
       const log = await new ModerationLog({ ...validLog(), action }).save();
       expect(log.action).toBe(action);
