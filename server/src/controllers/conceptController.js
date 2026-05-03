@@ -320,4 +320,124 @@ async function deleteConcept(req, res) {
   return res.status(200).json({ success: true, data: concept });
 }
 
-module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept };
+async function editConcept(req, res) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+
+  const concept = await Concept.findOne({ _id: id, isDeleted: { $ne: true } });
+  if (!concept) return notFound(res);
+
+  if (req.user.role === 'moderator' && concept.submittedBy && concept.submittedBy.toString() === req.user.id) {
+    return res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
+  }
+
+  if (!req.body.note) {
+    return res.status(400).json({ success: false, error: { message: 'note is required', field: 'note' } });
+  }
+
+  const editableFields = ['englishGloss', 'partOfSpeech'];
+  const before = {};
+  for (const field of editableFields) {
+    before[field] = concept[field];
+  }
+
+  if (req.body.englishGloss !== undefined) concept.englishGloss = req.body.englishGloss;
+  if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech;
+
+  await concept.save();
+
+  const changes = {};
+  for (const field of editableFields) {
+    if (concept[field] !== before[field]) {
+      changes[field] = { from: before[field], to: concept[field] };
+    }
+  }
+
+  await new ModerationLog({
+    targetModel: 'Concept',
+    targetId: concept._id,
+    action: 'edited',
+    performedBy: req.user.id,
+    note: req.body.note,
+    changes,
+  }).save();
+
+  return res.status(200).json({ success: true, data: concept });
+}
+
+async function mergeConcepts(req, res) {
+  const { sourceId } = req.params;
+  const { targetConceptId, note } = req.body;
+
+  if (!note) {
+    return res.status(400).json({ success: false, error: { message: 'note is required', field: 'note' } });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(sourceId)) {
+    return res.status(404).json({ success: false, error: { message: 'Source concept not found' } });
+  }
+  if (!mongoose.Types.ObjectId.isValid(targetConceptId)) {
+    return res.status(404).json({ success: false, error: { message: 'Target concept not found' } });
+  }
+
+  if (sourceId === targetConceptId.toString()) {
+    return res.status(400).json({ success: false, error: { message: 'Cannot merge a concept into itself' } });
+  }
+
+  const [sourceConcept, targetConcept] = await Promise.all([
+    Concept.findOne({ _id: sourceId, isDeleted: { $ne: true } }),
+    Concept.findOne({ _id: targetConceptId, isDeleted: { $ne: true } }),
+  ]);
+
+  if (!sourceConcept) return res.status(404).json({ success: false, error: { message: 'Source concept not found' } });
+  if (!targetConcept) return res.status(404).json({ success: false, error: { message: 'Target concept not found' } });
+
+  if (sourceConcept._id.toString() === targetConcept._id.toString()) {
+    return res.status(400).json({ success: false, error: { message: 'Cannot merge a concept into itself' } });
+  }
+
+  const sourceVariants = await Variant.find({ concept: sourceId, isDeleted: { $ne: true } });
+
+  const movedIds = [];
+  const skippedItems = [];
+
+  for (const variant of sourceVariants) {
+    const duplicate = await Variant.findOne({
+      concept: targetConceptId,
+      normalizedPashto: variant.normalizedPashto,
+      region: variant.region,
+      isDeleted: { $ne: true },
+    });
+    if (duplicate) {
+      skippedItems.push({ id: variant._id, reason: 'Duplicate exists on target concept' });
+    } else {
+      movedIds.push(variant._id);
+    }
+  }
+
+  if (movedIds.length > 0) {
+    await Variant.updateMany({ _id: { $in: movedIds } }, { concept: targetConceptId });
+  }
+
+  sourceConcept.isDeleted = true;
+  sourceConcept.deletedAt = new Date();
+  sourceConcept.deletedBy = req.user.id;
+  await sourceConcept.save();
+
+  await new ModerationLog({
+    targetModel: 'Concept',
+    targetId: sourceId,
+    action: 'merged',
+    performedBy: req.user.id,
+    note,
+    changes: {
+      mergedInto: targetConceptId,
+      variantsMoved: movedIds,
+      variantsSkipped: skippedItems.map((s) => s.id),
+    },
+  }).save();
+
+  return res.status(200).json({ success: true, data: { moved: movedIds.length, skipped: skippedItems } });
+}
+
+module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts };

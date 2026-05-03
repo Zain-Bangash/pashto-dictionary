@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, optionalVerifyToken } = require('../middleware/auth');
 const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
 const {
   createVariant,
@@ -11,6 +11,7 @@ const {
   searchVariants,
   getMyVariantSubmissions,
   deleteVariant,
+  editVariant,
 } = require('../controllers/variantController');
 
 const router = Router();
@@ -40,10 +41,11 @@ const statusValidators = [
 router.get('/search', searchVariants);
 router.get('/my-submissions', verifyToken, getMyVariantSubmissions);
 router.get('/', verifyToken, requireModeratorOrAdmin, listVariants);
-router.get('/:id', getVariant);
+router.get('/:id', optionalVerifyToken, getVariant);
 router.post('/', verifyToken, createValidators, createVariant);
-router.patch('/:id', verifyToken, updateValidators, updateVariant);
+router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editVariant);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionVariantStatus);
+router.patch('/:id', verifyToken, updateValidators, updateVariant);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteVariant);
 
 module.exports = router;

@@ -12,6 +12,8 @@ const {
   getMyConceptSubmissions,
   getWotd,
   deleteConcept,
+  editConcept,
+  mergeConcepts,
 } = require('../controllers/conceptController');
 
 const router = Router();
@@ -38,6 +40,8 @@ router.get('/',               listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
+router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editConcept);
+router.post('/:sourceId/merge', verifyToken, requireModeratorOrAdmin, mergeConcepts);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteConcept);
 
 module.exports = router;

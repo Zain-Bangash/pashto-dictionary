@@ -306,4 +306,91 @@ async function deleteVariant(req, res) {
   return res.status(200).json({ success: true, data: variant });
 }
 
-module.exports = { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions, deleteVariant };
+async function editVariant(req, res) {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+
+  const variant = await Variant.findOne({ _id: id, isDeleted: { $ne: true } });
+  if (!variant) return notFound(res);
+
+  if (req.user.role === 'moderator' && variant.submittedBy && variant.submittedBy.toString() === req.user.id) {
+    return res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
+  }
+
+  if (!req.body.note) {
+    return res.status(400).json({ success: false, error: { message: 'note is required', field: 'note' } });
+  }
+
+  const simpleFields = ['pashto', 'phonetic', 'region', 'definition', 'example'];
+  const before = {};
+  for (const field of simpleFields) {
+    before[field] = variant[field];
+  }
+  const beforeConceptId = variant.concept.toString();
+
+  const changes = {};
+
+  // Handle concept reassignment
+  if (req.body.concept !== undefined && req.body.concept !== beforeConceptId) {
+    const newConceptId = req.body.concept;
+    if (!mongoose.Types.ObjectId.isValid(newConceptId)) {
+      return res.status(404).json({ success: false, error: { message: 'Target concept not found' } });
+    }
+    const targetConcept = await Concept.findOne({ _id: newConceptId, isDeleted: { $ne: true } });
+    if (!targetConcept) {
+      return res.status(404).json({ success: false, error: { message: 'Target concept not found' } });
+    }
+
+    // Compute the normalizedPashto that will be used after save
+    const effectivePashto = req.body.pashto !== undefined ? req.body.pashto : variant.pashto;
+    const effectiveRegion = req.body.region !== undefined ? req.body.region : variant.region;
+    const normalizedPashto = effectivePashto.trim().normalize('NFC');
+
+    const duplicate = await Variant.findOne({
+      concept: newConceptId,
+      normalizedPashto,
+      region: effectiveRegion,
+      isDeleted: { $ne: true },
+      _id: { $ne: variant._id },
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, error: { message: 'A variant with the same Pashto and region already exists on the target concept' } });
+    }
+
+    const oldConcept = await Concept.findById(beforeConceptId).lean();
+    changes.concept = {
+      from: { id: oldConcept._id, englishGloss: oldConcept.englishGloss },
+      to:   { id: targetConcept._id, englishGloss: targetConcept.englishGloss },
+    };
+    variant.concept = newConceptId;
+  }
+
+  // Apply simple field updates
+  for (const field of simpleFields) {
+    if (req.body[field] !== undefined) {
+      variant[field] = req.body[field];
+    }
+  }
+
+  await variant.save();
+
+  // Compute diff for simple fields
+  for (const field of simpleFields) {
+    if (variant[field] !== before[field]) {
+      changes[field] = { from: before[field], to: variant[field] };
+    }
+  }
+
+  await new ModerationLog({
+    targetModel: 'Variant',
+    targetId: variant._id,
+    action: 'edited',
+    performedBy: req.user.id,
+    note: req.body.note,
+    changes,
+  }).save();
+
+  return res.status(200).json({ success: true, data: variant });
+}
+
+module.exports = { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions, deleteVariant, editVariant };
