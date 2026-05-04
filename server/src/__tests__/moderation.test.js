@@ -335,3 +335,142 @@ describe('ModerationLog integrity', () => {
     expect(logs).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Soft-delete filtering in moderation queues
+// ---------------------------------------------------------------------------
+
+describe('GET /api/moderation/concepts/queue — excludes soft-deleted concepts', () => {
+  test('does not return a soft-deleted pending concept in the queue', async () => {
+    await Concept.create({ englishGloss: 'visible', partOfSpeech: 'noun', status: 'pending' });
+    await Concept.create({ englishGloss: 'hidden', partOfSpeech: 'noun', status: 'pending', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const glosses = res.body.data.map((c) => c.englishGloss);
+    expect(glosses).toContain('visible');
+    expect(glosses).not.toContain('hidden');
+  });
+});
+
+describe('GET /api/moderation/variants/queue — excludes soft-deleted variants', () => {
+  test('does not return a soft-deleted pending variant in the queue', async () => {
+    const concept = await Concept.create({ englishGloss: 'tree', partOfSpeech: 'noun', status: 'published' });
+    await Variant.create({ concept: concept._id, pashto: 'ونه', region: 'Kohat', definition: 'tree visible', status: 'pending' });
+    await Variant.create({ concept: concept._id, pashto: 'وني', region: 'Hangu', definition: 'tree hidden', status: 'pending', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.get('/api/moderation/variants/queue').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const definitions = res.body.data.map((v) => v.definition);
+    expect(definitions).toContain('tree visible');
+    expect(definitions).not.toContain('tree hidden');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Moderator self-approval restriction in moderation flow
+// (concepts via PATCH /api/concepts/:id/status, variants via PATCH /api/variants/:id/status)
+// ---------------------------------------------------------------------------
+
+describe('Moderator self-approval — concept status transitions (moderation context)', () => {
+  test('moderator cannot approve their own pending concept', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const concept = await Concept.create({
+      englishGloss: 'modselfreview1',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('moderator cannot reject their own pending concept', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const concept = await Concept.create({
+      englishGloss: 'modselfreject2',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'conflict of interest' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('admin is NOT restricted — can approve their own concept', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'admin', id: adminId });
+    const concept = await Concept.create({
+      englishGloss: 'adminownsubmit2',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(adminId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+});
+
+describe('Moderator self-approval — variant status transitions (moderation context)', () => {
+  let modConcept;
+
+  beforeEach(async () => {
+    modConcept = await Concept.create({ englishGloss: 'river', partOfSpeech: 'noun', status: 'published' });
+  });
+
+  test('moderator cannot approve a variant they submitted', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const variant = await Variant.create({
+      concept: modConcept._id,
+      pashto: 'سیند',
+      region: 'Kohat',
+      definition: 'river',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('a different moderator CAN approve a variant submitted by another moderator', async () => {
+    const submitterModId = new mongoose.Types.ObjectId().toString();
+    const reviewerModId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const variant = await Variant.create({
+      concept: modConcept._id,
+      pashto: 'سیند',
+      region: 'Kohat',
+      definition: 'river',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(submitterModId),
+    });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+});

@@ -411,8 +411,8 @@ describe('GET /api/concepts/search', () => {
 
   test('does not return unpublished concepts', async () => {
     await Concept.create([
-      { englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' },
-      { englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' },
+      { englishGloss: 'house pending',  partOfSpeech: 'noun', status: 'pending' },
+      { englishGloss: 'house approved', partOfSpeech: 'noun', status: 'approved' },
     ]);
     const res = await request.get('/api/concepts/search?q=house');
     expect(res.status).toBe(200);
@@ -535,3 +535,555 @@ describe('PATCH /api/concepts/:id/status', () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Soft-delete: DELETE /api/concepts/:id
+// ---------------------------------------------------------------------------
+
+describe('DELETE /api/concepts/:id', () => {
+  test('returns 403 when role is moderator', async () => {
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 403 when role is user', async () => {
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'user' });
+    const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 401 when no token is provided', async () => {
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const res = await request.delete(`/api/concepts/${concept._id}`);
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 404 when concept does not exist', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'admin' });
+    const res = await request.delete(`/api/concepts/${fakeId}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('admin soft-deletes the concept and returns 200 with updated doc', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isDeleted).toBe(true);
+    expect(res.body.data.deletedAt).toBeDefined();
+    expect(res.body.data.deletedBy).toBe(adminId);
+  });
+
+  test('soft-delete sets isDeleted, deletedAt, deletedBy on the document in the database', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    const updated = await Concept.findById(concept._id);
+    expect(updated.isDeleted).toBe(true);
+    expect(updated.deletedAt).toBeDefined();
+    expect(updated.deletedBy.toString()).toBe(adminId);
+  });
+
+  test('writes a ModerationLog entry with action "deleted"', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    const log = await ModerationLog.findOne({ targetId: concept._id, targetModel: 'Concept', action: 'deleted' });
+    expect(log).not.toBeNull();
+    expect(log.performedBy.toString()).toBe(adminId);
+  });
+
+  test('response uses the envelope shape', async () => {
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
+    const token = makeToken({ role: 'admin' });
+    const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.body).toHaveProperty('success', true);
+    expect(res.body).toHaveProperty('data');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Soft-delete: DELETE /api/variants/:id
+// ---------------------------------------------------------------------------
+
+describe('DELETE /api/variants/:id', () => {
+  let concept;
+
+  beforeEach(async () => {
+    concept = await Concept.create({ englishGloss: 'water', partOfSpeech: 'noun', status: 'published' });
+  });
+
+  test('returns 403 when role is moderator', async () => {
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 401 when no token is provided', async () => {
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
+    const res = await request.delete(`/api/variants/${variant._id}`);
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('returns 404 when variant does not exist', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'admin' });
+    const res = await request.delete(`/api/variants/${fakeId}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('admin soft-deletes the variant and returns 200 with updated doc', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    const res = await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isDeleted).toBe(true);
+    expect(res.body.data.deletedAt).toBeDefined();
+    expect(res.body.data.deletedBy).toBe(adminId);
+  });
+
+  test('soft-delete sets isDeleted, deletedAt, deletedBy on the document in the database', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
+    const updated = await Variant.findById(variant._id);
+    expect(updated.isDeleted).toBe(true);
+    expect(updated.deletedAt).toBeDefined();
+    expect(updated.deletedBy.toString()).toBe(adminId);
+  });
+
+  test('writes a ModerationLog entry with action "deleted"', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
+    const token = makeToken({ role: 'admin', id: adminId });
+    await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
+    const log = await ModerationLog.findOne({ targetId: variant._id, targetModel: 'Variant', action: 'deleted' });
+    expect(log).not.toBeNull();
+    expect(log.performedBy.toString()).toBe(adminId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Soft-delete filtering: concepts are invisible after deletion
+// ---------------------------------------------------------------------------
+
+describe('Soft-deleted Concept is invisible to all public query paths', () => {
+  test('GET /api/concepts/:id returns 404 for a soft-deleted concept', async () => {
+    const concept = await Concept.create({ englishGloss: 'river', partOfSpeech: 'noun', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get(`/api/concepts/${concept._id}`);
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('GET /api/concepts does not include soft-deleted concepts', async () => {
+    await Concept.create({ englishGloss: 'river', partOfSpeech: 'noun', status: 'published' });
+    await Concept.create({ englishGloss: 'stone', partOfSpeech: 'noun', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get('/api/concepts');
+    expect(res.status).toBe(200);
+    const glosses = res.body.data.map((c) => c.englishGloss);
+    expect(glosses).toContain('river');
+    expect(glosses).not.toContain('stone');
+  });
+
+  test('GET /api/concepts/search does not return soft-deleted concepts', async () => {
+    await Concept.create({ englishGloss: 'mountain', partOfSpeech: 'noun', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get('/api/concepts/search?q=mountain');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  test('GET /api/concepts/suggest does not return soft-deleted concepts', async () => {
+    await Concept.create({ englishGloss: 'valley', partOfSpeech: 'noun', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get('/api/concepts/suggest?q=valley');
+    expect(res.status).toBe(200);
+    const glosses = res.body.data.map((c) => c.englishGloss);
+    expect(glosses).not.toContain('valley');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Soft-delete filtering: variants are invisible after deletion
+// ---------------------------------------------------------------------------
+
+describe('Soft-deleted Variant is invisible to all public query paths', () => {
+  let concept;
+
+  beforeEach(async () => {
+    concept = await Concept.create({ englishGloss: 'sky', partOfSpeech: 'noun', status: 'published' });
+  });
+
+  test('GET /api/variants/:id returns 404 for a soft-deleted variant', async () => {
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اسمان', region: 'Kohat', definition: 'sky', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get(`/api/variants/${variant._id}`);
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('GET /api/concepts/:id does not include soft-deleted variants in the variants array', async () => {
+    await Variant.create({ concept: concept._id, pashto: 'اسمان', region: 'Kohat', definition: 'sky', status: 'published' });
+    await Variant.create({ concept: concept._id, pashto: 'آسمان', region: 'Hangu', definition: 'sky deleted', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get(`/api/concepts/${concept._id}`);
+    expect(res.status).toBe(200);
+    const variantDefinitions = res.body.data.variants.map((v) => v.definition);
+    expect(variantDefinitions).toContain('sky');
+    expect(variantDefinitions).not.toContain('sky deleted');
+  });
+
+  test('GET /api/variants/search does not return soft-deleted variants', async () => {
+    await Variant.create({ concept: concept._id, pashto: 'اسمان', region: 'Kohat', definition: 'the sky above', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
+    const res = await request.get('/api/variants/search?q=اسمان');
+    expect(res.status).toBe(200);
+    const pashtos = res.body.data.map((v) => v.pashto);
+    expect(pashtos).not.toContain('اسمان');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Normalized duplicate detection: POST /api/concepts
+// ---------------------------------------------------------------------------
+
+describe('POST /api/concepts — normalized duplicate detection', () => {
+  const valid = () => ({ englishGloss: 'house', partOfSpeech: 'noun' });
+
+  test('returns 409 when concept with exact same englishGloss already exists', async () => {
+    const token = makeToken();
+    await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
+    expect(res.status).toBe(409);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('returns 409 when concept with same gloss but different case already exists (normalized match)', async () => {
+    const token = makeToken();
+    await Concept.create({ englishGloss: 'House', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house', partOfSpeech: 'noun' });
+    expect(res.status).toBe(409);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('returns 409 when concept with same gloss but extra whitespace already exists (normalized match)', async () => {
+    const token = makeToken();
+    await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: '  house  ', partOfSpeech: 'noun' });
+    expect(res.status).toBe(409);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('returns 201 when concept with a different gloss is submitted', async () => {
+    const token = makeToken();
+    await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
+    const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'water', partOfSpeech: 'noun' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Normalized duplicate detection: POST /api/variants
+// ---------------------------------------------------------------------------
+
+describe('POST /api/variants — normalized duplicate detection', () => {
+  let conceptIdForDupTest;
+
+  beforeEach(async () => {
+    const concept = await Concept.create({ englishGloss: 'duphouse', partOfSpeech: 'noun', status: 'published' });
+    conceptIdForDupTest = concept._id.toString();
+  });
+
+  test('returns 409 when variant with same pashto + concept + region already exists (normalized)', async () => {
+    const token = makeToken();
+    await Variant.create({
+      concept: conceptIdForDupTest,
+      pashto: 'کور',
+      normalizedPashto: 'کور'.trim().normalize('NFC'),
+      region: 'Kohat',
+      definition: 'existing dwelling',
+      status: 'pending',
+    });
+    const res = await request
+      .post('/api/variants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ conceptId: conceptIdForDupTest, pashto: 'کور', region: 'Kohat', definition: 'a dwelling place' });
+    expect(res.status).toBe(409);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('returns 201 when same pashto word is submitted for a different region', async () => {
+    const token = makeToken();
+    await Variant.create({
+      concept: conceptIdForDupTest,
+      pashto: 'کور',
+      normalizedPashto: 'کور'.trim().normalize('NFC'),
+      region: 'Kohat',
+      definition: 'existing dwelling',
+      status: 'pending',
+    });
+    const res = await request
+      .post('/api/variants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ conceptId: conceptIdForDupTest, pashto: 'کور', region: 'Hangu', definition: 'a dwelling place' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Moderator self-approval restriction: PATCH /api/concepts/:id/status
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/concepts/:id/status — moderator self-approval restriction', () => {
+  test('moderator gets 403 when trying to approve a concept they submitted', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const concept = await Concept.create({
+      englishGloss: 'selfapprovetest1',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('moderator gets 403 when trying to reject a concept they submitted', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const concept = await Concept.create({
+      englishGloss: 'selfrejecttest1',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'nope' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('a different moderator (not the submitter) can approve the concept', async () => {
+    const submitterModId = new mongoose.Types.ObjectId().toString();
+    const reviewerModId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const concept = await Concept.create({
+      englishGloss: 'othermodapprove1',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(submitterModId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+
+  test('admin can approve a concept they submitted themselves', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'admin', id: adminId });
+    const concept = await Concept.create({
+      englishGloss: 'adminselfapprove1',
+      partOfSpeech: 'noun',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(adminId),
+    });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Moderator self-approval restriction: PATCH /api/variants/:id/status
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/variants/:id/status — moderator self-approval restriction', () => {
+  let variantSelfApprovalConcept;
+
+  beforeEach(async () => {
+    variantSelfApprovalConcept = await Concept.create({ englishGloss: 'wind', partOfSpeech: 'noun', status: 'published' });
+  });
+
+  test('moderator gets 403 when trying to approve a variant they submitted', async () => {
+    const modId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: modId });
+    const variant = await Variant.create({
+      concept: variantSelfApprovalConcept._id,
+      pashto: 'باد',
+      region: 'Kohat',
+      definition: 'wind',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(modId),
+    });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/cannot approve or reject their own/i);
+  });
+
+  test('a different moderator can approve a variant they did not submit', async () => {
+    const submitterModId = new mongoose.Types.ObjectId().toString();
+    const reviewerModId = new mongoose.Types.ObjectId().toString();
+    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const variant = await Variant.create({
+      concept: variantSelfApprovalConcept._id,
+      pashto: 'باد',
+      region: 'Kohat',
+      definition: 'wind',
+      status: 'pending',
+      submittedBy: new mongoose.Types.ObjectId(submitterModId),
+    });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Soft-delete DB persistence — record survives as isDeleted: true
+// ---------------------------------------------------------------------------
+
+describe('Soft-delete DB persistence — Concept', () => {
+  test('soft-deleted concept still exists in DB with isDeleted:true', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const adminToken = makeToken({ role: 'admin', id: adminId });
+    const concept = await Concept.create({ englishGloss: 'persistence-concept', partOfSpeech: 'noun' });
+
+    await request
+      .delete(`/api/concepts/${concept._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    // Record must still exist in DB — soft delete, not hard delete
+    const found = await Concept.findById(concept._id);
+    expect(found).not.toBeNull();
+    expect(found.isDeleted).toBe(true);
+    expect(found.deletedAt).toBeDefined();
+    expect(found.deletedBy.toString()).toBe(adminId);
+  });
+});
+
+describe('Soft-delete DB persistence — Variant', () => {
+  test('soft-deleted variant still exists in DB with isDeleted:true', async () => {
+    const adminId = new mongoose.Types.ObjectId().toString();
+    const adminToken = makeToken({ role: 'admin', id: adminId });
+    const concept = await Concept.create({ englishGloss: 'persistence-variant-concept', partOfSpeech: 'noun' });
+    const variant = await Variant.create({
+      concept: concept._id,
+      pashto: 'ساه',
+      region: 'Kohat',
+      definition: 'breath',
+    });
+
+    await request
+      .delete(`/api/variants/${variant._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    const found = await Variant.findById(variant._id);
+    expect(found).not.toBeNull();
+    expect(found.isDeleted).toBe(true);
+    expect(found.deletedAt).toBeDefined();
+    expect(found.deletedBy.toString()).toBe(adminId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Soft-delete enables reuse — same identity can be re-submitted after delete
+// ---------------------------------------------------------------------------
+
+describe('Soft-delete enables Concept reuse', () => {
+  test('same englishGloss can be submitted again after the original is soft-deleted', async () => {
+    const adminToken = makeToken({ role: 'admin' });
+    const userToken = makeToken({ role: 'user' });
+
+    // Create and soft-delete the original
+    const original = await Concept.create({ englishGloss: 'Rebirth Test', partOfSpeech: 'noun' });
+    await request
+      .delete(`/api/concepts/${original._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    // Resubmit with the same gloss — partial filter index allows this
+    const res = await request
+      .post('/api/concepts')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ englishGloss: 'Rebirth Test', partOfSpeech: 'noun' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.englishGloss).toBe('Rebirth Test');
+  });
+});
+
+describe('Soft-delete enables Variant reuse', () => {
+  test('same pashto+concept+region can be submitted again after the original is soft-deleted', async () => {
+    const adminToken = makeToken({ role: 'admin' });
+    const userToken = makeToken({ role: 'user' });
+
+    const concept = await Concept.create({ englishGloss: 'reuse-variant-concept', partOfSpeech: 'noun' });
+
+    // Create original variant
+    const original = await Variant.create({
+      concept: concept._id,
+      pashto: 'رڼا',
+      region: 'Kohat',
+      definition: 'light',
+    });
+
+    // Soft-delete it
+    await request
+      .delete(`/api/variants/${original._id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    // Resubmit with the same pashto+concept+region
+    const res = await request
+      .post('/api/variants')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        conceptId: concept._id.toString(),
+        pashto: 'رڼا',
+        region: 'Kohat',
+        definition: 'light (resubmitted)',
+      });
+
+    expect(res.status).toBe(201);
+  });
+});
+
