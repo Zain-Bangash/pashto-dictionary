@@ -104,7 +104,7 @@ describe('ConceptDetail page', () => {
     api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
     renderDetail();
     expect(await screen.findByText('a dwelling place')).toBeInTheDocument();
-    expect(await screen.findByText('home')).toBeInTheDocument();
+    expect(await screen.findByText('← Back to concepts')).toBeInTheDocument();
   });
 
   test('renders variant example when present', async () => {
