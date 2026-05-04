@@ -24,7 +24,7 @@ This worked well for a prototype. A word was submitted, reviewed, and published 
 
 ## The Problem the Flat Model Could Not Solve
 
-Pashto is not uniform. Even within a single dialect, the same concept can have completely different words depending on which valley the speaker is from. "Sun" is *lmar* in Kohat, *nmar* in Tirah, and *merastarga* in Hangu. These are not synonyms — they are regionally distinct words that share a meaning.
+Pashto is not uniform. Even within a single dialect, the same concept can have completely different words depending on which valley the speaker is from. For example "Sun" can *lmar* in Kohat, *nmar* in Tirah, and *merastarga* in Hangu. These are not synonyms — they are regionally distinct words that share a meaning.
 
 The flat `Entry` model had no way to express this relationship. Each variant would become a separate, unlinked document. A user searching for "sun" would find three unrelated entries with no indication that they referred to the same thing. The dictionary would fragment the language rather than preserve its structure.
 
@@ -71,18 +71,125 @@ Every transition on either a Concept or a Variant writes a record to `Moderation
 
 Invalid transitions (e.g. `published → pending`) are rejected with a 400 — the state machine is enforced at the controller level, not left to the client to honour.
 
+### Governance: Moderator Self-Approval Restriction
+
+A moderator who is also an active contributor faces an inherent conflict of interest: they could submit an entry and then immediately approve it themselves, bypassing independent review entirely. To prevent this, the system enforces a submitter-separation rule at the controller level before any transition is applied.
+
+If the acting user's role is `moderator` and their ID matches the `submittedBy` field on the target document, the request is rejected with a 403:
+
+```js
+if (req.user.role === 'moderator' && entry.submittedBy.equals(req.user._id)) {
+  return res.status(403).json({ success: false, error: { message: 'Moderators cannot approve their own submissions' } });
+}
+```
+
+Admins are exempt from this restriction. The rationale is that admins operate at a higher trust level and are accountable for overall system integrity in a way that moderators are not. This rule was chosen over more complex alternatives (e.g. blocking anyone who touched the document at any prior stage) because it is simple to reason about, auditable in the ModerationLog, and covers the primary conflict-of-interest case without introducing ambiguous edge cases.
+
+The same self-separation rule extends to moderator edits (see *Moderator and Admin Edits* below). Moderators cannot edit their own submissions; admins can. The asymmetry is intentional for the same reason: admin is the final authority and must be able to correct their own mistakes without escalating to another admin.
+
 ---
 
-## Duplicate Detection
+## Moderator and Admin Edits
 
-When a user submits a new variant, the backend checks whether that exact Pashto word already exists as a variant anywhere in the system before inserting:
+### Two separate edit paths
+
+The system has two distinct mechanisms for changing a submission's content, and it is important that they remain separate:
+
+**User resubmission** (`PUT /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
+
+**Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status. A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
+
+Keeping these as two different routes with different semantics prevents ambiguity about who changed what and why. A `resubmitted` log entry always means the original submitter took action; an `edited` entry always means staff did.
+
+### ModerationLog `changes` field
+
+The `ModerationLog` schema includes an optional `changes` field (`Schema.Types.Mixed`) that stores a before/after diff for `edited` actions and a summary for `merged` actions:
+
+```js
+// edited
+changes: { pashto: { from: 'old', to: 'new' }, region: { from: 'Kohat', to: 'Tirah' } }
+
+// merged
+changes: { mergedInto: '<targetId>', variantsMoved: ['<id1>'], variantsSkipped: ['<id2>'] }
+```
+
+Only fields that actually changed appear in the diff — unchanged fields are omitted. This keeps the log readable and ensures the admin dashboard can show meaningful diffs without storing noise.
+
+### Concept merge
+
+The merge tool (`POST /api/concepts/:sourceId/merge`) addresses the near-duplicate problem: two concepts like "Love" and "Love / Affection" that a submitter treated as different but a moderator identifies as the same. The operation:
+
+1. Moves all non-deleted variants from the source concept to the target concept, running the duplicate check per variant and skipping any that would conflict.
+2. Soft-deletes the source concept.
+3. Logs the entire operation on the source concept as a single `merged` entry.
+
+The response surfaces any skipped variants so the moderator knows they need manual attention. The merge is available to both moderators and admins, and is accessible from the moderation queue (via the similar-concepts panel) and from the concepts list in the dashboard.
+
+The similar-concepts panel calls the existing `GET /api/concepts/suggest` endpoint — no new query mechanism was needed. The panel filters out the current item from the results before rendering.
+
+---
+
+## Soft Deletes and Content Archival
+
+Concepts and Variants support soft deletion rather than hard deletion. When an admin removes a document, three fields are written:
+
+```
+isDeleted  Boolean   default: false
+deletedAt  Date
+deletedBy  ObjectId  ref: User
+```
+
+All list endpoints, search queries, and the Word of the Day algorithm include `{ isDeleted: false }` as an implicit filter. From the perspective of any public-facing request, soft-deleted content does not exist.
+
+The decision against hard deletes is deliberate. The `ModerationLog` collection holds transition records that reference documents by ID. A hard delete would leave those log entries pointing at documents that no longer exist, breaking the audit trail and making the moderation history uninterpretable. Soft deletion keeps the audit record intact while hiding the content from all normal queries.
+
+There is a secondary benefit: incorrectly deleted content can be recovered by an admin without reconstructing it from logs. In a community-contributed system where moderation errors are possible, this recovery path has real practical value.
+
+Soft deletion applies only to `Concept` and `Variant`. User account deletion is a different concern — it may carry data erasure obligations and is handled separately, not by this mechanism.
+
+---
+
+## Normalization and Duplicate Detection
+
+### The problem with raw string comparison
+
+The initial duplicate check compared raw user input directly against stored values:
 
 ```js
 const existing = await Variant.findOne({ pashto: req.body.pashto });
 if (existing) return res.status(409).json({ ... });
 ```
 
-For concept creation, the submit form calls a `GET /api/concepts/suggest?q=` endpoint as the user types their English gloss, returning up to five similar existing concepts. This nudges users to attach their variant to an existing concept rather than fragmenting the data with near-duplicate concepts.
+This approach has two significant failure modes. First, it is sensitive to superficial input differences: a trailing space, a different capitalisation of an English gloss, or a Pashto word encoded differently by two different mobile keyboards would all bypass the check and create duplicate entries that appear identical to a human reader. Second, it has a race condition: two concurrent requests can both pass the pre-check query, both proceed to insert, and both succeed — producing a duplicate that the application-level guard was never capable of preventing.
+
+### Normalized fields
+
+To address the first problem, three normalized fields are derived automatically before any document is saved. They are set in Mongoose pre-save hooks and are never writable by client input:
+
+| Field | Source | Transformation |
+|---|---|---|
+| `Concept.normalizedGloss` | `englishGloss` | `.toLowerCase().trim()` |
+| `Variant.normalizedPashto` | `pashto` | `.trim().normalize('NFC')` |
+| `Variant.normalizedPhonetic` | `phonetic` | `.toLowerCase().trim()` |
+
+The NFC normalization on `normalizedPashto` deserves specific attention. Arabic-script keyboards — particularly on Android and iOS — can produce different Unicode byte sequences for the same visual character. One keyboard may output a precomposed code point; another may output a base character with a combining diacritical mark. Both render identically on screen but are not equal as strings. Without NFC normalization, two users submitting the same Pashto word from different phones would both pass the duplicate check. `.normalize('NFC')` collapses all representations to their canonical composed form, making the comparison encoding-independent. It requires no external library — it is a native JavaScript method.
+
+All duplicate checks use the normalized fields, not the raw input fields.
+
+### Database-level constraints
+
+To address the race condition, MongoDB unique indexes enforce the identity rules at the database layer:
+
+- `Concept`: unique index on `normalizedGloss`
+- `Variant`: compound unique index on `{ concept, normalizedPashto, region }`
+
+These constraints mean that even if two concurrent requests both pass the application-level pre-check, the database will reject the second insert with an `E11000 duplicate key` error (MongoDB error code 11000). The server catches this error and returns a 409 Conflict rather than letting it surface as a 500. The result is race-condition safety that is guaranteed by the storage layer, not by the timing of application-level queries.
+
+The identity rule for a variant is deliberately scoped to `concept + pashto + region` rather than globally unique across the entire collection. The same Pashto word can legitimately appear under two different concepts — a form of polysemy that is linguistically valid — and the compound index correctly permits this while still preventing exact duplicates within a single concept and region.
+
+### Why phonetics is excluded from identity rules
+
+`normalizedPhonetic` is stored and used for search ranking and display, but it is deliberately excluded from the duplicate identity model. The reasoning is that two contributors may transcribe the same Pashto word differently depending on transcription convention or dialect familiarity — one might write *lmar*, another *l'mar*. These are not two different words; they are two representations of the same word. Treating `phonetic` as part of the duplicate key would create false duplicates and fragment entries that genuinely belong together. The identity model is therefore: concept + pashto script + region. Phonetics is additional metadata, not an identifier.
 
 ---
 
@@ -190,7 +297,8 @@ All UI is built from scratch with Tailwind CSS utility classes. This was a delib
 |---|---|---|
 | Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
 | Backend | Node.js + Express | `express-async-errors` for clean async error handling |
-| Database | MongoDB via Mongoose | Two-collection Concept/Variant model |
+| Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
 | Auth | JWT (jsonwebtoken + bcryptjs) | Role-based: user / moderator / admin |
 | Validation | express-validator | All mutation endpoints validated before DB access |
+| Normalization | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
 | Testing | Vitest (client) + Jest + MongoMemoryServer (server) | In-memory DB for server integration tests |

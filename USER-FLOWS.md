@@ -42,7 +42,7 @@ As a user I should not be able to submit a variant with the same Pashto word and
 
 As a user, in Step 2 of the Submit form, I can optionally add a note to the moderators — such as a book reference, page number, or link — to help them verify the word. This note is visible to moderators and admins in the moderation queue but is not shown on the public concept detail page.
 
-As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published).
+As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
 
 ---
 
@@ -66,6 +66,14 @@ As a moderator I should be able to view the Concepts list page in the dashboard.
 
 As a moderator I should not be able to access the Users or Log pages — those are admin-only.
 
+As a moderator I should be able to reject a pending item by clicking Reject, which opens a modal requiring me to type a reason before confirming. The reason is stored and shown to the submitter in their My Submissions page.
+
+As a moderator I should be able to edit any submission that was not submitted by me, at any point in its lifecycle, using the Edit button on the queue card. The inline form opens pre-populated with the current values. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change.
+
+As a moderator I should see a "Similar concepts" panel on each concept card in the queue, populated by the suggest endpoint using that concept's English gloss. If a match is found I can click "Merge into this" to open a confirmation modal, enter a note, and merge the pending concept into the existing one. All variants are moved to the target; the source concept is soft-deleted.
+
+As a moderator I should be able to trigger a merge from the Concepts list page in the dashboard, not only from the queue.
+
 ---
 
 ## Admin
@@ -80,4 +88,8 @@ As an admin I should be able to publish an approved concept or variant, which mo
 
 As an admin I should be able to view the Users page in the dashboard, which lists all registered users.
 
-As an admin I should be able to view the Moderation Log page, which shows a full audit trail of every status transition — submitted, approved, rejected, published, resubmitted, profile_updated — with the actor's username and timestamp.
+As an admin I should be able to view the Moderation Log page, which shows a full audit trail of every status transition — submitted, approved, rejected, published, resubmitted, edited, merged, profile_updated — with the actor's username, timestamp, and for edited entries, the before/after field values.
+
+As an admin I should be able to edit any submission including my own, using the same inline Edit form available to moderators.
+
+As an admin I should be able to reassign a variant to a different concept by using the Concept search field inside the variant Edit form. Suggestions show the concept's English gloss and ID. Selecting one and saving moves the variant to the new concept in place.

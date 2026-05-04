@@ -452,6 +452,88 @@ chore(client): add loading and error states to all data fetches
 
 ---
 
+### Phase 11 — TypeScript Migration (Server)
+
+**Goal:** Convert the backend from CommonJS JavaScript to TypeScript. Client stays JSX/JS.
+
+**Steps:**
+1. Install `typescript`, `ts-node`, `ts-jest`, and `@types/*` packages
+2. Add `server/tsconfig.json` (strict mode, CommonJS, outDir: `dist/`)
+3. Update `jest.config.js` to use `ts-jest` preset
+4. Rename files one layer at a time: `utils/` → `middleware/` → `models/` → `controllers/` → `routes/` → `index.ts`
+5. Add `IUser`, `IConcept`, `IVariant`, `IModerationLog` interfaces to models
+6. Update `package.json` scripts: `dev` → `ts-node`, `start` → `node dist/`, add `build` → `tsc`
+
+**Commits this phase:**
+```
+chore(server): add tsconfig and ts-jest, install TypeScript deps
+refactor(server): migrate utils and middleware to TypeScript
+refactor(models): add TypeScript interfaces to all Mongoose schemas
+refactor(controllers): convert controllers to TypeScript
+refactor(routes): convert routes and index to TypeScript
+```
+
+**Done when:** `npx tsc --noEmit` passes with zero errors, `npm test` still passes
+
+> Full details in `MigrationPlan.md` — Phase 11
+
+---
+
+### Phase 12 — AWS Deployment (Amplify + Lambda)
+
+**Goal:** Host the React frontend on AWS Amplify and the Express backend on AWS Lambda + API Gateway. Zero code changes to business logic.
+
+**Steps:**
+1. Extract Express `app` into `server/src/app.ts` (separate from `index.ts`)
+2. Add `server/src/lambda.ts` entry point using `serverless-http`
+3. Create `amplify.yml` build config at project root
+4. Connect GitHub repo to AWS Amplify for automatic frontend deploys
+5. Deploy Lambda + API Gateway, set environment variables
+6. Update `client/.env` `VITE_API_URL` to the API Gateway URL
+
+**Commits this phase:**
+```
+refactor(server): extract app from index for serverless compatibility
+feat(server): add Lambda entry point with serverless-http
+chore: add amplify.yml build config
+chore(client): update VITE_API_URL to API Gateway endpoint
+```
+
+**Done when:** frontend live on Amplify URL, API calls reach Lambda, all tests still pass locally
+
+> Full details in `MigrationPlan.md` — Phase 12
+
+---
+
+### Phase 13 — AWS Cognito Migration
+
+**Goal:** Replace JWT/bcrypt auth with AWS Cognito. This is the highest-effort phase — treat it as a full TDD cycle.
+
+**Steps:**
+1. Create Cognito User Pool with email + password sign-in
+2. Replace `authController.ts` register/login logic with Cognito SDK calls
+3. Rewrite `auth.ts` middleware to verify Cognito tokens via `aws-jwt-verify`
+4. Remove `User.passwordHash`; add `User.cognitoSub`
+5. Replace frontend `AuthContext` axios calls with `@aws-amplify/auth` SDK
+6. Rewrite auth tests to mock Cognito; update E2E global setup for Cognito tokens
+
+**Commits this phase:**
+```
+feat(auth): create Cognito User Pool and configure client
+feat(auth): replace register/login with Cognito signUp/initiateAuth
+feat(middleware): verify Cognito JWTs with aws-jwt-verify
+refactor(models): remove passwordHash, add cognitoSub to User
+feat(client): migrate AuthContext to Amplify Auth SDK
+test(auth): rewrite auth tests for Cognito mocks
+test(e2e): add Cognito token helper to global setup
+```
+
+**Done when:** register, login, /me work via Cognito, protected routes reject invalid tokens, all tests pass
+
+> Full details in `MigrationPlan.md` — Phase 13
+
+---
+
 ## Professional Practices Checklist
 
 ### Before every coding session
