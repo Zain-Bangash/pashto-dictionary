@@ -24,4 +24,24 @@ function verifyToken(req, res, next) {
   }
 }
 
-module.exports = { verifyToken };
+// Populates req.user if a valid Bearer token is present, but does not block
+// unauthenticated requests. Used on routes that are public by default but grant
+// additional access to authenticated roles (e.g. GET /api/variants/:id).
+function optionalVerifyToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+  const token = authHeader.slice(7);
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({
+      success: false,
+      error: { message: 'Invalid or expired token' },
+    });
+  }
+  next();
+}
+
+module.exports = { verifyToken, optionalVerifyToken };

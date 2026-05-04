@@ -75,4 +75,18 @@ export function searchVariants(params = {}) {
   return api.get(`/api/variants/search${qs ? `?${qs}` : ''}`);
 }
 
+// ── Moderation enhancement functions ──────────────────────────────────────────
+
+export function editConcept(id, data) {
+  return api.patch(`/api/concepts/${id}/edit`, data);
+}
+
+export function editVariant(id, data) {
+  return api.patch(`/api/variants/${id}/edit`, data);
+}
+
+export function mergeConcepts(sourceId, body) {
+  return api.post(`/api/concepts/${sourceId}/merge`, body);
+}
+
 export default api;

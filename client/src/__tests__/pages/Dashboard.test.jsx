@@ -361,6 +361,13 @@ describe('DashboardQueue page — moderation queue', () => {
     });
     renderQueue();
     await user.click(await screen.findByRole('button', { name: /reject/i }));
+    // Rejection now requires a note via modal
+    const textarea = document.querySelector('textarea');
+    if (textarea) {
+      await user.type(textarea, 'Test rejection reason');
+      const confirmBtn = screen.queryByRole('button', { name: /confirm/i });
+      if (confirmBtn) await user.click(confirmBtn);
+    }
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith(
         expect.stringMatching(/\/api\/concepts\/concept456\/status/),
