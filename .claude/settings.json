@@ -15,7 +15,8 @@
       "Bash(git commit --allow-empty -m ' *)",
       "Bash(node -e ' *)",
       "Bash(git push *)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx jest *)"
     ]
   }
 }
