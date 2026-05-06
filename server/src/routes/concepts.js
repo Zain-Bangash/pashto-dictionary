@@ -14,6 +14,7 @@ const {
   deleteConcept,
   editConcept,
   mergeConcepts,
+  updateConcept,
 } = require('../controllers/conceptController');
 
 const router = Router();
@@ -31,6 +32,11 @@ const statusValidators = [
     .withMessage('status must be approved, rejected, or published'),
 ];
 
+const updateValidators = [
+  body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
+  body('partOfSpeech').optional().isIn(PART_OF_SPEECH).withMessage(`partOfSpeech must be one of: ${PART_OF_SPEECH.join(', ')}`),
+];
+
 // static paths must come before /:id
 router.get('/wotd',           getWotd);
 router.get('/suggest',        suggestConcepts);
@@ -39,6 +45,7 @@ router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
 router.get('/',               listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
+router.patch('/:id', verifyToken, updateValidators, updateConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
 router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editConcept);
 router.post('/:sourceId/merge', verifyToken, requireModeratorOrAdmin, mergeConcepts);

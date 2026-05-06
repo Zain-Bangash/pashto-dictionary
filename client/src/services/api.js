@@ -47,6 +47,10 @@ export function transitionConceptStatus(id, body) {
   return api.patch(`/api/concepts/${id}/status`, body);
 }
 
+export function updateConcept(id, body) {
+  return api.patch(`/api/concepts/${id}`, body);
+}
+
 // ── Variant service functions ──────────────────────────────────────────────
 
 export function getVariants(params = {}) {
