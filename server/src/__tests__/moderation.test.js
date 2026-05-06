@@ -427,6 +427,124 @@ describe('Moderator self-approval — concept status transitions (moderation con
   });
 });
 
+// ---------------------------------------------------------------------------
+// Concept-variant state integrity — publish guard
+// ---------------------------------------------------------------------------
+
+describe('Concept-variant integrity — publish guard', () => {
+  test('returns 400 when publishing a variant whose concept is not published', async () => {
+    const concept = await Concept.create({ englishGloss: 'guard-test', partOfSpeech: 'noun', status: 'approved' });
+    const variant = await Variant.create({
+      concept: concept._id,
+      pashto: 'ازمیون',
+      region: 'Kohat',
+      definition: 'test',
+      status: 'approved',
+    });
+    const token = makeToken({ role: 'admin' });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'published' });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toMatch(/not yet published/i);
+  });
+
+  test('returns 200 when publishing a variant whose concept is published', async () => {
+    const concept = await Concept.create({ englishGloss: 'guard-pass', partOfSpeech: 'noun', status: 'published' });
+    const variant = await Variant.create({
+      concept: concept._id,
+      pashto: 'خوشال',
+      region: 'Kohat',
+      definition: 'happy',
+      status: 'approved',
+    });
+    const token = makeToken({ role: 'admin' });
+    const res = await request
+      .patch(`/api/variants/${variant._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'published' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('published');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Concept-variant state integrity — cascade reject
+// ---------------------------------------------------------------------------
+
+describe('Concept-variant integrity — cascade reject', () => {
+  test('rejecting a concept soft-deletes its pending variants', async () => {
+    const concept = await Concept.create({ englishGloss: 'cascade-pending', partOfSpeech: 'noun', status: 'pending' });
+    const v1 = await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Kohat', definition: 'home', status: 'pending' });
+    const v2 = await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Hangu', definition: 'home', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'not valid' });
+    expect(res.status).toBe(200);
+    const saved1 = await Variant.findById(v1._id);
+    const saved2 = await Variant.findById(v2._id);
+    expect(saved1.isDeleted).toBe(true);
+    expect(saved2.isDeleted).toBe(true);
+  });
+
+  test('rejecting a pending concept also soft-deletes its already-approved variants', async () => {
+    // Scenario: variant was approved before the concept was reviewed,
+    // then the concept itself gets rejected.
+    const concept = await Concept.create({ englishGloss: 'cascade-approved-variant', partOfSpeech: 'noun', status: 'pending' });
+    const variant = await Variant.create({ concept: concept._id, pashto: 'سیند', region: 'Kohat', definition: 'river', status: 'approved' });
+    const token = makeToken({ role: 'moderator' });
+    const res = await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'not valid' });
+    expect(res.status).toBe(200);
+    const saved = await Variant.findById(variant._id);
+    expect(saved.isDeleted).toBe(true);
+  });
+
+  test('rejecting a pending concept writes ModerationLog entries for cascaded variants', async () => {
+    const concept = await Concept.create({ englishGloss: 'cascade-log', partOfSpeech: 'noun', status: 'pending' });
+    const variant = await Variant.create({ concept: concept._id, pashto: 'غر', region: 'Kohat', definition: 'mountain', status: 'pending' });
+    const token = makeToken({ role: 'moderator' });
+    await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'invalid' });
+    const cascadeLog = await ModerationLog.findOne({
+      targetId: variant._id,
+      targetModel: 'Variant',
+      action: 'rejected',
+    });
+    expect(cascadeLog).not.toBeNull();
+    expect(cascadeLog.note).toBe('Cascaded from concept rejection');
+  });
+
+  test('already-deleted variants are not affected by concept rejection cascade', async () => {
+    const concept = await Concept.create({ englishGloss: 'cascade-skip', partOfSpeech: 'noun', status: 'pending' });
+    const deletedVariant = await Variant.create({
+      concept: concept._id,
+      pashto: 'اوبه',
+      region: 'Kohat',
+      definition: 'water',
+      status: 'pending',
+      isDeleted: true,
+      deletedAt: new Date(),
+    });
+    const token = makeToken({ role: 'moderator' });
+    await request
+      .patch(`/api/concepts/${concept._id}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'rejected', moderatorNote: 'invalid' });
+    const logs = await ModerationLog.find({ targetId: deletedVariant._id, targetModel: 'Variant', action: 'rejected' });
+    // Should have no cascade log since the variant was already deleted
+    expect(logs).toHaveLength(0);
+  });
+});
+
 describe('Moderator self-approval — variant status transitions (moderation context)', () => {
   let modConcept;
 

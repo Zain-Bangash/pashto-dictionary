@@ -354,3 +354,122 @@ test.describe('Integrity — duplicate prevention', () => {
 // Declared outside all describe/test blocks so the sequential tests can pass
 // the concept ID from the "first POST" test to the two that follow it.
 let variantDupConceptId;
+
+// ---------------------------------------------------------------------------
+// Block 5 — Concept/variant state integrity (API + browser)
+// Verifies that variants cannot be published before their parent concept,
+// that rejecting a concept cascades to its pending/approved variants, and
+// that the moderation queue UI refetches after each action.
+// ---------------------------------------------------------------------------
+
+const { loginAs } = require('../helpers/auth.js');
+const {
+  getAdminToken: _getAdminToken5,
+  createApprovedConcept,
+  createApprovedVariant,
+  createPendingConcept,
+  createPendingVariant,
+} = require('../helpers/seed.js');
+
+test.describe('Integrity — concept/variant state', () => {
+  let adminToken;
+
+  test.beforeAll(async ({ request }) => {
+    adminToken = await _getAdminToken5(request);
+  });
+
+  // Variant cannot be published when its parent concept is only approved (not published).
+  // The guard must return 400 so data integrity is preserved.
+  test('publishing a variant whose concept is not yet published returns 400', async ({ request }) => {
+    const concept = await createApprovedConcept(request, adminToken, 'e2e-publish-guard-concept');
+    const variant = await createApprovedVariant(request, adminToken, concept._id, {
+      pashto: 'ازمیون',
+      phonetic: 'azmayoon',
+      region: 'Kohat',
+      definition: 'test (e2e guard)',
+    });
+
+    const res = await request.patch(`${API}/api/variants/${variant._id}/status`, {
+      data: { status: 'published' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error.message).toMatch(/not yet published/i);
+  });
+
+  // After the concept is published, the same variant should publish successfully.
+  test('publishing a variant after its concept is published returns 200', async ({ request }) => {
+    const concept = await createApprovedConcept(request, adminToken, 'e2e-publish-guard-pass');
+
+    const variant = await createApprovedVariant(request, adminToken, concept._id, {
+      pashto: 'خوشال',
+      phonetic: 'khoshal',
+      region: 'Hangu',
+      definition: 'happy (e2e guard pass)',
+    });
+
+    // Publish the concept first.
+    await request.patch(`${API}/api/concepts/${concept._id}/status`, {
+      data: { status: 'published' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    // Now publish the variant — should succeed.
+    const res = await request.patch(`${API}/api/variants/${variant._id}/status`, {
+      data: { status: 'published' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.data.status).toBe('published');
+  });
+
+  // Rejecting a concept must cascade-delete its pending variants so they
+  // don't accumulate as orphans in the moderation queue.
+  test('rejecting a concept removes its pending variants from the variant queue', async ({ request }) => {
+    const concept = await createPendingConcept(request, adminToken, 'e2e-cascade-reject');
+    await createPendingVariant(request, adminToken, concept._id, {
+      pashto: 'کور',
+      phonetic: 'kor',
+      region: 'Tirah',
+      definition: 'home (e2e cascade)',
+    });
+
+    // Reject the concept.
+    await request.patch(`${API}/api/concepts/${concept._id}/status`, {
+      data: { status: 'rejected', moderatorNote: 'e2e cascade test' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    // The variant queue should no longer contain a variant for this concept.
+    const queueRes = await request.get(`${API}/api/moderation/variants/queue?status=pending`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const { data: queueItems } = await queueRes.json();
+    const orphan = queueItems.find((v) => v.concept?._id === concept._id || v.concept === concept._id);
+    expect(orphan).toBeUndefined();
+  });
+
+  // After approving a concept in the dashboard queue UI, the card must disappear
+  // from the pending list — verifying the full-refetch behaviour on action.
+  test('approving a concept in the queue UI removes it from the pending list', async ({ page, request }) => {
+    // Seed a pending concept as admin.
+    const concept = await createPendingConcept(request, adminToken, 'e2e-ui-refresh-approve');
+
+    // Log in as admin in the browser and navigate to the queue.
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard/queue');
+
+    // Locate the concept card by its gloss text.
+    const card = page.getByText(concept.englishGloss, { exact: true });
+    await expect(card).toBeVisible({ timeout: 8000 });
+
+    // Click Approve — the queue should refetch and the card should vanish.
+    await card.locator('..').locator('..').getByRole('button', { name: 'Approve' }).click();
+    await expect(card).not.toBeVisible({ timeout: 8000 });
+  });
+});
