@@ -74,6 +74,10 @@ As a moderator I should see a "Similar concepts" panel on each concept card in t
 
 As a moderator I should be able to trigger a merge from the Concepts list page in the dashboard, not only from the queue.
 
+As a moderator, when I reject a concept, all of that concept's pending or approved variants are automatically rejected and removed from the variant queue. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
+
+As a moderator or admin, after I approve, reject, or publish an item, the moderation queue automatically refreshes from the server to reflect the latest state — including any cascade effects from concept rejection.
+
 ---
 
 ## Admin
@@ -93,3 +97,5 @@ As an admin I should be able to view the Moderation Log page, which shows a full
 As an admin I should be able to edit any submission including my own, using the same inline Edit form available to moderators.
 
 As an admin I should be able to reassign a variant to a different concept by using the Concept search field inside the variant Edit form. Suggestions show the concept's English gloss and ID. Selecting one and saving moves the variant to the new concept in place.
+
+As an admin, I cannot publish a variant whose parent concept has not yet been published. If I attempt to do so, I see an error message. I must publish the concept first, then publish its variants.

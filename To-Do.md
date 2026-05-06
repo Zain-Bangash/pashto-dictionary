@@ -1,6 +1,7 @@
 
 
-Complete E2E tests for all user flows
+best way is to manually go through the userflow and create e2e for them and then also manual test
+
 
 Show which user has added a the word
 
