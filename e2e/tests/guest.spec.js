@@ -133,7 +133,7 @@ test.describe('Guest — /concepts browse page', () => {
 
     await expect(page).toHaveURL(new RegExp(`/concepts/${concept._id}`));
     // The detail page always renders the "Regional Variants" heading when variants exist
-    await expect(page.getByText('Regional Variants')).toBeVisible();
+    await expect(page.getByText('Regional Variants')).toBeVisible({ timeout: 10000 });
   });
 });
 

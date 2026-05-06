@@ -236,3 +236,48 @@ test.describe('Auth — Protected route redirect', () => {
     await expect(page).toHaveURL('/login', { timeout: 10000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Flow 9 — Register with optional region and village fields
+//
+// USER-FLOWS.md: "As a user I should be able to register with a username,
+// email, and password. I can optionally add my region (Kohat, Hangu, Tirah,
+// Thal, or Parachinar) and village."
+// Flow 1 covers the required-fields-only path; this covers the optional path.
+// ---------------------------------------------------------------------------
+
+test.describe('Auth — Register with optional region and village', () => {
+  let registeredEmail;
+
+  test.beforeAll(() => {
+    registeredEmail = `e2e-opt-reg-${Date.now()}@test.local`;
+  });
+
+  test('filling optional region and village during registration succeeds and logs the user in', async ({ page }) => {
+    await page.goto('/register');
+
+    await page.getByLabel('Username').fill('e2e_opt_reg');
+    await page.getByLabel('Email').fill(registeredEmail);
+    await page.getByLabel('Password').fill('E2ePassword1!');
+
+    // Optional region dropdown — five allowed regions
+    const regionSelect = page.getByLabel(/region/i);
+    await expect(regionSelect).toBeVisible();
+    await regionSelect.selectOption('Hangu');
+
+    // Optional village field
+    const villageInput = page.getByLabel(/village/i);
+    await expect(villageInput).toBeVisible();
+    await villageInput.fill('Kachi Garhi');
+
+    await page.getByRole('button', { name: 'Register' }).click();
+
+    // Successful registration redirects to / with the logged-in navbar
+    await expect(page).toHaveURL('/', { timeout: 10000 });
+    await expect(page.getByText('e2e_opt_reg')).toBeVisible();
+
+    // Guest links must be absent
+    await expect(page.getByRole('link', { name: 'Login' })).not.toBeVisible();
+    await expect(page.getByRole('link', { name: 'Register' })).not.toBeVisible();
+  });
+});

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * admin.spec.js — golden-path journeys for the admin role.
+ * E2E tests for the Admin section of USER-FLOWS.md.
  *
  * Flows covered:
  *   1. Publish approved concept — card leaves the Approved queue; API confirms published status
@@ -9,11 +9,8 @@
  *   3. Pending / Approved filter toggle — correct items visible per filter
  *   4. Users page — accessible to admin; seeded test accounts are listed
  *   5. Moderation Log page — accessible to admin; action badges are visible
- *
- * NOT covered here (already tested elsewhere):
- *   - Inline edit / "edited" log badge  → moderation.spec.js
- *   - Variant reassignment              → moderation.spec.js
- *   - Approve (pending → approved)      → moderator.spec.js
+ *   6. Inline edit — admin edits a variant field via the inline form; log shows "edited"
+ *   7. Variant reassignment — admin reassigns a variant to a different concept
  */
 
 const { test, expect } = require('@playwright/test');
@@ -25,6 +22,7 @@ const {
   createApprovedConcept,
   createApprovedVariant,
   createPendingConcept,
+  createPendingVariant,
 } = require('../helpers/seed.js');
 
 const API = 'http://localhost:5000';
@@ -347,5 +345,167 @@ test.describe('Admin — Moderation Log page', () => {
     await expect(
       page.getByRole('link', { name: 'Log' })
     ).toBeVisible({ timeout: 10000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flow 6 — Admin edits a variant field via the inline form; log shows "edited"
+//
+// USER-FLOWS.md: "As an admin I should be able to edit any submission including
+// my own, using the same inline Edit form available to moderators."
+// ---------------------------------------------------------------------------
+
+test.describe('Admin — inline edit variant field; log shows "edited" entry', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let adminToken;
+  let parentConcept;
+  let pendingVariant;
+
+  test.beforeAll(async ({ request }) => {
+    adminToken = await withRetry(() => getAdminToken(request));
+
+    parentConcept = await createPublishedConcept(
+      request,
+      adminToken,
+      'e2e-edit-variant-parent'
+    );
+
+    pendingVariant = await createPendingVariant(request, adminToken, parentConcept._id, {
+      pashto:    'زوی',
+      phonetic:  'zoy',
+      region:    'Kohat',
+      definition: 'son (e2e edit test)',
+    });
+  });
+
+  test('admin opens Edit form on a pending variant — form is pre-populated', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard/queue');
+
+    await page.getByRole('button', { name: /variants/i }).click();
+    await expect(page.getByText('zoy')).toBeVisible({ timeout: 10000 });
+
+    const card = page.locator('li').filter({ hasText: 'zoy' });
+    await card.getByRole('button', { name: 'Edit' }).click();
+
+    await expect(page.getByRole('form', { name: 'Edit variant' })).toBeVisible();
+
+    const pashtoInput = page.getByRole('form', { name: 'Edit variant' }).getByLabel('Pashto');
+    await expect(pashtoInput).toHaveValue('زوی');
+  });
+
+  test('admin changes pashto field and saves — card updates in place without a full reload', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard/queue');
+
+    await page.getByRole('button', { name: /variants/i }).click();
+    await expect(page.getByText('zoy')).toBeVisible({ timeout: 10000 });
+
+    const card = page.locator('li').filter({ hasText: 'zoy' });
+    await card.getByRole('button', { name: 'Edit' }).click();
+
+    const form = page.getByRole('form', { name: 'Edit variant' });
+    const pashtoInput = form.getByLabel('Pashto');
+    await pashtoInput.clear();
+    await pashtoInput.fill('زامن');
+
+    await form.getByLabel('Note').fill('e2e admin edit — changed pashto');
+    await form.getByRole('button', { name: 'Save' }).click();
+
+    // Form closes after a successful save
+    await expect(form).not.toBeVisible({ timeout: 8000 });
+
+    // Updated pashto value must appear in the card without a full page reload
+    await expect(page.getByText('زامن')).toBeVisible();
+  });
+
+  test('admin visits Moderation Log and sees an "edited" entry for the variant', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard/log');
+
+    await expect(
+      page.getByText('edited', { exact: true }).first()
+    ).toBeVisible({ timeout: 10000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flow 7 — Admin reassigns a variant to a different concept
+//
+// USER-FLOWS.md: "As an admin I should be able to reassign a variant to a
+// different concept by using the Concept search field inside the variant Edit
+// form."
+// ---------------------------------------------------------------------------
+
+test.describe('Admin — reassign variant to a different concept', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let adminToken;
+  let conceptA;
+  let conceptB;
+  let pendingVariant;
+
+  test.beforeAll(async ({ request }) => {
+    adminToken = await withRetry(() => getAdminToken(request));
+
+    conceptA = await createPublishedConcept(request, adminToken, 'e2e-reassign-source-concept');
+    conceptB = await createPublishedConcept(request, adminToken, 'e2e-reassign-target-concept');
+
+    // Seed a published variant under conceptB so its detail page exists
+    await createPublishedVariant(request, adminToken, conceptB._id, {
+      pashto:    'ملګری',
+      phonetic:  'malgray',
+      region:    'Hangu',
+      definition: 'friend (e2e reassign anchor)',
+    });
+
+    // Pending variant starts under conceptA — admin will move it to conceptB
+    pendingVariant = await createPendingVariant(request, adminToken, conceptA._id, {
+      pashto:    'پلار',
+      phonetic:  'plar',
+      region:    'Kohat',
+      definition: 'father (e2e reassign)',
+    });
+  });
+
+  test('admin reassigns variant to conceptB via Concept search and saves', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard/queue');
+
+    await page.getByRole('button', { name: /variants/i }).click();
+    await expect(page.getByText('plar')).toBeVisible({ timeout: 10000 });
+
+    const card = page.locator('li').filter({ hasText: 'plar' });
+    await card.getByRole('button', { name: 'Edit' }).click();
+
+    const form = page.getByRole('form', { name: 'Edit variant' });
+
+    const conceptSearchInput = form.getByLabel('Concept');
+    await conceptSearchInput.fill('e2e-reassign-target');
+
+    const suggestion = page.getByText(new RegExp(`${conceptB.englishGloss}.*ID:`));
+    await expect(suggestion).toBeVisible({ timeout: 8000 });
+    await suggestion.click();
+
+    await form.getByLabel('Note').fill('e2e reassign to conceptB');
+    await form.getByRole('button', { name: 'Save' }).click();
+
+    await expect(form).not.toBeVisible({ timeout: 8000 });
+  });
+
+  test('reassigned variant appears under the target concept on the public detail page', async ({ page, request }) => {
+    // Publish the variant so it is visible on the public concept detail page
+    await request.patch(`${API}/api/variants/${pendingVariant._id}/status`, {
+      data: { status: 'approved' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    await request.patch(`${API}/api/variants/${pendingVariant._id}/status`, {
+      data: { status: 'published' },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    await page.goto(`/concepts/${conceptB._id}`);
+    await expect(page.getByText('plar')).toBeVisible({ timeout: 10000 });
   });
 });

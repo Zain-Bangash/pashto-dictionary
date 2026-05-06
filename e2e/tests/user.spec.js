@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * E2E tests for user-facing submission flows (USER-FLOWS.md — User section).
+ * E2E tests for the User section of USER-FLOWS.md.
  *
  * Flows covered:
  *   1. 2-step submit: new concept + variant (no autocomplete match)
@@ -10,6 +10,8 @@
  *   4. My Submissions — pending status badge visible
  *   5. Rejection reason visible to submitter in My Submissions
  *   6. Duplicate concept gloss → 409 inline error, page stays on Step 1
+ *   7. Duplicate variant (same Pashto + region) → inline error on /submit
+ *   8. Moderator note in Step 2 — visible in queue as "Submitter note", hidden on public page
  */
 
 const { test, expect } = require('@playwright/test');
@@ -342,5 +344,211 @@ test.describe('User — duplicate concept gloss shows inline error and stays on 
 
     // Must NOT navigate away — the user stays on /submit
     await expect(page).toHaveURL('/submit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flow 7 — Duplicate variant (same Pashto + region) shows inline error on /submit
+//
+// USER-FLOWS.md: "As a user I should not be able to submit a variant with the
+// same Pashto word and region under the same concept — the server rejects it
+// with a clear message. However, the same Pashto word from a different region
+// is allowed."
+// integrity.spec.js covers the API; this covers the browser-level UI flow.
+// ---------------------------------------------------------------------------
+
+test.describe('User — duplicate variant shows inline error on /submit', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let adminToken;
+  let concept;
+
+  // ASCII value avoids Unicode codepoint ambiguity between test runs.
+  const DUP_PASHTO = 'e2e-kalay-dup';
+
+  test.beforeAll(async ({ request }) => {
+    adminToken = await withRetry(() => getAdminToken(request));
+    // Unique gloss prevents collision when the suite is re-run without a clean.
+    concept = await createPublishedConcept(
+      request, adminToken, `e2e-dup-variant-ui-${Date.now()}`
+    );
+  });
+
+  test('first submission of a new variant succeeds and navigates to /my-submissions', async ({ page }) => {
+    await loginAs(page, 'user');
+    await page.goto('/submit');
+
+    await page.getByLabel('English Meaning').fill(concept.englishGloss);
+    // exact: true prevents matching the "+ Create new concept" button whose text also contains the gloss
+    const suggestion = page.getByRole('button', { name: concept.englishGloss + 'noun', exact: true });
+    await expect(suggestion).toBeVisible({ timeout: 10000 });
+    await suggestion.click();
+
+    await page.getByLabel('Pashto Word').fill(DUP_PASHTO);
+    await page.getByLabel('Region').selectOption('Kohat');
+    await page.getByLabel('Definition').fill('village (e2e dup first)');
+
+    await page.getByRole('button', { name: 'Submit Word' }).click();
+
+    await expect(page).toHaveURL('/my-submissions', { timeout: 12000 });
+  });
+
+  test('submitting the same Pashto word + region shows a server error and stays on /submit', async ({ page }) => {
+    await loginAs(page, 'user');
+    await page.goto('/submit');
+
+    await page.getByLabel('English Meaning').fill(concept.englishGloss);
+    const suggestion = page.getByRole('button', { name: concept.englishGloss +'noun', exact: true });
+    await expect(suggestion).toBeVisible({ timeout: 10000 });
+    await suggestion.click();
+
+    // Exact same pashto + region as the first test — server must return 409
+    await page.getByLabel('Pashto Word').fill(DUP_PASHTO);
+    await page.getByLabel('Region').selectOption('Kohat');
+    await page.getByLabel('Definition').fill('village (e2e dup attempt)');
+
+    await page.getByRole('button', { name: 'Submit Word' }).click();
+
+    await expect(
+      page.getByText('already exists', { exact: false })
+    ).toBeVisible({ timeout: 10000 });
+
+    await expect(page).toHaveURL('/submit');
+  });
+
+  test('same Pashto word with a different region succeeds — regional variation is allowed', async ({ page }) => {
+    await loginAs(page, 'user');
+    await page.goto('/submit');
+
+    await page.getByLabel('English Meaning').fill(concept.englishGloss);
+    const suggestion = page.getByRole('button', { name: concept.englishGloss, exact: true });
+    await expect(suggestion).toBeVisible({ timeout: 10000 });
+    await suggestion.click();
+
+    await page.getByLabel('Pashto Word').fill(DUP_PASHTO);
+    await page.getByLabel('Region').selectOption('Hangu');
+    await page.getByLabel('Definition').fill('village - Hangu (e2e dup different region)');
+
+    await page.getByRole('button', { name: 'Submit Word' }).click();
+
+    await expect(page).toHaveURL('/my-submissions', { timeout: 12000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flow 8 — Moderator note in Step 2: visible in queue, hidden on public page
+//
+// USER-FLOWS.md: "As a user, in Step 2 of the Submit form, I can optionally
+// add a note to the moderators… This note is visible to moderators and admins
+// in the moderation queue but is not shown on the public concept detail page."
+//
+// The note field label is "Note to moderators (optional)" (id: submissionNote).
+// In DashboardQueue the note appears under a "Submitter note" heading on the
+// variant card. The submissionNote is attached to the variant, not the concept.
+// ---------------------------------------------------------------------------
+
+test.describe('User — moderator note in Step 2 is visible in queue and hidden on public page', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let adminToken;
+  let submittedGloss;
+
+  test.beforeAll(async ({ request }) => {
+    adminToken = await withRetry(() => getAdminToken(request));
+    submittedGloss = `e2e-modnote-${Date.now()}`;
+  });
+
+  test('Step 2 of the Submit form has a "Note to moderators (optional)" textarea', async ({ page }) => {
+    await loginAs(page, 'user');
+    await page.goto('/submit');
+
+    await page.getByLabel('English Meaning').fill(submittedGloss);
+
+    const createBtn = page.getByRole('button', { name: `+ Create new concept "${submittedGloss}"` });
+    await expect(createBtn).toBeVisible({ timeout: 10000 });
+    await createBtn.click();
+
+    // The note textarea must be visible in Step 2 before any submission
+    await expect(
+      page.getByLabel('Note to moderators (optional)')
+    ).toBeVisible({ timeout: 8000 });
+  });
+
+  test('submitted note appears in the moderation queue under "Submitter note"', async ({ page }) => {
+    await loginAs(page, 'user');
+    await page.goto('/submit');
+
+    await page.getByLabel('English Meaning').fill(submittedGloss);
+
+    const createBtn = page.getByRole('button', { name: `+ Create new concept "${submittedGloss}"` });
+    await expect(createBtn).toBeVisible({ timeout: 10000 });
+    await createBtn.click();
+
+    // Fill required Step 2 fields
+    await page.getByLabel('Part of Speech').selectOption('noun');
+    await page.getByLabel('Pashto Word').fill('سفر');
+    await page.getByLabel('Phonetic (optional)').fill('safar-note');
+    await page.getByLabel('Region').selectOption('Kohat');
+    await page.getByLabel('Definition').fill('journey (e2e note test)');
+
+    // Fill the moderator note
+    await page.getByLabel('Note to moderators (optional)').fill('e2e reference: Ibn Battuta vol.2 p.17');
+
+    await page.getByRole('button', { name: 'Submit Word' }).click();
+    await expect(page).toHaveURL('/my-submissions', { timeout: 12000 });
+
+    // Check the queue as moderator — note attaches to the variant, not the concept
+    await loginAs(page, 'moderator');
+    await page.goto('/dashboard/queue');
+
+    await page.getByRole('button', { name: /variants/i }).click();
+    await expect(page.getByText('safar-note')).toBeVisible({ timeout: 10000 });
+
+    const card = page.locator('li').filter({ hasText: 'safar-note' });
+    await expect(card.getByText('Submitter note')).toBeVisible();
+    await expect(card.getByText('Ibn Battuta vol.2 p.17', { exact: false })).toBeVisible();
+  });
+
+  test('the note is not visible on the public concept detail page after publishing', async ({ page, request }) => {
+    const adminTok = await withRetry(() => getAdminToken(request));
+    const gloss = `e2e-note-public-${Date.now()}`;
+
+    const createRes = await request.post(`${API}/api/concepts`, {
+      data: { englishGloss: gloss, partOfSpeech: 'noun' },
+      headers: { Authorization: `Bearer ${adminTok}` },
+    });
+    const { data: concept } = await createRes.json();
+
+    const varRes = await request.post(`${API}/api/variants`, {
+      data: {
+        conceptId: concept._id,
+        pashto:    'باران',
+        phonetic:  'baran',
+        region:    'Kohat',
+        definition: 'rain (e2e note public test)',
+        submissionNote: 'e2e secret reference — must not appear publicly',
+      },
+      headers: { Authorization: `Bearer ${adminTok}` },
+    });
+    const { data: variant } = await varRes.json();
+
+    // Publish concept and variant
+    for (const [resource, id] of [['concepts', concept._id], ['variants', variant._id]]) {
+      await request.patch(`${API}/api/${resource}/${id}/status`, {
+        data: { status: 'approved' },
+        headers: { Authorization: `Bearer ${adminTok}` },
+      });
+      await request.patch(`${API}/api/${resource}/${id}/status`, {
+        data: { status: 'published' },
+        headers: { Authorization: `Bearer ${adminTok}` },
+      });
+    }
+
+    // Visit as a guest — the note must not be visible
+    await page.goto(`/concepts/${concept._id}`);
+    await expect(page.getByText(gloss)).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText('e2e secret reference — must not appear publicly')
+    ).not.toBeVisible();
   });
 });
