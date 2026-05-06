@@ -848,6 +848,28 @@ describe('POST /api/variants — normalized duplicate detection', () => {
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
   });
+
+  test('returns 201 when resubmitting the same pashto + region after prior rejection (rejected does not block)', async () => {
+    const token = makeToken();
+    // Rejected variants are soft-deleted by the API at rejection time, so isDeleted: true
+    // mirrors the real post-rejection state and falls outside the unique-index partial filter.
+    await Variant.create({
+      concept: conceptIdForDupTest,
+      pashto: 'کور',
+      normalizedPashto: 'کور'.trim().normalize('NFC'),
+      region: 'Kohat',
+      definition: 'rejected dwelling',
+      status: 'rejected',
+      isDeleted: true,
+      deletedAt: new Date(),
+    });
+    const res = await request
+      .post('/api/variants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ conceptId: conceptIdForDupTest, pashto: 'کور', region: 'Kohat', definition: 'resubmit after rejection' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
