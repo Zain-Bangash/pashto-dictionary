@@ -9,7 +9,7 @@ const editVariant = (id, data) => api.patch(`/api/variants/${id}/edit`, data);
 const mergeConcepts = (sourceId, body) => api.post(`/api/concepts/${sourceId}/merge`, body);
 
 const POS_OPTIONS = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
-const REGION_OPTIONS = ['Kandahar', 'Kabul', 'Peshawar', 'Kohat', 'Quetta', 'Other'];
+const REGION_OPTIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
 const TABS_LIST = ['concepts', 'variants'];
 
 // ---------------------------------------------------------------------------
@@ -384,6 +384,7 @@ export default function DashboardQueue() {
   const [variants, setVariants]           = useState([]);
   const [conceptsFilter, setConceptsFilter] = useState('pending');
   const [variantsFilter, setVariantsFilter] = useState('pending');
+  const [refreshKey, setRefreshKey]         = useState(0);
   const [conceptsCounts, setConceptsCounts] = useState({ pending: 0, approved: 0 });
   const [variantsCounts, setVariantsCounts] = useState({ pending: 0, approved: 0 });
   const [loading, setLoading]               = useState(true);
@@ -416,7 +417,7 @@ export default function DashboardQueue() {
       })
       .catch(() => setError('Failed to load queue'))
       .finally(() => setLoading(false));
-  }, [conceptsFilter, variantsFilter]);
+  }, [conceptsFilter, variantsFilter, refreshKey]);
 
   const items    = tab === 'concepts' ? concepts : variants;
   const setItems = tab === 'concepts' ? setConcepts : setVariants;
@@ -432,7 +433,7 @@ export default function DashboardQueue() {
       await api.patch(`/api/${modelPrefix}/${id}/status`, {
         status: action === 'approve' ? 'approved' : 'published',
       });
-      setItems((prev) => prev.filter((e) => e._id !== id));
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Action failed';
       setActionError(msg);
@@ -454,12 +455,8 @@ export default function DashboardQueue() {
         status: 'rejected',
         moderatorNote: note,
       });
-      if (modalTab === 'concepts') {
-        setConcepts((prev) => prev.filter((e) => e._id !== itemId));
-      } else {
-        setVariants((prev) => prev.filter((e) => e._id !== itemId));
-      }
       setRejectModal(null);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Action failed';
       setActionError(msg);
@@ -489,9 +486,8 @@ export default function DashboardQueue() {
     setActionError(null);
     try {
       await mergeConcepts(sourceItem._id, { targetConceptId: targetItem._id, note });
-      // Remove source from queue list (source gets deleted)
-      setConcepts((prev) => prev.filter((c) => c._id !== sourceItem._id));
       setMergeModal(null);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Merge failed';
       setActionError(msg);

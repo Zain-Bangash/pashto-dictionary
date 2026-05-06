@@ -129,7 +129,12 @@ async function updateVariant(req, res) {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
 
-  const variant = await Variant.findOne({ _id: id, isDeleted: { $ne: true } });
+  // Rejected variants are soft-deleted at rejection time — include them here
+  // so the submitter can still edit and resubmit their rejected submission.
+  const variant = await Variant.findOne({
+    _id: id,
+    $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }],
+  });
   if (!variant) return notFound(res);
 
   if (variant.submittedBy.toString() !== req.user.id) {
@@ -172,6 +177,8 @@ async function updateVariant(req, res) {
   if (submissionNote !== undefined)  variant.submissionNote = submissionNote;
   variant.status = 'pending';
   variant.moderatorNote = undefined;
+  variant.isDeleted = false;
+  variant.deletedAt = undefined;
   await variant.save();
 
   await new ModerationLog({
@@ -231,9 +238,23 @@ async function transitionVariantStatus(req, res) {
     return res.status(403).json({ success: false, error: { message: 'Only admins can publish' } });
   }
 
+  if (status === 'published') {
+    const parentConcept = await Concept.findById(variant.concept, 'status');
+    if (!parentConcept || parentConcept.status !== 'published') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Cannot publish a variant whose concept is not yet published.' },
+      });
+    }
+  }
+
   variant.status     = status;
   variant.reviewedBy = req.user.id;
   if (moderatorNote) variant.moderatorNote = moderatorNote;
+  if (status === 'rejected') {
+    variant.isDeleted = true;
+    variant.deletedAt = new Date();
+  }
   await variant.save();
 
   await new ModerationLog({
@@ -274,7 +295,11 @@ async function getMyVariantSubmissions(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = { submittedBy: req.user.id, isDeleted: { $ne: true } };
+  // Include soft-deleted rejected variants so submitters can still read the rejection note.
+  const filter = {
+    submittedBy: req.user.id,
+    $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }],
+  };
 
   const [data, total] = await Promise.all([
     Variant.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('concept', 'englishGloss').lean(),

@@ -163,8 +163,8 @@ export default function DashboardConcepts() {
     setActionError(null);
     try {
       await mergeConcepts(mergeSource._id, { targetConceptId, note });
-      setConcepts((prev) => prev.filter((c) => c._id !== mergeSource._id));
       setMergeSource(null);
+      fetchConcepts(status);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Merge failed';
       setActionError(msg);

@@ -266,6 +266,29 @@ async function transitionConceptStatus(req, res) {
     note: moderatorNote,
   }).save();
 
+  if (status === 'rejected') {
+    const variantsToDelete = await Variant.find({
+      concept: concept._id,
+      status: { $in: ['pending', 'approved'] },
+      isDeleted: { $ne: true },
+    });
+    await Promise.all(
+      variantsToDelete.map(async (v) => {
+        v.isDeleted = true;
+        v.deletedAt = new Date();
+        v.deletedBy = req.user.id;
+        await v.save();
+        await new ModerationLog({
+          targetModel: 'Variant',
+          targetId: v._id,
+          action: 'rejected',
+          performedBy: req.user.id,
+          note: 'Cascaded from concept rejection',
+        }).save();
+      })
+    );
+  }
+
   return res.status(200).json({ success: true, data: concept });
 }
 
@@ -440,4 +463,46 @@ async function mergeConcepts(req, res) {
   return res.status(200).json({ success: true, data: { moved: movedIds.length, skipped: skippedItems } });
 }
 
-module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts };
+async function updateConcept(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const first = errors.array()[0];
+    return res.status(400).json({ success: false, error: { message: first.msg, field: first.path } });
+  }
+
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) return invalidId(res);
+
+  const concept = await Concept.findById(id);
+  if (!concept) return notFound(res);
+
+  if (concept.submittedBy.toString() !== req.user.id) {
+    return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
+  }
+
+  if (concept.status !== 'rejected') {
+    return res.status(400).json({
+      success: false,
+      error: { message: 'Only rejected concepts can be edited' },
+    });
+  }
+
+  const { englishGloss, partOfSpeech } = req.body;
+
+  if (englishGloss !== undefined) concept.englishGloss = englishGloss;
+  if (partOfSpeech !== undefined) concept.partOfSpeech = partOfSpeech;
+  concept.status = 'pending';
+  concept.moderatorNote = undefined;
+  await concept.save();
+
+  await new ModerationLog({
+    targetModel: 'Concept',
+    targetId: concept._id,
+    action: 'resubmitted',
+    performedBy: req.user.id,
+  }).save();
+
+  return res.status(200).json({ success: true, data: concept });
+}
+
+module.exports = { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts, updateConcept };
