@@ -854,8 +854,6 @@ describe('POST /api/variants — normalized duplicate detection', () => {
 
   test('returns 201 when resubmitting the same pashto + region after prior rejection (rejected does not block)', async () => {
     const token = makeToken();
-    // Rejected variants are soft-deleted by the API at rejection time, so isDeleted: true
-    // mirrors the real post-rejection state and falls outside the unique-index partial filter.
     await Variant.create({
       concept: conceptIdForDupTest,
       pashto: 'کور',
@@ -1018,7 +1016,6 @@ describe('Soft-delete DB persistence — Concept', () => {
       .delete(`/api/concepts/${concept._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    // Record must still exist in DB — soft delete, not hard delete
     const found = await Concept.findById(concept._id);
     expect(found).not.toBeNull();
     expect(found.isDeleted).toBe(true);
@@ -1060,13 +1057,11 @@ describe('Soft-delete enables Concept reuse', () => {
     const adminToken = makeToken({ role: 'admin' });
     const userToken = makeToken({ role: 'user' });
 
-    // Create and soft-delete the original
     const original = await Concept.create({ englishGloss: 'Rebirth Test', partOfSpeech: 'noun' });
     await request
       .delete(`/api/concepts/${original._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    // Resubmit with the same gloss — partial filter index allows this
     const res = await request
       .post('/api/concepts')
       .set('Authorization', `Bearer ${userToken}`)
@@ -1084,7 +1079,6 @@ describe('Soft-delete enables Variant reuse', () => {
 
     const concept = await Concept.create({ englishGloss: 'reuse-variant-concept', partOfSpeech: 'noun' });
 
-    // Create original variant
     const original = await Variant.create({
       concept: concept._id,
       pashto: 'رڼا',
@@ -1092,12 +1086,10 @@ describe('Soft-delete enables Variant reuse', () => {
       definition: 'light',
     });
 
-    // Soft-delete it
     await request
       .delete(`/api/variants/${original._id}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    // Resubmit with the same pashto+concept+region
     const res = await request
       .post('/api/variants')
       .set('Authorization', `Bearer ${userToken}`)
@@ -1111,4 +1103,3 @@ describe('Soft-delete enables Variant reuse', () => {
     expect(res.status).toBe(201);
   });
 });
-

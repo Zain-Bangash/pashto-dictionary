@@ -1,8 +1,8 @@
-const { Router } = require('express');
-const { body } = require('express-validator');
-const { verifyToken, optionalVerifyToken } = require('../middleware/auth');
-const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
-const {
+import { Router } from 'express';
+import { body } from 'express-validator';
+import { verifyToken, optionalVerifyToken } from '../middleware/auth';
+import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
+import {
   createVariant,
   listVariants,
   getVariant,
@@ -12,7 +12,7 @@ const {
   getMyVariantSubmissions,
   deleteVariant,
   editVariant,
-} = require('../controllers/variantController');
+} from '../controllers/variantController';
 
 const router = Router();
 
@@ -48,4 +48,4 @@ router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidato
 router.patch('/:id', verifyToken, updateValidators, updateVariant);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteVariant);
 
-module.exports = router;
+export = router;

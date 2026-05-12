@@ -1,23 +1,25 @@
-const jwt = require('jsonwebtoken');
+import jwt, { JwtPayload } from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
 
-function verifyToken(req, res, next) {
+function verifyToken(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: { message: 'No token provided' },
     });
+    return;
   }
 
   const token = authHeader.slice(7);
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
+    req.user = { id: decoded.id as string, role: decoded.role as 'user' | 'moderator' | 'admin' };
     next();
   } catch {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: { message: 'Invalid or expired token' },
     });
@@ -27,18 +29,20 @@ function verifyToken(req, res, next) {
 // Populates req.user if a valid Bearer token is present, but does not block
 // unauthenticated requests. Used on routes that are public by default but grant
 // additional access to authenticated roles (e.g. GET /api/variants/:id).
-function optionalVerifyToken(req, res, next) {
+function optionalVerifyToken(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next();
+    next();
+    return;
   }
   const token = authHeader.slice(7);
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
+    req.user = { id: decoded.id as string, role: decoded.role as 'user' | 'moderator' | 'admin' };
   } catch {
     // Invalid/expired token on a public route — treat as unauthenticated, not an error
   }
   next();
 }
 
-module.exports = { verifyToken, optionalVerifyToken };
+export { verifyToken, optionalVerifyToken };

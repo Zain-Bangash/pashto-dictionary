@@ -1,7 +1,8 @@
-const Variant = require('../models/Variant');
-const User    = require('../models/User');
+import { Request, Response } from 'express';
+import Variant from '../models/Variant';
+import User from '../models/User';
 
-async function getStats(req, res) {
+async function getStats(_req: Request, res: Response): Promise<void> {
   const now          = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -11,10 +12,10 @@ async function getStats(req, res) {
     Variant.countDocuments({ status: 'published', isDeleted: { $ne: true }, createdAt: { $gte: firstOfMonth } }),
   ]);
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     data: { publishedVariants, registeredUsers, variantsThisMonth },
   });
 }
 
-module.exports = { getStats };
+export { getStats };

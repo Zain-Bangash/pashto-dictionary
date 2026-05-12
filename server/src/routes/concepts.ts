@@ -1,8 +1,8 @@
-const { Router } = require('express');
-const { body } = require('express-validator');
-const { verifyToken, optionalVerifyToken } = require('../middleware/auth');
-const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
-const {
+import { Router } from 'express';
+import { body } from 'express-validator';
+import { verifyToken, optionalVerifyToken } from '../middleware/auth';
+import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
+import {
   createConcept,
   listConcepts,
   getConcept,
@@ -15,7 +15,7 @@ const {
   editConcept,
   mergeConcepts,
   updateConcept,
-} = require('../controllers/conceptController');
+} from '../controllers/conceptController';
 
 const router = Router();
 
@@ -51,4 +51,4 @@ router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editConcept);
 router.post('/:sourceId/merge', verifyToken, requireModeratorOrAdmin, mergeConcepts);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteConcept);
 
-module.exports = router;
+export = router;

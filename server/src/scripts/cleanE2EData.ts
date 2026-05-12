@@ -1,15 +1,17 @@
 'use strict';
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const mongoose = require('mongoose');
-const User = require('../models/User');
-const Concept = require('../models/Concept');
-const Variant = require('../models/Variant');
-const ModerationLog = require('../models/ModerationLog');
+import mongoose from 'mongoose';
+import User from '../models/User';
+import Concept from '../models/Concept';
+import Variant from '../models/Variant';
+import ModerationLog from '../models/ModerationLog';
 
-async function clean() {
-  await mongoose.connect(process.env.MONGODB_URI);
+async function clean(): Promise<void> {
+  await mongoose.connect(process.env.MONGODB_URI as string);
 
   // Find all test accounts
   const testUsers = await User.find({ email: /@test\.local$/ }).lean();
@@ -41,17 +43,17 @@ async function clean() {
   // Delete users
   const deletedUsers = await User.deleteMany({ email: /@test\.local$/ });
 
-  console.log(
+  process.stdout.write(
     `[cleanE2EData] Removed: ${deletedUsers.deletedCount} users, ` +
     `${deletedConcepts.deletedCount} concepts, ` +
     `${deletedVariants.deletedCount} variants, ` +
-    `${deletedLogs.deletedCount} logs.`
+    `${deletedLogs.deletedCount} logs.\n`
   );
 
   await mongoose.disconnect();
 }
 
-clean().catch((err) => {
-  console.error('[cleanE2EData] Error:', err.message);
+clean().catch((err: Error) => {
+  process.stderr.write(`[cleanE2EData] Error: ${err.message}\n`);
   process.exit(1);
 });

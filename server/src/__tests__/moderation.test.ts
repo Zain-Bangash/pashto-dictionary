@@ -369,7 +369,6 @@ describe('GET /api/moderation/variants/queue — excludes soft-deleted variants'
 
 // ---------------------------------------------------------------------------
 // Phase 3 — Moderator self-approval restriction in moderation flow
-// (concepts via PATCH /api/concepts/:id/status, variants via PATCH /api/variants/:id/status)
 // ---------------------------------------------------------------------------
 
 describe('Moderator self-approval — concept status transitions (moderation context)', () => {
@@ -492,8 +491,6 @@ describe('Concept-variant integrity — cascade reject', () => {
   });
 
   test('rejecting a pending concept also soft-deletes its already-approved variants', async () => {
-    // Scenario: variant was approved before the concept was reviewed,
-    // then the concept itself gets rejected.
     const concept = await Concept.create({ englishGloss: 'cascade-approved-variant', partOfSpeech: 'noun', status: 'pending' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'سیند', region: 'Kohat', definition: 'river', status: 'approved' });
     const token = makeToken({ role: 'moderator' });
@@ -540,7 +537,6 @@ describe('Concept-variant integrity — cascade reject', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ status: 'rejected', moderatorNote: 'invalid' });
     const logs = await ModerationLog.find({ targetId: deletedVariant._id, targetModel: 'Variant', action: 'rejected' });
-    // Should have no cascade log since the variant was already deleted
     expect(logs).toHaveLength(0);
   });
 });

@@ -181,5 +181,5 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 > Update this line as you progress through the build plan.
 
-**Active phase:** Phase 10 — Polish & Production Readiness
+**Active phase:** Phase 11 — TypeScript Migration (Server Only)
 **Branch:** dev

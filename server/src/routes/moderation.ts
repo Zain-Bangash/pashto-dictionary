@@ -1,12 +1,12 @@
-const { Router } = require('express');
-const { verifyToken } = require('../middleware/auth');
-const { requireRole, requireModeratorOrAdmin } = require('../middleware/requireRole');
-const {
+import { Router } from 'express';
+import { verifyToken } from '../middleware/auth';
+import { requireRole, requireModeratorOrAdmin } from '../middleware/requireRole';
+import {
   getConceptQueue,
   getVariantQueue,
   getStats,
   getLog,
-} = require('../controllers/moderationController');
+} from '../controllers/moderationController';
 
 const router = Router();
 
@@ -17,4 +17,4 @@ router.get('/variants/queue', requireModeratorOrAdmin, getVariantQueue);
 router.get('/stats', requireModeratorOrAdmin, getStats);
 router.get('/log', requireRole('admin'), getLog);
 
-module.exports = router;
+export = router;

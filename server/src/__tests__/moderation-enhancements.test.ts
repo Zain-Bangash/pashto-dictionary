@@ -250,11 +250,9 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // Same _id — no new document created
     expect(res.body.data._id.toString()).toBe(concept._id.toString());
     expect(res.body.data.englishGloss).toBe('updated gloss');
 
-    // Confirm only one concept exists
     const count = await Concept.countDocuments({ englishGloss: { $in: ['original gloss', 'updated gloss'] } });
     expect(count).toBe(1);
   });
@@ -318,7 +316,6 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
   test('fields that were NOT changed do not appear in the changes diff', async () => {
     const concept = await Concept.create({ englishGloss: 'unchanged-fields-concept', partOfSpeech: 'noun' });
     const token = makeToken({ role: 'moderator' });
-    // Only changing englishGloss, not partOfSpeech
     await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -327,7 +324,6 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
     const log = await ModerationLog.findOne({ targetId: concept._id, action: 'edited' }).lean();
     expect(log.changes).toBeDefined();
     expect(log.changes.englishGloss).toBeDefined();
-    // partOfSpeech was not changed, must not appear
     expect(log.changes.partOfSpeech).toBeUndefined();
   });
 });
@@ -578,7 +574,6 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       definition: 'unchanged definition',
     });
     const token = makeToken({ role: 'moderator' });
-    // Only changing definition
     await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -631,10 +626,9 @@ describe('PATCH /api/variants/:id/edit — concept reassignment', () => {
   });
 
   test('returns 409 when reassignment would create a duplicate on the target concept', async () => {
-    // Create a conflicting variant on the target concept
     await Variant.create({
       concept: targetConcept._id,
-      pashto: 'reassign-variant', // same pashto + same region → duplicate
+      pashto: 'reassign-variant',
       region: 'Kohat',
       definition: 'already exists on target',
     });
@@ -785,11 +779,9 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.moved).toBe(2);
 
-    // Confirm variants now belong to target
     const movedVariants = await Variant.find({ concept: target._id, isDeleted: { $ne: true } });
     expect(movedVariants).toHaveLength(2);
 
-    // Confirm no variants remain on source (excluding deleted)
     const remainingOnSource = await Variant.find({ concept: source._id, isDeleted: { $ne: true } });
     expect(remainingOnSource).toHaveLength(0);
   });
@@ -818,18 +810,16 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       .send({ targetConceptId: target._id.toString(), note: 'merge test' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.moved).toBe(1); // Only the active variant moved
+    expect(res.body.data.moved).toBe(1);
   });
 
   test('skips variants that would create duplicates on target', async () => {
-    // Source variant
     await Variant.create({
       concept: source._id,
       pashto: 'دوستي',
       region: 'Kohat',
       definition: 'friendship',
     });
-    // Pre-existing variant on target with same pashto+region → would be duplicate
     await Variant.create({
       concept: target._id,
       pashto: 'دوستي',
@@ -865,7 +855,6 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ targetConceptId: target._id.toString(), note: 'in-place move' });
 
-    // Same _id, just concept field changed
     const found = await Variant.findById(originalVariant._id);
     expect(found).not.toBeNull();
     expect(found.concept.toString()).toBe(target._id.toString());

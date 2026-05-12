@@ -1,8 +1,8 @@
-const { Router } = require('express');
-const { body } = require('express-validator');
-const { register, login, me, updateProfile } = require('../controllers/authController');
-const { verifyToken } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimit');
+import { Router } from 'express';
+import { body } from 'express-validator';
+import { register, login, me, updateProfile } from '../controllers/authController';
+import { verifyToken } from '../middleware/auth';
+import { authLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -29,4 +29,4 @@ router.post('/login', authLimiter, loginValidators, login);
 router.get('/me', verifyToken, me);
 router.patch('/profile', verifyToken, profileValidators, updateProfile);
 
-module.exports = router;
+export = router;

@@ -1,6 +1,7 @@
-const mongoose = require('mongoose');
+import { Schema, model } from 'mongoose';
+import { IConcept } from '../types/models';
 
-const conceptSchema = new mongoose.Schema(
+const conceptSchema = new Schema<IConcept>(
   {
     englishGloss: { type: String, required: true, trim: true },
     normalizedGloss: { type: String },
@@ -14,12 +15,12 @@ const conceptSchema = new mongoose.Schema(
       enum: ['pending', 'approved', 'rejected', 'published'],
       default: 'pending',
     },
-    submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    reviewedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     moderatorNote: { type: String },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    deletedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
@@ -34,4 +35,4 @@ conceptSchema.index(
   { unique: true, partialFilterExpression: { isDeleted: false } }
 );
 
-module.exports = mongoose.model('Concept', conceptSchema);
+export = model<IConcept>('Concept', conceptSchema);

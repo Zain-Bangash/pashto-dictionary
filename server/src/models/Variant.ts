@@ -1,10 +1,11 @@
-const mongoose = require('mongoose');
+import { Schema, model } from 'mongoose';
+import { IVariant } from '../types/models';
 
-const variantSchema = new mongoose.Schema(
+const variantSchema = new Schema<IVariant>(
   {
-    concept: { type: mongoose.Schema.Types.ObjectId, ref: 'Concept', required: true },
-    pashto:   { type: String, required: true, trim: true },
-    normalizedPashto:  { type: String },
+    concept: { type: Schema.Types.ObjectId, ref: 'Concept', required: true },
+    pashto: { type: String, required: true, trim: true },
+    normalizedPashto: { type: String },
     phonetic: { type: String, trim: true },
     normalizedPhonetic: { type: String },
     region: {
@@ -13,19 +14,19 @@ const variantSchema = new mongoose.Schema(
       required: true,
     },
     definition: { type: String, required: true, trim: true },
-    example:        { type: String, trim: true },
+    example: { type: String, trim: true },
     submissionNote: { type: String, trim: true, maxlength: 500 },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],
       default: 'pending',
     },
-    submittedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    reviewedBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     moderatorNote: { type: String },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    deletedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
@@ -46,4 +47,4 @@ variantSchema.index(
   { unique: true, partialFilterExpression: { isDeleted: false } }
 );
 
-module.exports = mongoose.model('Variant', variantSchema);
+export = model<IVariant>('Variant', variantSchema);

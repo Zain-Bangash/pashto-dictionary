@@ -1,18 +1,19 @@
-const mongoose = require('mongoose');
-const Concept = require('../models/Concept');
-const Variant = require('../models/Variant');
-const ModerationLog = require('../models/ModerationLog');
+import mongoose from 'mongoose';
+import { Request, Response } from 'express';
+import Concept from '../models/Concept';
+import Variant from '../models/Variant';
+import ModerationLog from '../models/ModerationLog';
 // Require User so the schema is registered for populate calls
-require('../models/User');
+import '../models/User';
 
-async function getConceptQueue(req, res) {
-  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+async function getConceptQueue(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user!.role === 'admin';
   const allowed = isAdmin ? ['pending', 'approved'] : ['pending'];
-  const status  = allowed.includes(req.query.status) ? req.query.status : 'pending';
+  const status  = allowed.includes(req.query.status as string) ? req.query.status as string : 'pending';
 
   const [data, total, pendingCount, approvedCount] = await Promise.all([
     Concept.find({ status, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('submittedBy', 'username region village').lean(),
@@ -21,17 +22,17 @@ async function getConceptQueue(req, res) {
     isAdmin ? Concept.countDocuments({ status: 'approved', isDeleted: { $ne: true } }) : Promise.resolve(0),
   ]);
 
-  return res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
+  res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
 }
 
-async function getVariantQueue(req, res) {
-  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+async function getVariantQueue(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user!.role === 'admin';
   const allowed = isAdmin ? ['pending', 'approved'] : ['pending'];
-  const status  = allowed.includes(req.query.status) ? req.query.status : 'pending';
+  const status  = allowed.includes(req.query.status as string) ? req.query.status as string : 'pending';
 
   const [data, total, pendingCount, approvedCount] = await Promise.all([
     Variant.find({ status, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).skip(skip).limit(limit)
@@ -43,10 +44,10 @@ async function getVariantQueue(req, res) {
     isAdmin ? Variant.countDocuments({ status: 'approved', isDeleted: { $ne: true } }) : Promise.resolve(0),
   ]);
 
-  return res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
+  res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
 }
 
-async function getStats(req, res) {
+async function getStats(_req: Request, res: Response): Promise<void> {
   const [
     pendingConcepts,  approvedConcepts,  rejectedConcepts,  publishedConcepts,
     pendingVariants,  approvedVariants,  rejectedVariants,  publishedVariants,
@@ -61,7 +62,7 @@ async function getStats(req, res) {
     Variant.countDocuments({ status: 'published', isDeleted: { $ne: true } }),
   ]);
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     data: {
       pending:   pendingConcepts  + pendingVariants,
@@ -72,9 +73,9 @@ async function getStats(req, res) {
   });
 }
 
-async function getLog(req, res) {
-  const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+async function getLog(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
   const [data, total] = await Promise.all([
@@ -87,7 +88,7 @@ async function getLog(req, res) {
     ModerationLog.countDocuments(),
   ]);
 
-  return res.status(200).json({ success: true, data, meta: { page, limit, total } });
+  res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-module.exports = { getConceptQueue, getVariantQueue, getStats, getLog };
+export { getConceptQueue, getVariantQueue, getStats, getLog };
