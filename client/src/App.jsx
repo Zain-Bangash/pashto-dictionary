@@ -18,6 +18,7 @@ import DashboardQueue from './pages/dashboard/DashboardQueue';
 import DashboardConcepts from './pages/dashboard/DashboardConcepts';
 import DashboardUsers from './pages/dashboard/DashboardUsers';
 import DashboardLog from './pages/dashboard/DashboardLog';
+import NotFound from './pages/NotFound';
 
 function AppRoutes() {
   const { logout } = useAuth();
@@ -91,6 +92,7 @@ function AppRoutes() {
             </DashboardLayout>
           }
         />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

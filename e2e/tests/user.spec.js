@@ -398,7 +398,7 @@ test.describe('User — duplicate variant shows inline error on /submit', () => 
     await page.goto('/submit');
 
     await page.getByLabel('English Meaning').fill(concept.englishGloss);
-    const suggestion = page.getByRole('button', { name: concept.englishGloss +'noun', exact: true });
+    const suggestion = page.getByRole('button', { name: concept.englishGloss, exact: true });
     await expect(suggestion).toBeVisible({ timeout: 10000 });
     await suggestion.click();
 

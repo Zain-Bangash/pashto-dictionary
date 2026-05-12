@@ -14,7 +14,7 @@ test.describe('Guest — homepage', () => {
   test.beforeAll(async ({ request }) => {
     adminToken = await getAdminToken(request);
     // Seed one published concept so the homepage has content to show
-    concept = await createPublishedConcept(request, adminToken, 'e2e-homepage-gloss');
+    concept = await createPublishedConcept(request, adminToken, `e2e-homepage-gloss-${Date.now()}`);
     await createPublishedVariant(request, adminToken, concept._id, {
       pashto: 'کور',
       phonetic: 'kor',
@@ -107,7 +107,7 @@ test.describe('Guest — /concepts browse page', () => {
 
   test.beforeAll(async ({ request }) => {
     adminToken = await getAdminToken(request);
-    concept = await createPublishedConcept(request, adminToken, 'e2e-browse-gloss');
+    concept = await createPublishedConcept(request, adminToken, `e2e-browse-gloss-${Date.now()}`);
     await createPublishedVariant(request, adminToken, concept._id, {
       pashto: 'لور',
       phonetic: 'lor',
@@ -145,7 +145,7 @@ test.describe('Guest — concept detail region tab strip', () => {
     adminToken = await getAdminToken(request);
     // Create a concept with TWO variants that share the same Pashto word but differ
     // by region, phonetic, and definition so clicking between tabs changes visible text.
-    concept = await createPublishedConcept(request, adminToken, 'e2e-tab-gloss');
+    concept = await createPublishedConcept(request, adminToken, `e2e-tab-gloss-${Date.now()}`);
 
     await createPublishedVariant(request, adminToken, concept._id, {
       pashto: 'میرمن',

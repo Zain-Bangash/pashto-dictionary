@@ -131,14 +131,16 @@ export default function DashboardConcepts() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [status, setStatus]     = useState('all');
+  const [search, setSearch]     = useState('');
   const [mergeSource, setMergeSource] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  const fetchConcepts = (statusFilter) => {
+  const fetchConcepts = (statusFilter, searchQuery) => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
     if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+    if (searchQuery && searchQuery.trim()) params.set('q', searchQuery.trim());
     const url = `/api/concepts?${params.toString()}`;
     api
       .get(url)
@@ -152,11 +154,15 @@ export default function DashboardConcepts() {
   };
 
   useEffect(() => {
-    fetchConcepts(status);
-  }, [status]);
+    fetchConcepts(status, search);
+  }, [status, search]);
 
   const handleStatusChange = (e) => {
     setStatus(e.target.value);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
   };
 
   const handleMergeConfirm = async (targetConceptId, note) => {
@@ -164,7 +170,7 @@ export default function DashboardConcepts() {
     try {
       await mergeConcepts(mergeSource._id, { targetConceptId, note });
       setMergeSource(null);
-      fetchConcepts(status);
+      fetchConcepts(status, search);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Merge failed';
       setActionError(msg);
@@ -178,7 +184,7 @@ export default function DashboardConcepts() {
   return (
     <div>
       <h1 className="text-2xl font-display text-warm mb-6">All Concepts</h1>
-      <div className="mb-5 flex items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="status-filter" className="text-xs font-ui text-muted uppercase tracking-wider">
           Filter:
         </label>
@@ -196,6 +202,15 @@ export default function DashboardConcepts() {
             </option>
           ))}
         </select>
+        <input
+          id="concept-search"
+          aria-label="Search concepts"
+          type="text"
+          placeholder="Search by gloss…"
+          value={search}
+          onChange={handleSearchChange}
+          className="bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all w-48"
+        />
       </div>
 
       {actionError && (

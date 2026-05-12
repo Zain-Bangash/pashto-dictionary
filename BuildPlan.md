@@ -430,14 +430,14 @@ style(client): apply cyber-traditional design system and navbar
 
 **Goal:** The things that separate a portfolio project from a toy.
 
-- [ ] Input validation on all POST/PATCH endpoints (express-validator)
-- [ ] Rate limiting on auth endpoints (express-rate-limit)
-- [ ] Error handling middleware (consistent error shape across API)
-- [ ] Environment-based config (dev/prod)
-- [ ] API response envelope: `{ success, data, error, meta }`
-- [ ] MongoDB indexes on `status`, `pashto` (text index for search)
-- [ ] Loading and error states on all frontend data fetches
-- [ ] 404 page on client
+- [x] Input validation on all POST/PATCH endpoints (express-validator)
+- [x] Rate limiting on auth endpoints (express-rate-limit)
+- [x] Error handling middleware (consistent error shape across API)
+- [x] Environment-based config (dev/prod)
+- [x] API response envelope: `{ success, data, error, meta }`
+- [x] MongoDB indexes on `status`, `pashto` (text index for search)
+- [x] Loading and error states on all frontend data fetches
+- [x] 404 page on client
 
 **Commits this phase:**
 ```

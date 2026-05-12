@@ -591,8 +591,9 @@ test.describe('Moderator — merge concept from Concepts list page', () => {
     await loginAs(page, 'moderator');
     await page.goto('/dashboard/concepts');
 
-    // Filter to pending to ensure the source concept appears within the 20-item page limit
+    // Filter to pending then search by gloss to pin the row regardless of page count
     await page.getByLabel('Status').selectOption('pending');
+    await page.getByLabel('Search concepts').fill(sourceConcept.englishGloss);
 
     await expect(page.getByText(sourceConcept.englishGloss)).toBeVisible({ timeout: 10000 });
 
@@ -611,8 +612,9 @@ test.describe('Moderator — merge concept from Concepts list page', () => {
     await loginAs(page, 'moderator');
     await page.goto('/dashboard/concepts');
 
-    // Filter to pending so the source concept is visible regardless of total concept count
+    // Filter to pending then search by gloss to pin the row regardless of page count
     await page.getByLabel('Status').selectOption('pending');
+    await page.getByLabel('Search concepts').fill(sourceConcept.englishGloss);
 
     await expect(page.getByText(sourceConcept.englishGloss)).toBeVisible({ timeout: 10000 });
 

@@ -853,8 +853,8 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
     await user.click(await screen.findByRole('button', { name: /merge/i }));
 
     const searchInput =
-      screen.queryByLabelText(/search|concept/i) ||
-      screen.queryByPlaceholderText(/search|concept/i);
+      screen.queryByLabelText(/search target/i) ||
+      screen.queryByPlaceholderText(/search concept/i);
     expect(searchInput).toBeInTheDocument();
   });
 
@@ -876,8 +876,8 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
     await user.click(await screen.findByRole('button', { name: /merge/i }));
 
     const searchInput =
-      screen.queryByLabelText(/search|concept/i) ||
-      screen.queryByPlaceholderText(/search|concept/i);
+      screen.queryByLabelText(/search target/i) ||
+      screen.queryByPlaceholderText(/search concept/i);
     if (searchInput) await user.type(searchInput, 'hom');
 
     await waitFor(() => {
@@ -908,8 +908,8 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
     await user.click(await screen.findByRole('button', { name: /merge/i }));
 
     const searchInput =
-      screen.queryByLabelText(/search|concept/i) ||
-      screen.queryByPlaceholderText(/search|concept/i);
+      screen.queryByLabelText(/search target/i) ||
+      screen.queryByPlaceholderText(/search concept/i);
     if (searchInput) {
       await user.type(searchInput, 'hom');
       const suggestion = await screen.findByText(/home/i);
