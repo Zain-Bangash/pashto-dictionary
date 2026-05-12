@@ -36,10 +36,7 @@ function optionalVerifyToken(req, res, next) {
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
   } catch {
-    return res.status(401).json({
-      success: false,
-      error: { message: 'Invalid or expired token' },
-    });
+    // Invalid/expired token on a public route — treat as unauthenticated, not an error
   }
   next();
 }

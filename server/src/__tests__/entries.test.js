@@ -108,12 +108,15 @@ describe('GET /api/concepts', () => {
     expect(res.body).toHaveProperty('meta');
   });
 
-  test('returns pending concepts when status=pending filter is used', async () => {
+  test('returns pending concepts when status=pending filter is used by a moderator', async () => {
     await Concept.create([
       { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
       { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'pending' },
     ]);
-    const res = await request.get('/api/concepts?status=pending');
+    const modToken = makeToken({ role: 'moderator' });
+    const res = await request
+      .get('/api/concepts?status=pending')
+      .set('Authorization', `Bearer ${modToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].englishGloss).toBe('dog');

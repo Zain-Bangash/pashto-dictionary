@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { body } = require('express-validator');
 const { register, login, me, updateProfile } = require('../controllers/authController');
 const { verifyToken } = require('../middleware/auth');
+const { authLimiter } = require('../middleware/rateLimit');
 
 const router = Router();
 
@@ -23,8 +24,8 @@ const profileValidators = [
   body('village').optional().isString().trim().isLength({ max: 100 }).withMessage('Village name too long'),
 ];
 
-router.post('/register', registerValidators, register);
-router.post('/login', loginValidators, login);
+router.post('/register', authLimiter, registerValidators, register);
+router.post('/login', authLimiter, loginValidators, login);
 router.get('/me', verifyToken, me);
 router.patch('/profile', verifyToken, profileValidators, updateProfile);
 

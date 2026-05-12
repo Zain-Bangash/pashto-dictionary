@@ -73,16 +73,18 @@ async function listConcepts(req, res) {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  // Default to published for public; moderator/admin can pass ?status= filter
   const VALID_STATUSES = ['pending', 'approved', 'rejected', 'published'];
   const statusParam = req.query.status;
+  const canFilterByStatus = req.user && ['moderator', 'admin'].includes(req.user.role);
   const filter = {
-    status: statusParam && VALID_STATUSES.includes(statusParam) ? statusParam : 'published',
+    status: canFilterByStatus && statusParam && VALID_STATUSES.includes(statusParam)
+      ? statusParam
+      : 'published',
   };
 
   const q = (req.query.q || '').trim();
   if (q) {
-    filter.$text = { $search: q };
+    filter.englishGloss = new RegExp(escapeRegex(q), 'i');
   }
 
   filter.isDeleted = { $ne: true };

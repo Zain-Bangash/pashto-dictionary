@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, optionalVerifyToken } = require('../middleware/auth');
 const { requireModeratorOrAdmin, requireRole } = require('../middleware/requireRole');
 const {
   createConcept,
@@ -42,7 +42,7 @@ router.get('/wotd',           getWotd);
 router.get('/suggest',        suggestConcepts);
 router.get('/search',         searchConcepts);
 router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
-router.get('/',               listConcepts);
+router.get('/',               optionalVerifyToken, listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id', verifyToken, updateValidators, updateConcept);
