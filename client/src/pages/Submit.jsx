@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import api, { suggestConcepts, createConcept, createVariant } from '../services/api';
+import api, { suggestConcepts, createConcept, createVariant, checkCrossConceptPashto } from '../services/api';
 
 const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
 const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
@@ -36,6 +36,8 @@ export default function Submit() {
   const [definition, setDefinition]       = useState('');
   const [example, setExample]             = useState('');
   const [submissionNote, setSubmissionNote] = useState('');
+
+  const [crossConceptWarnings, setCrossConceptWarnings] = useState([]);
 
   const [errors, setErrors]     = useState({});
   const [apiError, setApiError] = useState('');
@@ -83,6 +85,7 @@ export default function Submit() {
     setGlossQuery(concept.englishGloss);
     setSuggestions([]);
     setCreatingNew(false);
+    setCrossConceptWarnings([]);
     setStep(2);
   }
 
@@ -92,6 +95,19 @@ export default function Submit() {
     setSelectedConcept(null);
     setSuggestions([]);
     setStep(2);
+  }
+
+  async function handlePashtoBlur() {
+    if (!pashto.trim() || !selectedConcept?._id) {
+      setCrossConceptWarnings([]);
+      return;
+    }
+    try {
+      const res = await checkCrossConceptPashto(pashto, selectedConcept._id);
+      setCrossConceptWarnings(res.data.data.conflicts);
+    } catch {
+      setCrossConceptWarnings([]);
+    }
   }
 
   function validateStep2() {
@@ -241,6 +257,7 @@ export default function Submit() {
                   dir="rtl"
                   value={pashto}
                   onChange={(e) => setPashto(e.target.value)}
+                  onBlur={handlePashtoBlur}
                   className={`${inputClass} font-pashto text-lg`}
                   placeholder="پښتو…"
                 />
@@ -251,6 +268,19 @@ export default function Submit() {
                     style={{ lineHeight: 1.7 }}
                   >
                     {pashto}
+                  </div>
+                )}
+                {crossConceptWarnings.length > 0 && (
+                  <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                    <span className="font-medium">Note:</span> This word already appears under{' '}
+                    {crossConceptWarnings.map((c, i) => (
+                      <span key={c.conceptId}>
+                        {i > 0 && ', '}
+                        <span className="font-medium">{c.englishGloss}</span>{' '}
+                        <span className="text-amber-600">({c.status})</span>
+                      </span>
+                    ))}
+                    . If it shares that meaning, consider selecting that concept in Step 1 instead.
                   </div>
                 )}
                 {errors.pashto && <p className="text-red-400 text-xs font-ui mt-1">{errors.pashto}</p>}

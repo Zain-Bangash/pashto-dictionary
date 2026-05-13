@@ -93,4 +93,8 @@ export function mergeConcepts(sourceId, body) {
   return api.post(`/api/concepts/${sourceId}/merge`, body);
 }
 
+export function checkCrossConceptPashto(pashto, conceptId) {
+  return api.get('/api/variants/cross-concept-check', { params: { pashto, conceptId } });
+}
+
 export default api;

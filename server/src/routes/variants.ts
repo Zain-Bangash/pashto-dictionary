@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 import { verifyToken, optionalVerifyToken } from '../middleware/auth';
 import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
 import {
@@ -12,6 +12,7 @@ import {
   getMyVariantSubmissions,
   deleteVariant,
   editVariant,
+  crossConceptCheck,
 } from '../controllers/variantController';
 
 const router = Router();
@@ -37,9 +38,15 @@ const statusValidators = [
     .withMessage('status must be approved, rejected, or published'),
 ];
 
+const crossConceptCheckValidators = [
+  query('pashto').notEmpty().withMessage('pashto is required'),
+  query('conceptId').isMongoId().withMessage('conceptId must be a valid MongoDB ObjectId'),
+];
+
 // static paths must come before /:id
 router.get('/search', searchVariants);
 router.get('/my-submissions', verifyToken, getMyVariantSubmissions);
+router.get('/cross-concept-check', verifyToken, crossConceptCheckValidators, crossConceptCheck);
 router.get('/', verifyToken, requireModeratorOrAdmin, listVariants);
 router.get('/:id', optionalVerifyToken, getVariant);
 router.post('/', verifyToken, createValidators, createVariant);

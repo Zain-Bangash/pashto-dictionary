@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { Request, Response } from 'express';
 import Concept from '../models/Concept';
 import Variant from '../models/Variant';
@@ -487,4 +487,42 @@ async function editVariant(req: Request, res: Response): Promise<void> {
   res.status(200).json({ success: true, data: variant });
 }
 
-export { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions, deleteVariant, editVariant };
+async function crossConceptCheck(req: Request, res: Response): Promise<void> {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const first = errors.array()[0];
+    res.status(400).json({ success: false, error: { message: first.msg } });
+    return;
+  }
+
+  const pashto = req.query.pashto as string;
+  const conceptId = req.query.conceptId as string;
+
+  const normalizedPashto = pashto.trim().normalize('NFC');
+
+  const matches = await Variant.find({
+    normalizedPashto,
+    concept: { $ne: conceptId },
+    isDeleted: { $ne: true },
+  })
+    .populate<{ concept: { _id: Types.ObjectId; englishGloss: string; status: string } }>('concept', 'englishGloss status')
+    .lean();
+
+  const seen = new Set<string>();
+  const conflicts = matches
+    .filter(v => {
+      const id = (v.concept as any)._id.toString();
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .map(v => ({
+      conceptId: (v.concept as any)._id,
+      englishGloss: (v.concept as any).englishGloss,
+      status: (v.concept as any).status,
+    }));
+
+  res.json({ success: true, data: { conflicts } });
+}
+
+export { createVariant, listVariants, getVariant, updateVariant, transitionVariantStatus, searchVariants, getMyVariantSubmissions, deleteVariant, editVariant, crossConceptCheck };

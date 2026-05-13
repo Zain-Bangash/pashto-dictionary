@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../../services/api';
+import api, { checkCrossConceptPashto } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 // Use api.get/patch/post directly so vi.fn() mocks on api.* work in tests
@@ -400,6 +400,9 @@ export default function DashboardQueue() {
   // Merge modal state: { sourceItem, targetItem }
   const [mergeModal, setMergeModal] = useState(null);
 
+  // Cross-concept conflict map: { [variantId]: [{ conceptId, englishGloss, status }] }
+  const [crossConceptMap, setCrossConceptMap] = useState({});
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -407,13 +410,25 @@ export default function DashboardQueue() {
       api.get(`/api/moderation/concepts/queue?status=${conceptsFilter}`),
       api.get(`/api/moderation/variants/queue?status=${variantsFilter}`),
     ])
-      .then(([cRes, vRes]) => {
+      .then(async ([cRes, vRes]) => {
+        const fetchedVariants = vRes.data.data || [];
         setConcepts(cRes.data.data || []);
-        setVariants(vRes.data.data || []);
+        setVariants(fetchedVariants);
         const cm = cRes.data.meta || {};
         const vm = vRes.data.meta || {};
         setConceptsCounts({ pending: cm.pendingCount ?? 0, approved: cm.approvedCount ?? 0 });
         setVariantsCounts({ pending: vm.pendingCount ?? 0, approved: vm.approvedCount ?? 0 });
+
+        const checks = await Promise.all(
+          fetchedVariants.map((v) =>
+            checkCrossConceptPashto(v.pashto, v.concept._id)
+              .then((r) => ({ id: v._id, conflicts: r.data.data.conflicts }))
+              .catch(() => ({ id: v._id, conflicts: [] }))
+          )
+        );
+        const map = {};
+        checks.forEach(({ id, conflicts }) => { map[id] = conflicts; });
+        setCrossConceptMap(map);
       })
       .catch(() => setError('Failed to load queue'))
       .finally(() => setLoading(false));
@@ -572,6 +587,15 @@ export default function DashboardQueue() {
                           {item.region}
                         </span>
                       </div>
+                      {crossConceptMap[item._id]?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {crossConceptMap[item._id].map((c) => (
+                            <span key={c.conceptId} className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                              ⚠ Also under: {c.englishGloss} ({c.status})
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-sm font-ui text-muted">{item.definition}</p>
                       {item.example && (
                         <p className="text-xs font-ui text-muted/60 italic">{item.example}</p>
