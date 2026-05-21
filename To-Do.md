@@ -1,11 +1,13 @@
-
-
 best way is to manually go through the userflow and create e2e for them and then also manual test
 
+Github workflow (AWS SAM templates) and add this CV as well. Through Github actions (workflow)
+
+Domain Driven Decision discuss with Aun Shirazi Bhai and clean architecture
+
+AWS Developer assocate
 
 Show which user has added a the word
 
-Using JWT localStorage, should that be changed?
 Improve and test search bar (fuzzy search)
 
 updates userflows, buildplan, claude, and agent files

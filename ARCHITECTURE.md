@@ -191,6 +191,19 @@ The identity rule for a variant is deliberately scoped to `concept + pashto + re
 
 `normalizedPhonetic` is stored and used for search ranking and display, but it is deliberately excluded from the duplicate identity model. The reasoning is that two contributors may transcribe the same Pashto word differently depending on transcription convention or dialect familiarity — one might write *lmar*, another *l'mar*. These are not two different words; they are two representations of the same word. Treating `phonetic` as part of the duplicate key would create false duplicates and fragment entries that genuinely belong together. The identity model is therefore: concept + pashto script + region. Phonetics is additional metadata, not an identifier.
 
+### Cross-concept duplicate signalling
+
+Permitting the same Pashto word under different concepts is linguistically correct, but it creates a silent failure mode: a user who mistakenly files مینه under "lover" (when it belongs to "love") gets no feedback, and the moderator reviewing the pending entry has no signal that the word already exists elsewhere.
+
+A read-only `GET /api/variants/cross-concept-check?pashto=&conceptId=` endpoint addresses this. It normalises the input identically to the pre-save hook, then queries for variants sharing the same `normalizedPashto` but a different `concept`. Results are deduplicated by concept (multiple regions under the same other concept produce one warning entry, not several).
+
+The check surfaces at two points:
+
+- **Submission form (Step 2):** On blur of the Pashto input, an amber warning box lists the conflicting concepts. Submission is still allowed — a language-expert moderator may judge the cross-concept usage valid.
+- **Moderation queue:** After the pending variant list loads, the check runs in parallel for every card. Cards with conflicts show a small amber badge: *⚠ Also under: Love (published).*
+
+Same-concept occurrences (مینه under "love" in Kohat vs Hangu) are intentionally excluded — those are different regional variants of the same concept, which is the whole point of the data model.
+
 ---
 
 ## The Submit Flow
