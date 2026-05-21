@@ -8,9 +8,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "skipLibCheck": true,
-    "isolatedModules": true,
-    "types": ["node", "jest"],
     "ignoreDeprecations": "6.0"
+  },
+  "ts-node": {
+    "files": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/__tests__"]

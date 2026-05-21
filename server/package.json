@@ -2,10 +2,11 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
     "test": "jest --runInBand --forceExit"
   },
   "keywords": [],
@@ -24,6 +25,7 @@
     "mongodb-memory-server": "^11.0.1",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   },
   "dependencies": {
