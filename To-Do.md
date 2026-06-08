@@ -1,31 +1,42 @@
-best way is to manually go through the userflow and create e2e for them and then also manual test
+# To-Do
 
-Github workflow (AWS SAM templates) and add this CV as well. Through Github actions (workflow)
+## Active — Phase 13: AWS Cognito Migration
 
-Domain Driven Decision discuss with Aun Shirazi Bhai and clean architecture
+Follow the TDD cycle: spawn tester agent first, then coder agent.
 
-AWS Developer assocate
+- [ ] Create Cognito User Pool (email + password sign-in, custom `role` attribute)
+- [ ] Replace `authController.ts` register/login with Cognito SDK calls
+- [ ] Rewrite `auth.ts` middleware to verify Cognito tokens via `aws-jwt-verify`
+- [ ] Remove `User.passwordHash`; add `User.cognitoSub`
+- [ ] Replace frontend `AuthContext` axios calls with `@aws-amplify/auth` SDK
+- [ ] Rewrite auth tests to mock Cognito; update E2E global setup for Cognito tokens
 
-Show which user has added a the word
+> Full spec in `MigrationPlan.md` — Phase 13
 
-Improve and test search bar (fuzzy search)
+---
 
-updates userflows, buildplan, claude, and agent files
+## Backlog
 
-Future: 
+### Cloud / Infrastructure
+- SAM template (`template.yaml`) — describe Lambda + API Gateway as infrastructure-as-code (good CV signal, mentioned in MigrationPlan.md)
+- Multi-region with Route 53 (future)
+- Update Lambda runtime to `nodejs22.x` in AWS Console (currently `nodejs20.x` — upgrade for consistency with CI)
 
-Community Page should show top contributing users
-Scaling
-Make about page
+### App
+- Show which user added a word on the concept/variant detail view
+- Improve search — fuzzy matching
+- Community page: top contributing users
+- About page
 
-Use AWS Cognito for password login, use OR for login
-AWS amplify to host (free tier)
-Migrate DB to AWS
-Change to TypeScript
+### CV notes
+- Add AI section to CV: agents, LLM, code reviews, Claude Code skills
+- Add data section to CV
+- Emphasise React on CV
+- GitHub Actions badge in README
 
-CV:
-Add AI section: Agents, LLM, Code reviews, skills
-Add data section: to CV
-Emphasise react
+---
 
-
+## Completed
+- Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
+- Phase 11: TypeScript migration (server)
+- Phase 12: AWS deployment — Amplify frontend, Lambda + API Gateway backend, GitHub Actions CI/CD

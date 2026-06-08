@@ -479,25 +479,18 @@ refactor(routes): convert routes and index to TypeScript
 
 ---
 
-### Phase 12 — AWS Deployment (Amplify + Lambda)
+### Phase 12 — AWS Deployment (Amplify + Lambda) ✓ COMPLETE
 
 **Goal:** Host the React frontend on AWS Amplify and the Express backend on AWS Lambda + API Gateway. Zero code changes to business logic.
 
 **Steps:**
-1. Extract Express `app` into `server/src/app.ts` (separate from `index.ts`)
-2. Add `server/src/lambda.ts` entry point using `serverless-http`
-3. Create `amplify.yml` build config at project root
-4. Connect GitHub repo to AWS Amplify for automatic frontend deploys
-5. Deploy Lambda + API Gateway, set environment variables
-6. Update `client/.env` `VITE_API_URL` to the API Gateway URL
-
-**Commits this phase:**
-```
-refactor(server): extract app from index for serverless compatibility
-feat(server): add Lambda entry point with serverless-http
-chore: add amplify.yml build config
-chore(client): update VITE_API_URL to API Gateway endpoint
-```
+- [x] Extract Express `app` into `server/src/app.ts` (separate from `index.ts`)
+- [x] Add `server/src/lambda.ts` entry point using `serverless-http`
+- [x] Create `amplify.yml` build config at project root
+- [x] Connect GitHub repo to AWS Amplify for automatic frontend deploys
+- [x] Deploy Lambda + API Gateway, set environment variables
+- [x] Update `client/.env` `VITE_API_URL` to the API Gateway URL
+- [x] Add GitHub Actions CI/CD — test gate on PRs (`ci.yml`) + Lambda auto-deploy on merge to `main` (`deploy.yml`)
 
 **Done when:** frontend live on Amplify URL, API calls reach Lambda, all tests still pass locally
 

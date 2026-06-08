@@ -15,7 +15,8 @@ A community-driven platform for preserving Pashto regional dialects. Users submi
 | Database | MongoDB via Mongoose |
 | Auth | JWT (jsonwebtoken + bcryptjs) |
 | Validation | express-validator (server), native React state (client) |
-| CI/CD | GitHub Actions (add later) |
+| CI/CD | GitHub Actions (test gate on PRs + Lambda deploy on merge to main) |
+| Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway (backend) |
 
 ---
 
@@ -23,6 +24,10 @@ A community-driven platform for preserving Pashto regional dialects. Users submi
 
 ```
 pashto-dictionary/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml         # Test gate — runs on push to dev and PRs to main
+│       └── deploy.yml     # Lambda deploy — runs on push to main
 ├── client/
 │   └── src/
 │       ├── components/    # Reusable UI components
@@ -31,13 +36,18 @@ pashto-dictionary/
 │       ├── services/      # API call functions (axios)
 │       ├── context/       # React Context providers
 │       └── utils/         # Pure helper functions
+├── e2e/                   # Playwright end-to-end tests
 ├── server/
 │   └── src/
-│       ├── controllers/   # Route handler logic
-│       ├── models/        # Mongoose schemas
-│       ├── routes/        # Express router definitions
-│       ├── middleware/     # Auth, role, error handlers
-│       └── utils/         # Server-side helpers
+│       ├── controllers/   # Route handler logic (TypeScript)
+│       ├── models/        # Mongoose schemas + interfaces (TypeScript)
+│       ├── routes/        # Express router definitions (TypeScript)
+│       ├── middleware/     # Auth, role, error handlers (TypeScript)
+│       ├── utils/         # Server-side helpers (TypeScript)
+│       ├── app.ts         # Express app (no listen call — shared by index + lambda)
+│       ├── index.ts       # Local dev entry point (calls app.listen)
+│       └── lambda.ts      # AWS Lambda entry point (serverless-http wrapper)
+├── amplify.yml            # AWS Amplify frontend build config
 ├── CLAUDE.md
 └── README.md
 ```
@@ -86,7 +96,7 @@ All API responses must use this shape. Never return a raw object or array.
 - Keep controllers thin — business logic belongs in a service or utility function if it grows beyond ~20 lines
 
 ### Naming
-- Files: `camelCase.js` for utilities and services, `PascalCase.jsx` for React components
+- Files: `camelCase.ts` for server utilities and services, `PascalCase.jsx` for React components
 - MongoDB models: PascalCase singular (`Entry`, `User`, `ModerationLog`)
 - API routes: lowercase plural kebab (`/api/entries`, `/api/moderation`)
 - React components: PascalCase, one component per file
@@ -165,12 +175,26 @@ chore(deps): add express-rate-limit to server
 ```
 # server/.env
 PORT=5000
-mongodb+srv://<user>:<password>@cluster0.oq0rk.mongodb.net/
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.oq0rk.mongodb.net/
 JWT_SECRET=your_secret_here
 NODE_ENV=development
 
 # client/.env
 VITE_API_URL=http://localhost:5000
+```
+
+### Production (Lambda environment variables — set in AWS Console)
+```
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+NODE_ENV=production
+```
+
+### GitHub Actions secrets
+```
+AWS_ACCESS_KEY_ID     — IAM user with lambda:UpdateFunctionCode on pashto-backend
+AWS_SECRET_ACCESS_KEY
+AWS_REGION            — region where pashto-backend Lambda lives
 ```
 
 Keep `.env.example` files updated whenever a new variable is added.
@@ -181,5 +205,10 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 > Update this line as you progress through the build plan.
 
-**Active phase:** Phase 11 — TypeScript Migration (Server Only)
+**Active phase:** Phase 13 — AWS Cognito Migration
 **Branch:** dev
+
+### Completed phases
+- Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
+- Phase 11: TypeScript migration (server only — all `.js` → `.ts`, strict mode)
+- Phase 12: AWS deployment (Amplify hosting, Lambda + API Gateway, GitHub Actions CI/CD)
