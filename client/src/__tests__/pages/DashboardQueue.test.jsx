@@ -15,7 +15,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
-import api from '../../services/api';
+import api, { checkCrossConceptPashto } from '../../services/api';
 import DashboardQueue from '../../pages/dashboard/DashboardQueue';
 import DashboardConcepts from '../../pages/dashboard/DashboardConcepts';
 
@@ -31,6 +31,7 @@ vi.mock('../../services/api', () => ({
   editConcept: vi.fn(),
   editVariant: vi.fn(),
   mergeConcepts: vi.fn(),
+  checkCrossConceptPashto: vi.fn().mockResolvedValue({ data: { data: { conflicts: [] } } }),
 }));
 
 const mockUseAuth = vi.fn();
@@ -107,6 +108,7 @@ const renderConcepts = () =>
 
 beforeEach(() => {
   vi.resetAllMocks();
+  checkCrossConceptPashto.mockResolvedValue({ data: { data: { conflicts: [] } } });
 });
 
 // ===========================================================================
