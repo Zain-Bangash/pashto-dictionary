@@ -17,9 +17,11 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.js'],
     globals: true,
     pool: 'vmForks',
-    server: {
-      deps: {
-        inline: ['react-router', 'react-router-dom'],
+    deps: {
+      optimizer: {
+        web: {
+          include: ['react-router', 'react-router-dom'],
+        },
       },
     },
   },
