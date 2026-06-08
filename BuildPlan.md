@@ -527,6 +527,32 @@ test(e2e): add Cognito token helper to global setup
 
 ---
 
+### Phase 14 — SAM Infrastructure as Code
+
+**Goal:** Replace the direct `aws lambda update-function-code` deploy with AWS SAM. All AWS resources are declared in `template.yaml` and owned by a CloudFormation stack — no Console-only state.
+
+**Steps:**
+1. Install SAM CLI locally (`winget install Amazon.SAM-CLI`)
+2. Write `template.yaml` at project root — Lambda function, HTTP API (API Gateway v2), IAM execution role, environment variables
+3. Run `sam deploy --guided` once locally to create the initial CloudFormation stack and generate `samconfig.toml`
+4. Update `.github/workflows/deploy.yml` — replace the zip + `update-function-code` steps with `sam build && sam deploy --no-confirm-changeset`
+5. Add `samconfig.toml` to the repo (stack name, region, S3 bucket — no secrets)
+6. Remove `LAMBDA_FUNCTION_NAME` GitHub secret (no longer needed — SAM reads it from the template)
+7. Expand IAM user permissions: add `cloudformation:*`, `s3:*`, `iam:PassRole`
+
+**Commits this phase:**
+```
+feat(infra): add SAM template declaring Lambda and HTTP API
+chore(ci): update deploy workflow to use sam build and sam deploy
+chore(infra): add samconfig.toml for non-interactive pipeline deploys
+```
+
+**Done when:** `sam deploy` succeeds in the pipeline, Lambda is owned by a CloudFormation stack (`pashto-dictionary`), `template.yaml` is the single source of truth for all backend infrastructure
+
+> Full details in `MigrationPlan.md` — Phase 14
+
+---
+
 ## Professional Practices Checklist
 
 ### Before every coding session

@@ -17,10 +17,17 @@ Follow the TDD cycle: spawn tester agent first, then coder agent.
 
 ## Backlog
 
+### Phase 14 — SAM Infrastructure as Code (after Phase 13)
+- [ ] Write `template.yaml` — Lambda + HTTP API + IAM role
+- [ ] Run `sam deploy --guided` locally → generates `samconfig.toml`
+- [ ] Update `deploy.yml` to use `sam build && sam deploy`
+- [ ] Remove `LAMBDA_FUNCTION_NAME` GitHub secret
+- [ ] Expand IAM user permissions (cloudformation, s3, iam:PassRole)
+
+> Full spec in `MigrationPlan.md` — Phase 14
+
 ### Cloud / Infrastructure
-- SAM template (`template.yaml`) — describe Lambda + API Gateway as infrastructure-as-code (good CV signal, mentioned in MigrationPlan.md)
 - Multi-region with Route 53 (future)
-- Update Lambda runtime to `nodejs22.x` in AWS Console (currently `nodejs20.x` — upgrade for consistency with CI)
 
 ### App
 - Show which user added a word on the concept/variant detail view
