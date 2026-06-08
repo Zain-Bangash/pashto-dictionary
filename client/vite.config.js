@@ -17,12 +17,5 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.js'],
     globals: true,
     pool: 'vmForks',
-    deps: {
-      optimizer: {
-        web: {
-          include: ['react-router', 'react-router-dom'],
-        },
-      },
-    },
   },
 })
