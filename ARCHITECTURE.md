@@ -304,14 +304,39 @@ All UI is built from scratch with Tailwind CSS utility classes. This was a delib
 
 ---
 
+## TypeScript Migration (Phase 11)
+
+The server was migrated from CommonJS JavaScript to TypeScript strict mode. Every Mongoose model has an explicit document interface (`IUser`, `IConcept`, `IVariant`, `IModerationLog`). Migration was done one layer at a time — utils → middleware → models → controllers → routes → entrypoints — keeping the test suite green throughout. The client stayed JSX/JS.
+
+---
+
+## AWS Deployment (Phase 12)
+
+The Express app was split across three entrypoints to support both local dev and Lambda without duplicating business logic:
+
+- `app.ts` — Express app with all routes and middleware, no `listen` call
+- `index.ts` — local dev entrypoint; imports `app` and calls `app.listen`
+- `lambda.ts` — AWS Lambda entrypoint; wraps `app` with `serverless-http`
+
+Frontend is hosted on **AWS Amplify** — every push to the connected branch triggers a rebuild via `amplify.yml`. Backend runs as **AWS Lambda** (`pashto-backend`) behind **API Gateway**. No route handler changes were needed.
+
+A **GitHub Actions CI/CD pipeline** enforces quality and automates deployments:
+
+- `ci.yml` — runs `tsc --noEmit` + full test suite on every PR to `main`; a failing test blocks the merge
+- `deploy.yml` — on every merge to `main`, compiles TypeScript, packages `dist/` + production `node_modules`, and deploys via `aws lambda update-function-code`
+
+---
+
 ## Stack Summary
 
 | Layer | Technology | Notable choice |
 |---|---|---|
 | Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
-| Backend | Node.js + Express | `express-async-errors` for clean async error handling |
+| Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
 | Auth | JWT (jsonwebtoken + bcryptjs) | Role-based: user / moderator / admin |
+| Hosting | AWS Amplify (frontend) · Lambda + API Gateway (backend) | `serverless-http` wraps Express with zero business logic changes |
+| CI/CD | GitHub Actions | Test gate on PRs; auto-deploy Lambda on merge to `main` |
 | Validation | express-validator | All mutation endpoints validated before DB access |
-| Normalization | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
-| Testing | Vitest (client) + Jest + MongoMemoryServer (server) | In-memory DB for server integration tests |
+| Normalisation | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
+| Testing | Vitest + RTL (client) · Jest + MongoMemoryServer (server) · Playwright (E2E) | In-memory DB for server integration tests |
