@@ -1,0 +1,42 @@
+name: Deploy
+
+# Tests must pass on the PR (via ci.yml) before merging to main.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-lambda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: cd server && npm ci
+
+      - run: cd server && npm run build
+
+      - name: Package Lambda zip
+        run: |
+          mkdir -p /tmp/lambda-pkg
+          cp -r server/dist /tmp/lambda-pkg/dist
+          cp server/package.json server/package-lock.json /tmp/lambda-pkg/
+          cd /tmp/lambda-pkg && npm ci --omit=dev
+          zip -r /tmp/function.zip .
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to Lambda
+        run: aws lambda update-function-code --function-name pashto-backend --zip-file fileb:///tmp/function.zip
+
+      - name: Wait for update
+        run: aws lambda wait function-updated --function-name pashto-backend
