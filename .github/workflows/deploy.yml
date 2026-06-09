@@ -38,12 +38,4 @@ jobs:
       - name: Deploy to Lambda
         run: aws lambda update-function-code --function-name pashto-backend --zip-file fileb:///tmp/function.zip
 
-      - name: Wait for code update to complete
-        run: aws lambda wait function-updated --function-name pashto-backend
-
-      - name: Update Lambda environment variables
-        run: |
-          aws lambda update-function-configuration \
-            --function-name pashto-backend \
-            --environment "Variables={MONGODB_URI=${{ secrets.MONGODB_URI }},COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }},COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }},COGNITO_CLIENT_SECRET=${{ secrets.COGNITO_CLIENT_SECRET }},NODE_ENV=production}"
 
