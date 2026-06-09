@@ -2,8 +2,10 @@ import {
   CognitoIdentityProviderClient,
   SignUpCommand,
   AdminConfirmSignUpCommand,
+  AdminDeleteUserCommand,
   InitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { createHmac } from 'crypto';
 import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
 import User from '../models/User';
@@ -15,6 +17,12 @@ const cognitoClient = new CognitoIdentityProviderClient({
 });
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID!;
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID!;
+const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET;
+
+function secretHash(username: string): string | undefined {
+  if (!CLIENT_SECRET) return undefined;
+  return createHmac('sha256', CLIENT_SECRET).update(username + CLIENT_ID).digest('base64');
+}
 
 type SafeUserInput = IUser | (Omit<IUser, keyof Document> & {
   _id: unknown;
@@ -85,6 +93,7 @@ async function register(req: Request, res: Response): Promise<void> {
   try {
     const signUpResult = await cognitoClient.send(new SignUpCommand({
       ClientId: CLIENT_ID,
+      SecretHash: secretHash(normalizedEmail),
       Username: normalizedEmail,
       Password: password,
       UserAttributes: [
@@ -104,33 +113,43 @@ async function register(req: Request, res: Response): Promise<void> {
     throw err;
   }
 
-  // Auto-confirm the user (dev flow)
-  await cognitoClient.send(new AdminConfirmSignUpCommand({
-    UserPoolId: USER_POOL_ID,
-    Username: normalizedEmail,
-  }));
+  // Everything after SignUp must be atomic — if it fails, remove the Cognito user
+  // so the email is not permanently locked and the user can retry.
+  let accessToken: string;
+  let user: IUser;
+  try {
+    await cognitoClient.send(new AdminConfirmSignUpCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: normalizedEmail,
+    }));
 
-  // Get access token via auth flow
-  const authResult = await cognitoClient.send(new InitiateAuthCommand({
-    AuthFlow: 'USER_PASSWORD_AUTH',
-    ClientId: CLIENT_ID,
-    AuthParameters: {
-      USERNAME: normalizedEmail,
-      PASSWORD: password,
-    },
-  }));
+    const authResult = await cognitoClient.send(new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        USERNAME: normalizedEmail,
+        PASSWORD: password,
+        ...(secretHash(normalizedEmail) && { SECRET_HASH: secretHash(normalizedEmail) }),
+      },
+    }));
 
-  const accessToken = authResult.AuthenticationResult!.AccessToken!;
+    accessToken = authResult.AuthenticationResult!.AccessToken!;
 
-  // Create MongoDB user
-  const user = await new User({
-    username,
-    email: normalizedEmail,
-    cognitoSub,
-    role: 'user',
-    region,
-    village,
-  }).save();
+    user = await new User({
+      username,
+      email: normalizedEmail,
+      cognitoSub,
+      role: 'user',
+      region,
+      village,
+    }).save();
+  } catch (err) {
+    await cognitoClient.send(new AdminDeleteUserCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: normalizedEmail,
+    })).catch(() => {});
+    throw err;
+  }
 
   res.status(201).json({
     success: true,
@@ -161,6 +180,7 @@ async function login(req: Request, res: Response): Promise<void> {
       AuthParameters: {
         USERNAME: normalizedEmail,
         PASSWORD: password,
+        ...(secretHash(normalizedEmail) && { SECRET_HASH: secretHash(normalizedEmail) }),
       },
     }));
     const ar = authResult.AuthenticationResult!;

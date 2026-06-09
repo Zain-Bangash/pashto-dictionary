@@ -7,6 +7,9 @@ vi.mock('../services/api', () => ({
   default: {
     get: vi.fn(() => Promise.resolve({ data: { data: [], meta: { page: 1, limit: 20, total: 0 } } })),
   },
+  setToken: vi.fn(),
+  clearToken: vi.fn(),
+  getToken: vi.fn(() => null),
   setLogoutHandler: vi.fn(),
 }));
 
