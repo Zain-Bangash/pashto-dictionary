@@ -103,10 +103,18 @@ async function register(req: Request, res: Response): Promise<void> {
     }));
     cognitoSub = signUpResult.UserSub!;
   } catch (err) {
-    if ((err as { name?: string }).name === 'UsernameExistsException') {
+    const errName = (err as { name?: string }).name;
+    if (errName === 'UsernameExistsException') {
       res.status(409).json({
         success: false,
         error: { message: 'email already in use', field: 'email' },
+      });
+      return;
+    }
+    if (errName === 'InvalidPasswordException') {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Password does not meet requirements. Use at least 8 characters with an uppercase letter, a number, and a special character.', field: 'password' },
       });
       return;
     }

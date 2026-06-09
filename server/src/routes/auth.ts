@@ -10,8 +10,10 @@ const registerValidators = [
   body('username').trim().notEmpty().withMessage('username is required'),
   body('email').isEmail().withMessage('valid email is required').normalizeEmail(),
   body('password')
-    .isLength({ min: 8 })
-    .withMessage('password must be at least 8 characters'),
+    .isLength({ min: 8 }).withMessage('password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('password must contain at least one uppercase letter')
+    .matches(/[0-9]/).withMessage('password must contain at least one number')
+    .matches(/[^A-Za-z0-9]/).withMessage('password must contain at least one special character'),
 ];
 
 const loginValidators = [
