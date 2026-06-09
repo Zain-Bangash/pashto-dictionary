@@ -3,15 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import Register from '../../pages/Register';
-import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
 vi.mock('../../context/AuthContext', () => ({
-  useAuth: vi.fn(() => ({ login: vi.fn(), user: null })),
+  useAuth: vi.fn(),
 }));
+
+const mockRegister = vi.fn();
 
 const renderRegister = (initialEntries = ['/register']) => {
   let locationRef = {};
@@ -33,6 +35,8 @@ const renderRegister = (initialEntries = ['/register']) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRegister.mockReset();
+  useAuth.mockReturnValue({ register: mockRegister, user: null });
 });
 
 describe('Register page', () => {
@@ -69,30 +73,24 @@ describe('Register page', () => {
     expect(await screen.findByText(/password must be at least 8 characters/i)).toBeInTheDocument();
   });
 
-  it('calls api.post with username, email, and password on valid submit', async () => {
+  it('calls context register() with username, email, and password on valid submit', async () => {
     const user = userEvent.setup();
-    api.post.mockResolvedValueOnce({
-      data: { success: true, data: { token: 'jwt-token', user: { _id: '1', role: 'user' } } },
-    });
+    mockRegister.mockResolvedValue(undefined);
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /register/i }));
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/api/auth/register', {
-        username: 'testuser',
-        email: 'test@test.com',
-        password: 'password123',
-      });
+      expect(mockRegister).toHaveBeenCalledWith(
+        'testuser', 'test@test.com', 'password123', undefined, undefined
+      );
     });
   });
 
   it('redirects to / after successful registration', async () => {
     const user = userEvent.setup();
-    api.post.mockResolvedValueOnce({
-      data: { success: true, data: { token: 'jwt-token', user: { _id: '1', role: 'user' } } },
-    });
+    mockRegister.mockResolvedValue(undefined);
     const { locationRef } = renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
@@ -103,22 +101,23 @@ describe('Register page', () => {
     });
   });
 
-  it('shows an error message when the API returns email already taken', async () => {
+  it('shows an error message when the email is already taken', async () => {
     const user = userEvent.setup();
-    api.post.mockRejectedValueOnce({
-      response: { data: { success: false, error: { message: 'Email already in use' } } },
+    const err = Object.assign(new Error('An account with the given email already exists.'), {
+      name: 'UsernameExistsException',
     });
+    mockRegister.mockRejectedValue(err);
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'taken@test.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /register/i }));
-    expect(await screen.findByText(/email already in use/i)).toBeInTheDocument();
+    expect(await screen.findByText(/an account with this email already exists/i)).toBeInTheDocument();
   });
 
   it('disables the submit button while the request is in flight', async () => {
     const user = userEvent.setup();
-    api.post.mockReturnValueOnce(new Promise(() => {}));
+    mockRegister.mockReturnValue(new Promise(() => {}));
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');

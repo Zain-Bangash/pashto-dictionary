@@ -3,18 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import Login from '../../pages/Login';
-import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
-// AuthContext may not exist yet — tests are written against the spec, not current code.
-// The coder must create an AuthContext that the Login page consumes.
-// We mock it here so tests are self-contained once the context exists.
 vi.mock('../../context/AuthContext', () => ({
-  useAuth: vi.fn(() => ({ login: vi.fn(), user: null })),
+  useAuth: vi.fn(),
 }));
+
+const mockLogin = vi.fn();
 
 const renderLogin = (initialEntries = ['/login']) => {
   let locationRef = {};
@@ -36,6 +35,8 @@ const renderLogin = (initialEntries = ['/login']) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockLogin.mockReset();
+  useAuth.mockReturnValue({ login: mockLogin, user: null });
 });
 
 describe('Login page', () => {
@@ -61,28 +62,21 @@ describe('Login page', () => {
     expect(await screen.findByText(/password is required/i)).toBeInTheDocument();
   });
 
-  it('calls api.post with email and password on valid submit', async () => {
+  it('calls context login() with email and password on valid submit', async () => {
     const user = userEvent.setup();
-    api.post.mockResolvedValueOnce({
-      data: { success: true, data: { token: 'jwt-token', user: { _id: '1', role: 'user' } } },
-    });
+    mockLogin.mockResolvedValue(undefined);
     renderLogin();
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /log in/i }));
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/api/auth/login', {
-        email: 'test@test.com',
-        password: 'password123',
-      });
+      expect(mockLogin).toHaveBeenCalledWith('test@test.com', 'password123');
     });
   });
 
   it('redirects to / after successful login', async () => {
     const user = userEvent.setup();
-    api.post.mockResolvedValueOnce({
-      data: { success: true, data: { token: 'jwt-token', user: { _id: '1', role: 'user' } } },
-    });
+    mockLogin.mockResolvedValue(undefined);
     const { locationRef } = renderLogin();
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
@@ -92,21 +86,22 @@ describe('Login page', () => {
     });
   });
 
-  it('shows an error message when the API returns invalid credentials', async () => {
+  it('shows an error message when credentials are invalid', async () => {
     const user = userEvent.setup();
-    api.post.mockRejectedValueOnce({
-      response: { data: { success: false, error: { message: 'Invalid credentials' } } },
+    const err = Object.assign(new Error('Incorrect username or password.'), {
+      name: 'NotAuthorizedException',
     });
+    mockLogin.mockRejectedValue(err);
     renderLogin();
     await user.type(screen.getByLabelText(/email/i), 'wrong@test.com');
     await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
     await user.click(screen.getByRole('button', { name: /log in/i }));
-    expect(await screen.findByText(/invalid credentials/i)).toBeInTheDocument();
+    expect(await screen.findByText(/invalid email or password/i)).toBeInTheDocument();
   });
 
   it('shows a loading/disabled state on the submit button while the request is in flight', async () => {
     const user = userEvent.setup();
-    api.post.mockReturnValueOnce(new Promise(() => {}));
+    mockLogin.mockReturnValue(new Promise(() => {}));
     renderLogin();
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
