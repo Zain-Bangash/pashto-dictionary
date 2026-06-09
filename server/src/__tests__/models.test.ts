@@ -175,7 +175,6 @@ describe('User model', () => {
   const validUser = (suffix = '') => ({
     username: `testuser${suffix}`,
     email: `test${suffix}@example.com`,
-    passwordHash: 'hashedpassword123',
   });
 
   test('saves with all required fields', async () => {
@@ -193,9 +192,9 @@ describe('User model', () => {
     await expect(new User(data).save()).rejects.toThrow(/email/i);
   });
 
-  test('rejects when passwordHash is missing', async () => {
-    const { passwordHash: _p, ...data } = validUser();
-    await expect(new User(data).save()).rejects.toThrow(/passwordHash/i);
+  test('cognitoSub is not required (sparse unique field)', async () => {
+    const user = await new User(validUser()).save();
+    expect(user.cognitoSub).toBeUndefined();
   });
 
   test('defaults role to "user"', async () => {
