@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -32,13 +31,15 @@ export default function Login() {
     setApiError('');
     setLoading(true);
     try {
-      const res = await api.post('/api/auth/login', { email, password });
-      const { token, user } = res.data.data;
-      login(user, token);
+      await login(email, password);
       navigate(location.state?.from?.pathname || '/');
     } catch (err) {
-      const message = err?.response?.data?.error?.message ?? 'Login failed';
-      setApiError(message);
+      const name = err?.name ?? '';
+      if (name === 'NotAuthorizedException' || name === 'UserNotFoundException') {
+        setApiError('Invalid email or password');
+      } else {
+        setApiError(err?.message ?? 'Login failed');
+      }
     } finally {
       setLoading(false);
     }

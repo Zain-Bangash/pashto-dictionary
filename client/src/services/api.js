@@ -1,11 +1,17 @@
 import axios from 'axios';
+import { fetchAuthSession } from '@aws-amplify/auth';
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL });
 
-// Attach JWT on every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+// Attach Cognito AccessToken on every request (Amplify auto-refreshes on expiry)
+api.interceptors.request.use(async (config) => {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.accessToken?.toString();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  } catch {
+    // not signed in — send request without token
+  }
   return config;
 });
 

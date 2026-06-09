@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
 
 export default function Register() {
-  const { login } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -38,13 +37,15 @@ export default function Register() {
     setApiError('');
     setLoading(true);
     try {
-      const res = await api.post('/api/auth/register', { username, email, password, ...(region && { region }), ...(village.trim() && { village: village.trim() }) });
-      const { token, user } = res.data.data;
-      login(user, token);
+      await register(username, email, password, region || undefined, village.trim() || undefined);
       navigate(location.state?.from?.pathname || '/');
     } catch (err) {
-      const message = err?.response?.data?.error?.message ?? 'Registration failed';
-      setApiError(message);
+      const name = err?.name ?? '';
+      if (name === 'UsernameExistsException') {
+        setApiError('An account with this email already exists');
+      } else {
+        setApiError(err?.message ?? 'Registration failed');
+      }
     } finally {
       setLoading(false);
     }

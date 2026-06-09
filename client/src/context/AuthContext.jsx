@@ -1,39 +1,49 @@
+import { signIn, signUp, signOut, getCurrentUser } from '@aws-amplify/auth';
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken]           = useState(() => localStorage.getItem('token'));
-  const [user, setUser]             = useState(null);
-  const [initializing, setInitializing] = useState(!!localStorage.getItem('token'));
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    if (!token) { setInitializing(false); return; }
-    api.get('/api/auth/me')
-      .then((res) => setUser(res.data.data.user))
-      .catch(() => {
-        // Token expired or invalid — clear it
-        localStorage.removeItem('token');
-        setToken(null);
-      })
+    getCurrentUser()
+      .then(() => api.get('/api/auth/me').then((res) => setUser(res.data.data.user)))
+      .catch(() => {})
       .finally(() => setInitializing(false));
-  }, []); // intentionally runs once on mount only
+  }, []);
 
-  function login(userData, jwt) {
-    setUser(userData);
-    setToken(jwt);
-    localStorage.setItem('token', jwt);
+  async function login(email, password) {
+    await signIn({ username: email.toLowerCase(), password });
+    const res = await api.get('/api/auth/me');
+    setUser(res.data.data.user);
   }
 
-  function logout() {
+  async function register(username, email, password, region, village) {
+    await signUp({
+      username: email.toLowerCase(),
+      password,
+      options: {
+        userAttributes: {
+          email: email.toLowerCase(),
+          preferred_username: username,
+        },
+      },
+    });
+    await signIn({ username: email.toLowerCase(), password });
+    const res = await api.get('/api/auth/me');
+    setUser(res.data.data.user);
+  }
+
+  async function logout() {
+    await signOut();
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, initializing }}>
+    <AuthContext.Provider value={{ user, login, register, logout, initializing }}>
       {children}
     </AuthContext.Provider>
   );
