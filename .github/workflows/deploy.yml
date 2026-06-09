@@ -38,5 +38,3 @@ jobs:
       - name: Deploy to Lambda
         run: aws lambda update-function-code --function-name pashto-backend --zip-file fileb:///tmp/function.zip
 
-      - name: Wait for update
-        run: aws lambda wait function-updated --function-name pashto-backend
