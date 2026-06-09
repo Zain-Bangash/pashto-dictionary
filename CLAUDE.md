@@ -183,10 +183,12 @@ NODE_ENV=development
 VITE_API_URL=http://localhost:5000
 ```
 
-### Production (Lambda environment variables — set in AWS Console)
+### Production (Lambda environment variables — managed by SAM template.yaml from Phase 14)
 ```
 MONGODB_URI=mongodb+srv://...
-JWT_SECRET=...
+COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 NODE_ENV=production
 ```
 

@@ -2,12 +2,14 @@
 
 ## Active — Phase 14: SAM Infrastructure as Code
 
-- [ ] Install SAM CLI locally (`winget install Amazon.SAM-CLI`)
-- [ ] Write `template.yaml` — Lambda + HTTP API + IAM role
-- [ ] Run `sam deploy --guided` locally → generates `samconfig.toml`
-- [ ] Update `deploy.yml` to use `sam build && sam deploy`
-- [ ] Remove `LAMBDA_FUNCTION_NAME` GitHub secret
-- [ ] Expand IAM user permissions (cloudformation, s3, iam:PassRole)
+- [x] Write `template.yaml` — Lambda + HTTP API (esbuild bundler)
+- [x] Write `samconfig.toml` — stack name, region, resolve_s3
+- [x] Update `deploy.yml` to use `sam build && sam deploy`
+- [ ] Add GitHub Secrets: `MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`
+- [ ] Expand IAM user permissions — cloudformation:*, s3:*, iam:PassRole, apigateway:*
+- [ ] Push to main → first SAM deploy creates CloudFormation stack `pashto-dictionary`
+- [ ] Update Amplify `VITE_API_URL` to the new API Gateway URL from CloudFormation outputs
+- [ ] Trigger fresh Amplify build to bake in the new URL
 
 > Full spec in `MigrationPlan.md` — Phase 14
 
