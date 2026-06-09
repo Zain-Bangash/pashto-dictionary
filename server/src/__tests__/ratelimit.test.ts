@@ -2,6 +2,23 @@
 // Window: 15 minutes, max 10 requests. The 11th request must receive 429.
 // The 429 body must match the API envelope: { success: false, error: { message: "..." } }
 
+// Mock Cognito packages so the auth middleware and controller don't hit real AWS
+jest.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: { create: () => ({ verify: jest.fn().mockRejectedValue(new Error('Not used in rate limit tests')) }) },
+}));
+
+jest.mock('@aws-sdk/client-cognito-identity-provider', () => ({
+  CognitoIdentityProviderClient: jest.fn().mockImplementation(() => ({
+    send: jest.fn().mockRejectedValue(Object.assign(new Error('Incorrect username or password.'), { name: 'NotAuthorizedException' })),
+  })),
+  SignUpCommand: jest.fn().mockImplementation((i) => ({ _type: 'SignUpCommand', input: i })),
+  AdminConfirmSignUpCommand: jest.fn().mockImplementation((i) => ({ _type: 'AdminConfirmSignUpCommand', input: i })),
+  InitiateAuthCommand: jest.fn().mockImplementation((i) => ({ _type: 'InitiateAuthCommand', input: i })),
+  UsernameExistsException: class extends Error { constructor(a) { super(a.message); this.name = 'UsernameExistsException'; } },
+  NotAuthorizedException: class extends Error { constructor(a) { super(a.message); this.name = 'NotAuthorizedException'; } },
+  UserNotFoundException: class extends Error { constructor(a) { super(a.message); this.name = 'UserNotFoundException'; } },
+}));
+
 require('dotenv').config();
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-jest';
 

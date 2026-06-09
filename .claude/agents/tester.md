@@ -195,26 +195,44 @@ describe('POST /api/auth/register', () => {
 
 ### Server test helpers — create in each test file as needed
 
-```js
-import request from 'supertest'
-import app from '../../index.js'
-import User from '../../models/User.js'
-import bcrypt from 'bcryptjs'
+Auth now uses AWS Cognito. In test files you do **not** create passwords or call bcrypt. Instead:
 
+- Mock `aws-jwt-verify` to return a controlled `{ sub, 'custom:role' }` payload
+- Create User documents directly in MongoDB with a `cognitoSub` value that matches what the mock returns
+
+```ts
+// Mock at the top of the test file (before any imports)
+const mockVerify = jest.fn();
+jest.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: { create: jest.fn(() => ({ verify: mockVerify })) },
+}));
+
+// In tests — mint a fake Cognito token (any base64-encoded JSON with sub + role)
+function makeToken(sub: string, role = 'user') {
+  const payload = Buffer.from(JSON.stringify({ sub, 'custom:role': role })).toString('base64');
+  return `header.${payload}.sig`;
+}
+
+// Create a user in MongoDB that matches the token sub
 const createUser = (overrides = {}) =>
   User.create({
     username: 'testuser',
     email: 'test@test.com',
-    passwordHash: bcrypt.hashSync('password123', 10),
+    cognitoSub: 'test-sub-123',
     role: 'user',
     ...overrides,
-  })
+  });
 
-const getToken = async (email = 'test@test.com', password = 'password123') => {
-  const res = await request(app).post('/api/auth/login').send({ email, password })
-  return res.body.data.token
-}
+// In beforeEach: configure the mock to decode whatever token is passed
+beforeEach(() => {
+  mockVerify.mockImplementation(async (token) => {
+    const p = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    return p; // returns { sub, 'custom:role' }
+  });
+});
 ```
+
+For tests that call the real `POST /api/auth/login` or `POST /api/auth/register` endpoints, mock `@aws-sdk/client-cognito-identity-provider` instead — see `server/src/__tests__/auth.test.ts` for the full mock pattern.
 
 ### Client test pattern
 

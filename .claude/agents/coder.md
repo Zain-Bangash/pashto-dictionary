@@ -40,6 +40,11 @@ Read the full specification for each phase from:
 | 7 | Frontend Auth + Submission | Login, register, submit form, my-submissions |
 | 8 | Admin Dashboard | Moderation queue UI, entries view, audit log |
 | 9 | Polish | Validation, rate limiting, error handler, indexes, loading/error states |
+| 10 | Design & Production Readiness | Design system, navbar, API interceptors, env config |
+| 11 | TypeScript Migration | Server fully migrated to TypeScript strict mode |
+| 12 | AWS Deployment | Amplify frontend, Lambda + API Gateway, GitHub Actions CI/CD |
+| 13 | AWS Cognito Migration ✓ | Cognito replaces bcrypt/JWT; aws-jwt-verify middleware; Amplify Auth client |
+| 14 | SAM Infrastructure as Code | template.yaml + samconfig.toml; SAM-based deploy pipeline |
 
 When told to start a phase, read that phase's section from the build plan before
 writing a single line of code.
@@ -53,7 +58,7 @@ writing a single line of code.
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | Node.js, Express |
 | Database | MongoDB via Mongoose |
-| Auth | JWT (jsonwebtoken + bcryptjs) |
+| Auth | AWS Cognito (aws-jwt-verify on server · @aws-amplify/auth on client) |
 | Validation | express-validator (server), React state (client) |
 
 ---

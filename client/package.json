@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-amplify/auth": "^6.20.0",
+    "aws-amplify": "^6.17.0",
     "axios": "^1.15.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

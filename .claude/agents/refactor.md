@@ -43,7 +43,7 @@ expand scope, guess at intent, or make opportunistic cleanups.
 | Frontend | React 18, Vite, Tailwind CSS v4 (`@import "tailwindcss"`, `@theme {}`) |
 | Backend | Node.js, Express |
 | Database | MongoDB via Mongoose |
-| Auth | JWT (jsonwebtoken + bcryptjs) |
+| Auth | AWS Cognito (aws-jwt-verify on server · @aws-amplify/auth on client) |
 | Tests | Vitest + @testing-library/react (client only, `npm run test` from `client/`) |
 
 ---

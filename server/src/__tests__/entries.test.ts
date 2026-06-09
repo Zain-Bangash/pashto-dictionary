@@ -1,3 +1,18 @@
+// Decode existing jwt.sign() tokens so verifyToken middleware accepts them
+jest.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: {
+    create: () => ({
+      verify: async (token) => {
+        const parts = (token || '').split('.');
+        if (parts.length < 2) throw new Error('Invalid token');
+        const p = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+        if (!p.id && !p.sub) throw new Error('Invalid token');
+        return { sub: p.id || p.sub, 'custom:role': p.role ?? 'user' };
+      },
+    }),
+  },
+}));
+
 require('dotenv').config();
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-jest';
 

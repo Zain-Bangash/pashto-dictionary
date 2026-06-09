@@ -304,14 +304,72 @@ All UI is built from scratch with Tailwind CSS utility classes. This was a delib
 
 ---
 
+## TypeScript Migration (Phase 11)
+
+The server was migrated from CommonJS JavaScript to TypeScript strict mode. Every Mongoose model has an explicit document interface (`IUser`, `IConcept`, `IVariant`, `IModerationLog`). Migration was done one layer at a time — utils → middleware → models → controllers → routes → entrypoints — keeping the test suite green throughout. The client stayed JSX/JS.
+
+---
+
+## AWS Deployment (Phase 12)
+
+The Express app was split across three entrypoints to support both local dev and Lambda without duplicating business logic:
+
+- `app.ts` — Express app with all routes and middleware, no `listen` call
+- `index.ts` — local dev entrypoint; imports `app` and calls `app.listen`
+- `lambda.ts` — AWS Lambda entrypoint; wraps `app` with `serverless-http`
+
+Frontend is hosted on **AWS Amplify** — every push to the connected branch triggers a rebuild via `amplify.yml`. Backend runs as **AWS Lambda** (`pashto-backend`) behind **API Gateway**. No route handler changes were needed.
+
+A **GitHub Actions CI/CD pipeline** enforces quality and automates deployments:
+
+- `ci.yml` — runs `tsc --noEmit` + full test suite on every PR to `main`; a failing test blocks the merge
+- `deploy.yml` — on every merge to `main`, compiles TypeScript, packages `dist/` + production `node_modules`, and deploys via `aws lambda update-function-code`
+
+---
+
+## AWS Cognito Migration (Phase 13)
+
+Authentication was migrated from a custom bcrypt + JWT stack to **AWS Cognito**.
+
+### What changed and why
+
+The previous auth implementation stored a `passwordHash` in MongoDB and signed tokens with a `JWT_SECRET` environment variable. This placed credential management, key rotation, and token lifecycle entirely on the application. Cognito delegates these responsibilities to a managed service: it handles password hashing, token signing with auto-rotated JWKS keys, and session expiry.
+
+### Backend
+
+The `authController.ts` register and login functions now call Cognito via `@aws-sdk/client-cognito-identity-provider`:
+
+- **`register`**: `SignUpCommand` → `AdminConfirmSignUpCommand` (auto-confirm for dev) → `InitiateAuthCommand` to obtain an access token. The Cognito `UserSub` (a UUID) is stored in MongoDB as `User.cognitoSub` to link the Cognito identity to the profile.
+- **`login`**: `InitiateAuthCommand` with `USER_PASSWORD_AUTH` flow. The `cognitoSub` is decoded from the returned access token's JWT payload (base64 decode only — Cognito just issued it, no re-verification needed), then used to look up the MongoDB User.
+
+The `authMiddleware` (`server/src/middleware/auth.ts`) now uses `aws-jwt-verify`'s `CognitoJwtVerifier` instead of `jwt.verify()`. On the first request the verifier fetches the User Pool's JWKS endpoint; subsequent verifications use the cached public keys. The token's `sub` claim becomes `req.user.id`; the `custom:role` claim (a mutable user attribute in Cognito) becomes `req.user.role`.
+
+The `User` model dropped `passwordHash` and added `cognitoSub: { type: String, unique: true, sparse: true }`. The `sparse: true` allows multiple documents with no `cognitoSub` value on the unique index, which was needed during migration.
+
+### Frontend
+
+`client/src/main.jsx` calls `Amplify.configure()` once at startup with `VITE_COGNITO_USER_POOL_ID` and `VITE_COGNITO_CLIENT_ID`. `AuthContext.jsx` calls `@aws-amplify/auth` functions (`signIn`, `signUp`, `signOut`, `getCurrentUser`) directly — no more manual `localStorage` token management. The Axios interceptor in `services/api.js` calls `fetchAuthSession()` to get a fresh access token on every request; Amplify auto-refreshes expired tokens transparently.
+
+### Role model
+
+Roles (`user`, `moderator`, `admin`) are stored as a `custom:role` attribute in the Cognito User Pool and read from the access token claim. MongoDB's `User.role` field is kept in sync but the token is now the authoritative source for middleware decisions.
+
+### Test strategy
+
+Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client-cognito-identity-provider` (the SDK client). The mock for `aws-jwt-verify` returns controlled `{ sub, 'custom:role' }` payloads, allowing all auth-boundary and role-check tests to run without a real User Pool. Legacy test files that create their own JWTs use a Buffer base64-decode shim in the mock factory to extract `sub` and `role` from the existing token format.
+
+---
+
 ## Stack Summary
 
 | Layer | Technology | Notable choice |
 |---|---|---|
 | Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
-| Backend | Node.js + Express | `express-async-errors` for clean async error handling |
+| Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
-| Auth | JWT (jsonwebtoken + bcryptjs) | Role-based: user / moderator / admin |
+| Auth | AWS Cognito + `aws-jwt-verify` + `@aws-amplify/auth` | Managed passwords, auto-rotating JWKS, role stored as `custom:role` attribute |
+| Hosting | AWS Amplify (frontend) · Lambda + API Gateway (backend) | `serverless-http` wraps Express with zero business logic changes |
+| CI/CD | GitHub Actions | Test gate on PRs; auto-deploy Lambda on merge to `main` |
 | Validation | express-validator | All mutation endpoints validated before DB access |
-| Normalization | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
-| Testing | Vitest (client) + Jest + MongoMemoryServer (server) | In-memory DB for server integration tests |
+| Normalisation | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
+| Testing | Vitest + RTL (client) · Jest + MongoMemoryServer (server) · Playwright (E2E) | In-memory DB for server integration tests |

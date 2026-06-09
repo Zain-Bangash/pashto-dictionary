@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 export interface IUser extends Document {
   username: string;
   email: string;
-  passwordHash: string;
+  cognitoSub: string;
   role: 'user' | 'moderator' | 'admin';
   region?: 'Kohat' | 'Hangu' | 'Tirah' | 'Thal' | 'Parachinar';
   village?: string;

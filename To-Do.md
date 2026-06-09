@@ -1,31 +1,39 @@
-best way is to manually go through the userflow and create e2e for them and then also manual test
+# To-Do
 
-Github workflow (AWS SAM templates) and add this CV as well. Through Github actions (workflow)
+## Active — Phase 14: SAM Infrastructure as Code
 
-Domain Driven Decision discuss with Aun Shirazi Bhai and clean architecture
+- [ ] Install SAM CLI locally (`winget install Amazon.SAM-CLI`)
+- [ ] Write `template.yaml` — Lambda + HTTP API + IAM role
+- [ ] Run `sam deploy --guided` locally → generates `samconfig.toml`
+- [ ] Update `deploy.yml` to use `sam build && sam deploy`
+- [ ] Remove `LAMBDA_FUNCTION_NAME` GitHub secret
+- [ ] Expand IAM user permissions (cloudformation, s3, iam:PassRole)
 
-AWS Developer assocate
+> Full spec in `MigrationPlan.md` — Phase 14
 
-Show which user has added a the word
+---
 
-Improve and test search bar (fuzzy search)
+## Backlog
 
-updates userflows, buildplan, claude, and agent files
+### Cloud / Infrastructure
+- Multi-region with Route 53 (future)
 
-Future: 
+### App
+- Show which user added a word on the concept/variant detail view
+- Improve search — fuzzy matching
+- Community page: top contributing users
+- About page
 
-Community Page should show top contributing users
-Scaling
-Make about page
+### CV notes
+- Add AI section to CV: agents, LLM, code reviews, Claude Code skills
+- Add data section to CV
+- Emphasise React on CV
+- GitHub Actions badge in README
 
-Use AWS Cognito for password login, use OR for login
-AWS amplify to host (free tier)
-Migrate DB to AWS
-Change to TypeScript
+---
 
-CV:
-Add AI section: Agents, LLM, Code reviews, skills
-Add data section: to CV
-Emphasise react
-
-
+## Completed
+- Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
+- Phase 11: TypeScript migration (server)
+- Phase 12: AWS deployment — Amplify frontend, Lambda + API Gateway backend, GitHub Actions CI/CD
+- Phase 13: AWS Cognito migration — replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client; 330/330 tests passing

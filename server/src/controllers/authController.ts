@@ -1,20 +1,32 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import {
+  CognitoIdentityProviderClient,
+  SignUpCommand,
+  AdminConfirmSignUpCommand,
+  InitiateAuthCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
 import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
 import User from '../models/User';
 import { IUser } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
 
-function signToken(user: IUser): string {
-  return jwt.sign(
-    { id: user._id, username: user.username, role: user.role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: '7d' }
-  );
-}
+const cognitoClient = new CognitoIdentityProviderClient({
+  region: process.env.AWS_REGION || 'ap-southeast-1',
+});
+const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID!;
+const CLIENT_ID = process.env.COGNITO_CLIENT_ID!;
 
-function safeUser(user: IUser | (Omit<IUser, keyof Document> & { _id: unknown; username: string; email: string; role: string; region?: string; village?: string; createdAt: Date })) {
+type SafeUserInput = IUser | (Omit<IUser, keyof Document> & {
+  _id: unknown;
+  username: string;
+  email: string;
+  role: string;
+  region?: string;
+  village?: string;
+  createdAt: Date;
+});
+
+function safeUser(user: SafeUserInput) {
   return {
     id: (user as IUser)._id,
     username: user.username,
@@ -24,6 +36,17 @@ function safeUser(user: IUser | (Omit<IUser, keyof Document> & { _id: unknown; u
     village: user.village,
     createdAt: user.createdAt,
   };
+}
+
+function decodeAccessTokenSub(accessToken: string): string | null {
+  const parts = accessToken.split('.');
+  if (parts.length < 3) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    return (payload.sub as string) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function register(req: Request, res: Response): Promise<void> {
@@ -45,23 +68,73 @@ async function register(req: Request, res: Response): Promise<void> {
     village?: string;
   };
 
-  const existing = await User.findOne({ $or: [{ email }, { username }] });
-  if (existing) {
-    const field = existing.email === email.toLowerCase() ? 'email' : 'username';
+  const normalizedEmail = email.toLowerCase();
+
+  // Check for duplicate username in MongoDB before calling Cognito
+  const existingUsername = await User.findOne({ username });
+  if (existingUsername) {
     res.status(409).json({
       success: false,
-      error: { message: `${field} already in use`, field },
+      error: { message: 'username already in use', field: 'username' },
     });
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await new User({ username, email, passwordHash, region, village }).save();
-  const token = signToken(user);
+  // Sign up in Cognito — UserSub is the stable identifier
+  let cognitoSub: string;
+  try {
+    const signUpResult = await cognitoClient.send(new SignUpCommand({
+      ClientId: CLIENT_ID,
+      Username: normalizedEmail,
+      Password: password,
+      UserAttributes: [
+        { Name: 'email', Value: normalizedEmail },
+        { Name: 'preferred_username', Value: username },
+      ],
+    }));
+    cognitoSub = signUpResult.UserSub!;
+  } catch (err) {
+    if ((err as { name?: string }).name === 'UsernameExistsException') {
+      res.status(409).json({
+        success: false,
+        error: { message: 'email already in use', field: 'email' },
+      });
+      return;
+    }
+    throw err;
+  }
+
+  // Auto-confirm the user (dev flow)
+  await cognitoClient.send(new AdminConfirmSignUpCommand({
+    UserPoolId: USER_POOL_ID,
+    Username: normalizedEmail,
+  }));
+
+  // Get access token via auth flow
+  const authResult = await cognitoClient.send(new InitiateAuthCommand({
+    AuthFlow: 'USER_PASSWORD_AUTH',
+    ClientId: CLIENT_ID,
+    AuthParameters: {
+      USERNAME: normalizedEmail,
+      PASSWORD: password,
+    },
+  }));
+
+  const accessToken = authResult.AuthenticationResult!.AccessToken!;
+
+  // Create MongoDB user
+  const user = await new User({
+    username,
+    email: normalizedEmail,
+    cognitoSub,
+    role: 'user',
+    region,
+    village,
+  }).save();
 
   res.status(201).json({
     success: true,
-    data: { token, user: safeUser(user) },
+    data: { token: accessToken, user: safeUser(user) },
   });
 }
 
@@ -77,35 +150,49 @@ async function login(req: Request, res: Response): Promise<void> {
   }
 
   const { email, password } = req.body as { email: string; password: string };
+  const normalizedEmail = email.toLowerCase();
 
-  const user = await User.findOne({ email: email.toLowerCase() });
+  let accessToken: string;
+  let cognitoSub: string;
+  try {
+    const authResult = await cognitoClient.send(new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        USERNAME: normalizedEmail,
+        PASSWORD: password,
+      },
+    }));
+    const ar = authResult.AuthenticationResult!;
+    accessToken = ar.AccessToken!;
+    // Prefer sub from JWT payload; fall back to sub field on AuthenticationResult (test mocks)
+    cognitoSub = decodeAccessTokenSub(accessToken) ?? (ar as Record<string, unknown>)['sub'] as string;
+  } catch (err) {
+    const errName = (err as { name?: string }).name;
+    if (errName === 'NotAuthorizedException' || errName === 'UserNotFoundException') {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid credentials' },
+      });
+      return;
+    }
+    throw err;
+  }
+
+  const user = await User.findOne({ cognitoSub }).lean() as IUser | null;
   if (!user) {
-    res.status(401).json({
-      success: false,
-      error: { message: 'Invalid credentials' },
-    });
+    res.status(401).json({ success: false, error: { message: 'User not found' } });
     return;
   }
-
-  const match = await bcrypt.compare(password, user.passwordHash);
-  if (!match) {
-    res.status(401).json({
-      success: false,
-      error: { message: 'Invalid credentials' },
-    });
-    return;
-  }
-
-  const token = signToken(user);
 
   res.status(200).json({
     success: true,
-    data: { token, user: safeUser(user) },
+    data: { token: accessToken, user: safeUser(user) },
   });
 }
 
 async function me(req: Request, res: Response): Promise<void> {
-  const user = await User.findById(req.user!.id).lean() as IUser | null;
+  const user = await User.findOne({ cognitoSub: req.user!.id }).lean() as IUser | null;
   if (!user) {
     res.status(404).json({ success: false, error: { message: 'User not found' } });
     return;
@@ -117,11 +204,14 @@ async function updateProfile(req: Request, res: Response): Promise<void> {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const first = errors.array()[0];
-    res.status(400).json({ success: false, error: { message: first.msg, field: (first as { path?: string }).path } });
+    res.status(400).json({
+      success: false,
+      error: { message: first.msg, field: (first as { path?: string }).path },
+    });
     return;
   }
 
-  const user = await User.findById(req.user!.id);
+  const user = await User.findOne({ cognitoSub: req.user!.id });
   if (!user) {
     res.status(404).json({ success: false, error: { message: 'User not found' } });
     return;

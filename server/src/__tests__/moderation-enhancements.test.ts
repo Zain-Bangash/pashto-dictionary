@@ -1,3 +1,17 @@
+jest.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: {
+    create: () => ({
+      verify: async (token) => {
+        const parts = (token || '').split('.');
+        if (parts.length < 2) throw new Error('Invalid token');
+        const p = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+        if (!p.id && !p.sub) throw new Error('Invalid token');
+        return { sub: p.id || p.sub, 'custom:role': p.role ?? 'user' };
+      },
+    }),
+  },
+}));
+
 // Phase 9.5 — Moderation Enhancements (Backend)
 // Tests for:
 //   1. ModerationLog schema — 'edited' and 'merged' action values, 'changes' field

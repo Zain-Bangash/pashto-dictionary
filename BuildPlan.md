@@ -479,25 +479,18 @@ refactor(routes): convert routes and index to TypeScript
 
 ---
 
-### Phase 12 — AWS Deployment (Amplify + Lambda)
+### Phase 12 — AWS Deployment (Amplify + Lambda) ✓ COMPLETE
 
 **Goal:** Host the React frontend on AWS Amplify and the Express backend on AWS Lambda + API Gateway. Zero code changes to business logic.
 
 **Steps:**
-1. Extract Express `app` into `server/src/app.ts` (separate from `index.ts`)
-2. Add `server/src/lambda.ts` entry point using `serverless-http`
-3. Create `amplify.yml` build config at project root
-4. Connect GitHub repo to AWS Amplify for automatic frontend deploys
-5. Deploy Lambda + API Gateway, set environment variables
-6. Update `client/.env` `VITE_API_URL` to the API Gateway URL
-
-**Commits this phase:**
-```
-refactor(server): extract app from index for serverless compatibility
-feat(server): add Lambda entry point with serverless-http
-chore: add amplify.yml build config
-chore(client): update VITE_API_URL to API Gateway endpoint
-```
+- [x] Extract Express `app` into `server/src/app.ts` (separate from `index.ts`)
+- [x] Add `server/src/lambda.ts` entry point using `serverless-http`
+- [x] Create `amplify.yml` build config at project root
+- [x] Connect GitHub repo to AWS Amplify for automatic frontend deploys
+- [x] Deploy Lambda + API Gateway, set environment variables
+- [x] Update `client/.env` `VITE_API_URL` to the API Gateway URL
+- [x] Add GitHub Actions CI/CD — test gate on PRs (`ci.yml`) + Lambda auto-deploy on merge to `main` (`deploy.yml`)
 
 **Done when:** frontend live on Amplify URL, API calls reach Lambda, all tests still pass locally
 
@@ -505,7 +498,7 @@ chore(client): update VITE_API_URL to API Gateway endpoint
 
 ---
 
-### Phase 13 — AWS Cognito Migration
+### Phase 13 — AWS Cognito Migration ✓ COMPLETE
 
 **Goal:** Replace JWT/bcrypt auth with AWS Cognito. This is the highest-effort phase — treat it as a full TDD cycle.
 
@@ -531,6 +524,32 @@ test(e2e): add Cognito token helper to global setup
 **Done when:** register, login, /me work via Cognito, protected routes reject invalid tokens, all tests pass
 
 > Full details in `MigrationPlan.md` — Phase 13
+
+---
+
+### Phase 14 — SAM Infrastructure as Code
+
+**Goal:** Replace the direct `aws lambda update-function-code` deploy with AWS SAM. All AWS resources are declared in `template.yaml` and owned by a CloudFormation stack — no Console-only state.
+
+**Steps:**
+1. Install SAM CLI locally (`winget install Amazon.SAM-CLI`)
+2. Write `template.yaml` at project root — Lambda function, HTTP API (API Gateway v2), IAM execution role, environment variables
+3. Run `sam deploy --guided` once locally to create the initial CloudFormation stack and generate `samconfig.toml`
+4. Update `.github/workflows/deploy.yml` — replace the zip + `update-function-code` steps with `sam build && sam deploy --no-confirm-changeset`
+5. Add `samconfig.toml` to the repo (stack name, region, S3 bucket — no secrets)
+6. Remove `LAMBDA_FUNCTION_NAME` GitHub secret (no longer needed — SAM reads it from the template)
+7. Expand IAM user permissions: add `cloudformation:*`, `s3:*`, `iam:PassRole`
+
+**Commits this phase:**
+```
+feat(infra): add SAM template declaring Lambda and HTTP API
+chore(ci): update deploy workflow to use sam build and sam deploy
+chore(infra): add samconfig.toml for non-interactive pipeline deploys
+```
+
+**Done when:** `sam deploy` succeeds in the pipeline, Lambda is owned by a CloudFormation stack (`pashto-dictionary`), `template.yaml` is the single source of truth for all backend infrastructure
+
+> Full details in `MigrationPlan.md` — Phase 14
 
 ---
 
