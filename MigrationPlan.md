@@ -448,8 +448,8 @@ GET /api/health → 200
 Phase 10  — Polish & production readiness        ✓ done
 Phase 11  — TypeScript migration                 ✓ done
 Phase 12  — AWS deployment (Amplify + Lambda)    ✓ done
-Phase 13  — AWS Cognito migration                ← active
-Phase 14  — SAM infrastructure as code
+Phase 13  — AWS Cognito migration                ✓ done
+Phase 14  — SAM infrastructure as code          ← active
 ```
 
 Each phase merges to `main` independently. SAM is last because it is purely infrastructure — it has no impact on application logic and is the safest phase to do after all auth and deployment concerns are settled.

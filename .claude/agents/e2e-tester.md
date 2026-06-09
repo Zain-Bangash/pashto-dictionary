@@ -4,9 +4,10 @@ description: >
   Playwright E2E agent for the pashto-dictionary project. Call it to: (1) write
   new E2E tests for a user/mod/admin flow described in USER-FLOWS.md, (2) update
   or refactor existing specs when a flow changes, or (3) run the test suite and
-  report results. Knows the app's auth model (JWT in localStorage), route
-  structure, and moderation state machine. Never writes unit or component tests —
-  those belong to the tester agent.
+  report results. Knows the app's auth model (AWS Cognito + Amplify; tokens
+  managed via storageState, not manual localStorage), route structure, and
+  moderation state machine. Never writes unit or component tests — those belong
+  to the tester agent.
 tools:
   - Bash
   - Read
@@ -67,7 +68,7 @@ e2e/
   global-setup.js          # seeds admin/mod/user accounts once before all tests
   global-teardown.js       # wipes seeded accounts after all tests
   helpers/
-    auth.js                # loginAs(page, role) — injects JWT into localStorage
+    auth.js                # loginAs(page, role) — drives the login UI so Amplify manages session storage
     seed.js                # createConcept(), createVariant() via API
   tests/
     guest.spec.js          # browse, search, concept detail, region tabs
@@ -137,7 +138,19 @@ export default defineConfig({
 
 ---
 
+## Auth model (Phase 13+)
+
+Auth is managed by **AWS Cognito + @aws-amplify/auth**. Amplify stores session tokens in its own localStorage keys — not under a single `token` key. Do **not** write raw tokens to `localStorage` manually; Amplify will not recognise them.
+
+The correct approach for pre-authenticated tests is Playwright `storageState` files built by `global-setup.js`. Each role's authenticated state is saved to a JSON file (e.g. `e2e/state/admin.json`) and restored when the browser context is created:
+
+```js
+test.use({ storageState: 'e2e/state/admin.json' });
+```
+
 ## Auth helper (`helpers/auth.js`)
+
+For specs that need to log in mid-test rather than via pre-built storageState, drive the login UI so Amplify handles its own session storage:
 
 ```js
 export async function loginAs(page, role) {
@@ -147,16 +160,11 @@ export async function loginAs(page, role) {
     user:      { email: 'e2e-user@test.local',   password: 'E2ePassword1!' },
   };
   const { email, password } = credentials[role];
-
-  const res = await page.request.post('http://localhost:5000/api/auth/login', {
-    data: { email, password },
-  });
-  const { data } = await res.json();
-
-  await page.goto('/');
-  await page.evaluate((token) => localStorage.setItem('token', token), data.token);
-  // Reload so AuthContext's useEffect rehydrates the user object from /api/auth/me
-  await page.reload();
+  await page.goto('/login');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/password/i).fill(password);
+  await page.getByRole('button', { name: /log in/i }).click();
+  await page.waitForURL('/');
 }
 ```
 

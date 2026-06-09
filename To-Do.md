@@ -1,23 +1,8 @@
 # To-Do
 
-## Active — Phase 13: AWS Cognito Migration
+## Active — Phase 14: SAM Infrastructure as Code
 
-Follow the TDD cycle: spawn tester agent first, then coder agent.
-
-- [ ] Create Cognito User Pool (email + password sign-in, custom `role` attribute)
-- [ ] Replace `authController.ts` register/login with Cognito SDK calls
-- [ ] Rewrite `auth.ts` middleware to verify Cognito tokens via `aws-jwt-verify`
-- [ ] Remove `User.passwordHash`; add `User.cognitoSub`
-- [ ] Replace frontend `AuthContext` axios calls with `@aws-amplify/auth` SDK
-- [ ] Rewrite auth tests to mock Cognito; update E2E global setup for Cognito tokens
-
-> Full spec in `MigrationPlan.md` — Phase 13
-
----
-
-## Backlog
-
-### Phase 14 — SAM Infrastructure as Code (after Phase 13)
+- [ ] Install SAM CLI locally (`winget install Amazon.SAM-CLI`)
 - [ ] Write `template.yaml` — Lambda + HTTP API + IAM role
 - [ ] Run `sam deploy --guided` locally → generates `samconfig.toml`
 - [ ] Update `deploy.yml` to use `sam build && sam deploy`
@@ -25,6 +10,10 @@ Follow the TDD cycle: spawn tester agent first, then coder agent.
 - [ ] Expand IAM user permissions (cloudformation, s3, iam:PassRole)
 
 > Full spec in `MigrationPlan.md` — Phase 14
+
+---
+
+## Backlog
 
 ### Cloud / Infrastructure
 - Multi-region with Route 53 (future)
@@ -47,3 +36,4 @@ Follow the TDD cycle: spawn tester agent first, then coder agent.
 - Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
 - Phase 11: TypeScript migration (server)
 - Phase 12: AWS deployment — Amplify frontend, Lambda + API Gateway backend, GitHub Actions CI/CD
+- Phase 13: AWS Cognito migration — replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client; 330/330 tests passing

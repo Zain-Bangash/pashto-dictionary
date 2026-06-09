@@ -13,7 +13,7 @@ A community-driven platform for preserving Pashto regional dialects. Users submi
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | Node.js, Express |
 | Database | MongoDB via Mongoose |
-| Auth | JWT (jsonwebtoken + bcryptjs) |
+| Auth | AWS Cognito (aws-jwt-verify on server · @aws-amplify/auth on client) |
 | Validation | express-validator (server), native React state (client) |
 | CI/CD | GitHub Actions (test gate on PRs + Lambda deploy on merge to main) |
 | Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway (backend) |
@@ -205,10 +205,11 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 > Update this line as you progress through the build plan.
 
-**Active phase:** Phase 13 — AWS Cognito Migration
+**Active phase:** Phase 14 — SAM Infrastructure as Code
 **Branch:** dev
 
 ### Completed phases
 - Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
 - Phase 11: TypeScript migration (server only — all `.js` → `.ts`, strict mode)
 - Phase 12: AWS deployment (Amplify hosting, Lambda + API Gateway, GitHub Actions CI/CD)
+- Phase 13: AWS Cognito migration (replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client)
