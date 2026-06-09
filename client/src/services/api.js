@@ -1,29 +1,42 @@
 import axios from 'axios';
-import { fetchAuthSession } from '@aws-amplify/auth';
+
+const TOKEN_KEY = 'auth_token';
+
+// Initialise from sessionStorage so token survives a page refresh within the tab.
+let _token = sessionStorage.getItem(TOKEN_KEY) ?? null;
+let _logoutHandler = null;
+
+export function setToken(token) {
+  _token = token;
+  sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken() {
+  _token = null;
+  sessionStorage.removeItem(TOKEN_KEY);
+}
+
+export function getToken() {
+  return _token;
+}
+
+export function setLogoutHandler(fn) {
+  _logoutHandler = fn;
+}
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL });
 
-// Attach Cognito AccessToken on every request (Amplify auto-refreshes on expiry)
-api.interceptors.request.use(async (config) => {
-  try {
-    const session = await fetchAuthSession();
-    const token = session.tokens?.accessToken?.toString();
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch {
-    // not signed in — send request without token
-  }
+api.interceptors.request.use((config) => {
+  if (_token) config.headers.Authorization = `Bearer ${_token}`;
   return config;
 });
-
-// 401 → clear session and redirect to login
-let _logoutHandler = null;
-export function setLogoutHandler(fn) { _logoutHandler = fn; }
 
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && _logoutHandler) {
-      _logoutHandler();
+    if (err.response?.status === 401) {
+      clearToken();
+      if (_logoutHandler) _logoutHandler();
       window.location.replace('/login');
     }
     return Promise.reject(err);

@@ -1,6 +1,5 @@
-import { signIn, signUp, signOut, getCurrentUser } from '@aws-amplify/auth';
 import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { setToken, clearToken, getToken, setLogoutHandler } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -9,23 +8,29 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    getCurrentUser()
-      .then(() => api.get('/api/auth/me').then((res) => setUser(res.data.data.user)))
-      .catch(() => {})
+    setLogoutHandler(() => setUser(null));
+
+    if (!getToken()) {
+      setInitializing(false);
+      return;
+    }
+    api.get('/api/auth/me')
+      .then((res) => setUser(res.data.data.user))
+      .catch(() => clearToken())
       .finally(() => setInitializing(false));
   }, []);
 
   async function login(email, password) {
-    await signIn({ username: email.toLowerCase(), password });
-    const res = await api.get('/api/auth/me');
+    const res = await api.post('/api/auth/login', { email, password });
+    setToken(res.data.data.token);
     setUser(res.data.data.user);
   }
 
   async function register(username, email, password, region, village) {
-    // Backend creates the Cognito user (SignUp + AdminConfirm) and MongoDB profile.
-    // Re-throw backend errors as Amplify-named exceptions so callers handle them uniformly.
     try {
-      await api.post('/api/auth/register', { username, email, password, region, village });
+      const res = await api.post('/api/auth/register', { username, email, password, region, village });
+      setToken(res.data.data.token);
+      setUser(res.data.data.user);
     } catch (err) {
       const field = err?.response?.data?.error?.field ?? '';
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Registration failed';
@@ -34,14 +39,10 @@ export function AuthProvider({ children }) {
       }
       throw new Error(msg);
     }
-    // Establish the local Amplify session so fetchAuthSession() works for API calls.
-    await signIn({ username: email.toLowerCase(), password });
-    const res = await api.get('/api/auth/me');
-    setUser(res.data.data.user);
   }
 
   async function logout() {
-    await signOut();
+    clearToken();
     setUser(null);
   }
 
