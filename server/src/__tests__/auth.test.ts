@@ -41,13 +41,22 @@ jest.mock('@aws-sdk/client-cognito-identity-provider', () => ({
   })),
   SignUpCommand: jest.fn().mockImplementation((input) => ({ _type: 'SignUpCommand', input })),
   AdminConfirmSignUpCommand: jest.fn().mockImplementation((input) => ({ _type: 'AdminConfirmSignUpCommand', input })),
+  AdminDeleteUserCommand: jest.fn().mockImplementation((input) => ({ _type: 'AdminDeleteUserCommand', input })),
   InitiateAuthCommand: jest.fn().mockImplementation((input) => ({ _type: 'InitiateAuthCommand', input })),
-  // Exception classes — needed by controller (instanceof checks) and tests (throwing errors)
+  // Exception classes — needed by controller (name checks) and tests (throwing errors)
   UsernameExistsException: class UsernameExistsException extends Error {
     $metadata: object;
     constructor(args: { message: string; $metadata: object }) {
       super(args.message);
       this.name = 'UsernameExistsException';
+      this.$metadata = args.$metadata;
+    }
+  },
+  InvalidPasswordException: class InvalidPasswordException extends Error {
+    $metadata: object;
+    constructor(args: { message: string; $metadata: object }) {
+      super(args.message);
+      this.name = 'InvalidPasswordException';
       this.$metadata = args.$metadata;
     }
   },
@@ -184,7 +193,7 @@ async function registerUser(overrides: {
   const res = await request.post('/api/auth/register').send({
     username: overrides.username ?? 'testuser',
     email: overrides.email ?? 'test@example.com',
-    password: overrides.password ?? 'password123',
+    password: overrides.password ?? 'Password1!',
   });
 
   return { token: res.body.data?.token ?? accessToken, sub };
@@ -198,7 +207,7 @@ describe('POST /api/auth/register', () => {
   const valid = () => ({
     username: 'testuser',
     email: 'test@example.com',
-    password: 'password123',
+    password: 'Password1!',
   });
 
   beforeEach(() => {
@@ -354,7 +363,7 @@ describe('POST /api/auth/register', () => {
     const res = await request.post('/api/auth/register').send({
       username: 'dupeuser',
       email: 'other@example.com',
-      password: 'password123',
+      password: 'Password1!',
     });
     expect(res.status).toBe(409);
     expect(res.body.success).toBe(false);
@@ -376,7 +385,7 @@ describe('POST /api/auth/register', () => {
     const res = await request.post('/api/auth/register').send({
       username: 'dupeuser2',
       email: 'different@example.com',
-      password: 'password123',
+      password: 'Password1!',
     });
     expect(res.status).toBe(409);
     expect(res.body.error.field).toBe('username');
@@ -402,7 +411,7 @@ describe('POST /api/auth/register', () => {
     const res = await request.post('/api/auth/register').send({
       username: 'differentuser',
       email: 'CI@EXAMPLE.COM',
-      password: 'password123',
+      password: 'Password1!',
     });
     expect(res.status).toBe(409);
     expect(res.body.success).toBe(false);
@@ -414,7 +423,7 @@ describe('POST /api/auth/register', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/auth/login', () => {
-  const creds = { email: 'login@example.com', password: 'password123' };
+  const creds = { email: 'login@example.com', password: 'Password1!' };
 
   beforeEach(async () => {
     await registerUser({
@@ -484,7 +493,7 @@ describe('POST /api/auth/login', () => {
 
     const res = await request
       .post('/api/auth/login')
-      .send({ email: 'nobody@example.com', password: 'password123' });
+      .send({ email: 'nobody@example.com', password: 'Password1!' });
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
   });
