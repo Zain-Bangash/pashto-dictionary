@@ -79,11 +79,11 @@ describe('Register page', () => {
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/password/i), 'Password1!');
     await user.click(screen.getByRole('button', { name: /register/i }));
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith(
-        'testuser', 'test@test.com', 'password123', undefined, undefined
+        'testuser', 'test@test.com', 'Password1!', undefined, undefined
       );
     });
   });
@@ -94,7 +94,7 @@ describe('Register page', () => {
     const { locationRef } = renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/password/i), 'Password1!');
     await user.click(screen.getByRole('button', { name: /register/i }));
     await waitFor(() => {
       expect(locationRef.current?.pathname).toBe('/');
@@ -110,7 +110,7 @@ describe('Register page', () => {
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'taken@test.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/password/i), 'Password1!');
     await user.click(screen.getByRole('button', { name: /register/i }));
     expect(await screen.findByText(/an account with this email already exists/i)).toBeInTheDocument();
   });
@@ -121,7 +121,7 @@ describe('Register page', () => {
     renderRegister();
     await user.type(screen.getByLabelText(/username/i), 'testuser');
     await user.type(screen.getByLabelText(/email/i), 'test@test.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/password/i), 'Password1!');
     await user.click(screen.getByRole('button', { name: /register/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /register/i })).toBeDisabled();

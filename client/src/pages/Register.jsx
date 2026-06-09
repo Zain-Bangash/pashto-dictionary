@@ -22,7 +22,9 @@ export default function Register() {
     const errs = {};
     if (!username.trim()) errs.username = 'Username is required';
     if (!email.trim()) errs.email = 'Email is required';
-    if (!password || password.length < 8) errs.password = 'Password must be at least 8 characters';
+    if (!password || !/^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
+      errs.password = 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character';
+    }
     return errs;
   }
 
