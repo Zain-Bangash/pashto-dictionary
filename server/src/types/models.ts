@@ -48,7 +48,6 @@ export interface IVariant extends Document {
 }
 
 export interface IModerationLog extends Document {
-  entry?: Types.ObjectId;
   targetModel?: 'Concept' | 'Variant' | 'User';
   targetId?: Types.ObjectId;
   action:
