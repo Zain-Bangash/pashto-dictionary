@@ -20,6 +20,11 @@ Parameters:
     NoEcho: true
 
 Resources:
+  PashtoApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Tags: {}
+
   PashtoBackend:
     Type: AWS::Serverless::Function
     Properties:
@@ -36,6 +41,7 @@ Resources:
         Api:
           Type: HttpApi
           Properties:
+            ApiId: !Ref PashtoApi
             Path: /{proxy+}
             Method: ANY
     Metadata:
@@ -49,4 +55,4 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Value: !Sub 'https://${PashtoApi}.execute-api.${AWS::Region}.amazonaws.com'
