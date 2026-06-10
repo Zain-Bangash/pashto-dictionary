@@ -83,7 +83,8 @@ const mockUser = (overrides = {}) => ({
 
 const mockLogEntry = (overrides = {}) => ({
   _id: 'log1',
-  entry: { _id: 'e1', pashto: 'کور' },
+  targetModel: 'Concept',
+  target: { englishGloss: 'home' },
   action: 'approved',
   performedBy: { username: 'mod1' },
   note: '',
@@ -676,11 +677,11 @@ describe('DashboardLog page — audit log (admin only)', () => {
     expect(await screen.findByText(/moduser/i)).toBeInTheDocument();
   });
 
-  it('renders the pashto word of the entry that was acted on', async () => {
+  it('renders the target name of the entry that was acted on', async () => {
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
-        data: [mockLogEntry({ entry: { _id: 'e1', pashto: 'لرګی' } })],
+        data: [mockLogEntry({ targetModel: 'Variant', target: { pashto: 'لرګی', region: 'Kohat' } })],
         meta: { page: 1, limit: 20, total: 1 },
       },
     });
