@@ -527,7 +527,7 @@ test(e2e): add Cognito token helper to global setup
 
 ---
 
-### Phase 14 — SAM Infrastructure as Code
+### Phase 14 — SAM Infrastructure as Code ✓ COMPLETE
 
 **Goal:** Replace the direct `aws lambda update-function-code` deploy with AWS SAM. All AWS resources are declared in `template.yaml` and owned by a CloudFormation stack — no Console-only state.
 
