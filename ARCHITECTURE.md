@@ -342,7 +342,7 @@ The `authController.ts` register and login functions now call Cognito via `@aws-
 - **`register`**: `SignUpCommand` → `AdminConfirmSignUpCommand` (auto-confirm for dev) → `InitiateAuthCommand` to obtain an access token. The Cognito `UserSub` (a UUID) is stored in MongoDB as `User.cognitoSub` to link the Cognito identity to the profile.
 - **`login`**: `InitiateAuthCommand` with `USER_PASSWORD_AUTH` flow. The `cognitoSub` is decoded from the returned access token's JWT payload (base64 decode only — Cognito just issued it, no re-verification needed), then used to look up the MongoDB User.
 
-The `authMiddleware` (`server/src/middleware/auth.ts`) now uses `aws-jwt-verify`'s `CognitoJwtVerifier` instead of `jwt.verify()`. On the first request the verifier fetches the User Pool's JWKS endpoint; subsequent verifications use the cached public keys. The token's `sub` claim becomes `req.user.id`; the `custom:role` claim (a mutable user attribute in Cognito) becomes `req.user.role`.
+The `authMiddleware` (`server/src/middleware/auth.ts`) now uses `aws-jwt-verify`'s `CognitoJwtVerifier` instead of `jwt.verify()`. On the first request the verifier fetches the User Pool's JWKS endpoint; subsequent verifications use the cached public keys. The token's `sub` claim becomes `req.user.id`; the role is resolved by looking up the MongoDB `User` document by `cognitoSub` — Cognito Access Tokens do not carry custom user attributes, so reading `custom:role` from the token is not possible.
 
 The `User` model dropped `passwordHash` and added `cognitoSub: { type: String, unique: true, sparse: true }`. The `sparse: true` allows multiple documents with no `cognitoSub` value on the unique index, which was needed during migration.
 
@@ -352,11 +352,11 @@ The `User` model dropped `passwordHash` and added `cognitoSub: { type: String, u
 
 ### Role model
 
-Roles (`user`, `moderator`, `admin`) are stored as a `custom:role` attribute in the Cognito User Pool and read from the access token claim. MongoDB's `User.role` field is kept in sync but the token is now the authoritative source for middleware decisions.
+Roles (`user`, `moderator`, `admin`) are stored in MongoDB `User.role`. The middleware resolves the role by looking up the User document via `cognitoSub` on every authenticated request. A `custom:role` attribute exists on Cognito user records for reference, but it cannot be read from Access Tokens (only from ID tokens), so MongoDB is the authoritative source for role decisions.
 
 ### Test strategy
 
-Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client-cognito-identity-provider` (the SDK client). The mock for `aws-jwt-verify` returns controlled `{ sub, 'custom:role' }` payloads, allowing all auth-boundary and role-check tests to run without a real User Pool. Legacy test files that create their own JWTs use a Buffer base64-decode shim in the mock factory to extract `sub` and `role` from the existing token format.
+Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client-cognito-identity-provider` (the SDK client). The mock for `aws-jwt-verify` returns a controlled `{ sub }` payload. Because role is resolved from MongoDB (not the token), each test's `makeToken` helper is async — it seeds a `User` document with the given `cognitoSub` and `role` before signing the JWT, ensuring the middleware's MongoDB lookup finds the correct role.
 
 ---
 
@@ -367,7 +367,7 @@ Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client
 | Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
 | Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
-| Auth | AWS Cognito + `aws-jwt-verify` + `@aws-amplify/auth` | Managed passwords, auto-rotating JWKS, role stored as `custom:role` attribute |
+| Auth | AWS Cognito + `aws-jwt-verify` + `@aws-amplify/auth` | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role` |
 | Hosting | AWS Amplify (frontend) · Lambda + API Gateway (backend) | `serverless-http` wraps Express with zero business logic changes |
 | CI/CD | GitHub Actions | Test gate on PRs; auto-deploy Lambda on merge to `main` |
 | Validation | express-validator | All mutation endpoints validated before DB access |

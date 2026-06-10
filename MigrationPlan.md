@@ -280,7 +280,10 @@ export async function verifyToken(req, res, next) {
   if (!token) return res.status(401).json({ success: false, error: { message: 'No token' } });
   try {
     const payload = await verifier.verify(token);
-    req.user = { id: payload.sub, role: payload['custom:role'] ?? 'user' };
+    // Role is resolved from MongoDB — Cognito Access Tokens do not include
+    // custom user attributes (custom:role only appears in ID tokens).
+    const user = await User.findOne({ cognitoSub: payload.sub }, 'role').lean();
+    req.user = { id: payload.sub, role: user?.role ?? 'user' };
     next();
   } catch {
     res.status(401).json({ success: false, error: { message: 'Invalid token' } });
