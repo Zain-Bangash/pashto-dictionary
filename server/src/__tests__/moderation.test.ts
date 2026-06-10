@@ -272,6 +272,52 @@ describe('GET /api/moderation/log', () => {
     const rawJson = JSON.stringify(res.body);
     expect(rawJson).not.toMatch(/passwordHash/);
   });
+
+  test('populates performedBy with username when User has matching cognitoSub', async () => {
+    const token = await makeToken({ role: 'admin', id: 'sub-enrich-test' });
+    const concept = await Concept.create({ englishGloss: 'river', partOfSpeech: 'noun', status: 'pending' });
+    await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: 'sub-enrich-test' });
+
+    const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].performedBy).toHaveProperty('username');
+    expect(res.body.data[0].performedBy).toHaveProperty('cognitoSub', 'sub-enrich-test');
+  });
+
+  test('populates target.englishGloss for Concept log entries', async () => {
+    const token = await makeToken({ role: 'admin' });
+    const concept = await Concept.create({ englishGloss: 'mountain', partOfSpeech: 'noun', status: 'pending' });
+    await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: 'any-sub' });
+
+    const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].target).toHaveProperty('englishGloss', 'mountain');
+  });
+
+  test('filters by action query param', async () => {
+    const token = await makeToken({ role: 'admin' });
+    const concept = await Concept.create({ englishGloss: 'sky', partOfSpeech: 'noun', status: 'pending' });
+    await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: 'any-sub' });
+    await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'approved', performedBy: 'any-sub' });
+
+    const res = await request.get('/api/moderation/log?action=approved').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.every((e) => e.action === 'approved')).toBe(true);
+    expect(res.body.meta.total).toBe(1);
+  });
+
+  test('filters by targetModel query param', async () => {
+    const token = await makeToken({ role: 'admin' });
+    const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'pending' });
+    const variant = await Variant.create({ concept: concept._id, pashto: 'اور', region: 'Kohat', definition: 'fire', status: 'pending', submittedBy: 'any-sub' });
+    await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: 'any-sub' });
+    await ModerationLog.create({ targetModel: 'Variant', targetId: variant._id, action: 'submitted', performedBy: 'any-sub' });
+
+    const res = await request.get('/api/moderation/log?targetModel=Variant').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.every((e) => e.targetModel === 'Variant')).toBe(true);
+    expect(res.body.meta.total).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

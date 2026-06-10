@@ -5,6 +5,9 @@ import Concept from '../models/Concept';
 import { IConcept } from '../types/models';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
+import { enrichActors } from '../utils/enrichActors';
+
+type Doc = Record<string, unknown>;
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -123,15 +126,18 @@ async function getConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const concept = await Concept.findOne({ _id: id, status: 'published', isDeleted: { $ne: true } }).lean();
-  if (!concept) {
+  const found = await Concept.findOne({ _id: id, status: 'published', isDeleted: { $ne: true } }).lean();
+  if (!found) {
     notFound(res);
     return;
   }
 
-  const variants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }).lean();
+  const rawVariants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }).lean();
 
-  res.status(200).json({ success: true, data: { ...concept, variants } });
+  const [enrichedConcept] = await enrichActors([found as unknown as Doc], 'submittedBy');
+  const variants = await enrichActors(rawVariants as unknown as Doc[], 'submittedBy');
+
+  res.status(200).json({ success: true, data: { ...enrichedConcept, variants } });
 }
 
 async function suggestConcepts(req: Request, res: Response): Promise<void> {

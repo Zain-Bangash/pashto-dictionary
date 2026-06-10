@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { updateConcept, updateVariant } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_STYLES = {
   pending:   { color: '#e8c547', border: 'rgba(232,197,71,0.3)',  bg: 'rgba(232,197,71,0.08)' },
@@ -188,6 +189,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
 }
 
 export default function MySubmissions() {
+  const { user } = useAuth();
   const [concepts, setConcepts]   = useState([]);
   const [variants, setVariants]   = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -238,7 +240,12 @@ export default function MySubmissions() {
     <div className="min-h-screen bg-charcoal">
       <div className="max-w-2xl mx-auto px-5 py-10">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-display text-warm">My Submissions</h1>
+          <div>
+            <h1 className="text-2xl font-display text-warm">My Submissions</h1>
+            {user?.username && (
+              <p className="text-xs font-ui text-muted mt-1">{user.username}</p>
+            )}
+          </div>
           <Link
             to="/submit"
             className="px-4 py-2 bg-terracotta text-warm text-sm font-ui font-semibold rounded-[10px] hover:opacity-90 transition-opacity"

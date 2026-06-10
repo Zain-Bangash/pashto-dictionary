@@ -348,7 +348,7 @@ The `User` model dropped `passwordHash` and added `cognitoSub: { type: String, u
 
 ### Frontend
 
-`client/src/main.jsx` calls `Amplify.configure()` once at startup with `VITE_COGNITO_USER_POOL_ID` and `VITE_COGNITO_CLIENT_ID`. `AuthContext.jsx` calls `@aws-amplify/auth` functions (`signIn`, `signUp`, `signOut`, `getCurrentUser`) directly — no more manual `localStorage` token management. The Axios interceptor in `services/api.js` calls `fetchAuthSession()` to get a fresh access token on every request; Amplify auto-refreshes expired tokens transparently.
+`AuthContext.jsx` calls the backend endpoints directly via axios — `POST /api/auth/register` and `POST /api/auth/login`. The backend performs all Cognito SDK calls and returns a Cognito access token in the response. The token is stored in `sessionStorage` and attached as a `Bearer` header by the axios interceptor in `services/api.js` on every subsequent request. No `@aws-amplify/auth` is used on the client; the Cognito surface is entirely server-side.
 
 ### Role model
 
@@ -360,6 +360,76 @@ Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client
 
 ---
 
+## SAM Infrastructure as Code (Phase 14)
+
+Phase 12 deployed Lambda code via `aws lambda update-function-code` — a direct API call that updated only the function's code bundle. The Lambda function itself, the API Gateway, the IAM execution role, and all environment variables existed only in the AWS Console. Phase 14 replaced this with AWS SAM.
+
+### What SAM owns
+
+All backend infrastructure is now declared in `template.yaml` at the project root and owned by a CloudFormation stack named `pashto-dictionary`:
+
+- `AWS::Serverless::HttpApi` — HTTP API (API Gateway v2) with a catch-all `/{proxy+}` route
+- `AWS::Serverless::Function` — Lambda function with the esbuild-bundled TypeScript source
+- `AWS::IAM::Role` — Lambda execution role (created automatically by SAM with `CAPABILITY_IAM`)
+
+### Build and deploy
+
+SAM uses esbuild to bundle TypeScript directly from `server/src/lambda.ts` — no separate `tsc` step is needed. `esbuild` is listed in `dependencies` (not `devDependencies`) because SAM's npm install step runs `--omit=dev`.
+
+The deploy pipeline (`deploy.yml`) is:
+```
+sam build → sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+```
+
+Environment variables (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`) are passed as CloudFormation parameters sourced from GitHub Secrets — never stored in the template.
+
+### Lambda execution role — Cognito permissions
+
+SAM creates the Lambda execution role automatically but only grants it basic Lambda permissions (CloudWatch Logs). The register and login handlers call Cognito admin APIs (`AdminConfirmSignUp`, `AdminDeleteUser`) which require explicit IAM grants on the execution role. These are declared in the `Policies` block of the `PashtoBackend` resource in `template.yaml`, scoped to the specific User Pool ARN via `!Sub`. Without this, registration returns a 403 from Cognito at the `AdminConfirmSignUp` step.
+
+Adding `Policies` to the function requires `iam:PutRolePolicy` and `iam:DeleteRolePolicy` in the `github-actions-deploy` IAM policy, on top of the standard `iam:CreateRole` / `iam:AttachRolePolicy` set.
+
+### Why `--no-fail-on-empty-changeset`
+
+Pushes that change only documentation or client code still trigger the deploy workflow. Without this flag, SAM exits with code 1 when there is nothing to update on the Lambda side, which would mark the Actions run as failed. The flag makes "nothing changed" a clean success.
+
+---
+
+## Post-Phase-14 Polish
+
+### Username resolution — `enrichActors` utility
+
+Actor fields (`submittedBy`, `reviewedBy`, `performedBy`, `deletedBy`) are stored as plain strings (the Cognito `sub` UUID). This is correct — storing them as `ObjectId` references would require passing `new mongoose.Types.ObjectId(req.user.id)` for a UUID string, which the schema intentionally avoids.
+
+The consequence is that Mongoose's `.populate()` silently no-ops on String fields. Endpoints that called `.populate('submittedBy', 'username')` were returning the raw UUID string with no user data attached, making every "by username" display blank.
+
+The fix is `server/src/utils/enrichActors.ts` — a batch lookup utility:
+
+```ts
+// After fetching docs, collect unique cognitoSubs and resolve them in one query
+const users = await User.find({ cognitoSub: { $in: subs } }, projection).lean();
+const byId  = Object.fromEntries(users.map(u => [u.cognitoSub, u]));
+return docs.map(d => ({ ...d, [field]: byId[d[field]] ?? d[field] }));
+```
+
+This is called after the main query in any endpoint that needs to surface user details:
+- `moderationController.ts` — `getConceptQueue`, `getVariantQueue`, `getLog`
+- `conceptController.ts` — `getConcept` (concept + variants on the public detail page)
+
+Usernames now appear in: the admin moderation queue, the audit log, public concept detail pages (concept submitter + per-variant submitter that updates when switching region tabs), and the My Submissions page header.
+
+### Audit log improvements
+
+The `GET /api/moderation/log` endpoint was extended with:
+
+- **Target population**: after fetching log entries, concept and variant names are batch-loaded (`englishGloss` for concepts, `pashto + region` for variants) and attached as a `target` field. The frontend renders "CONCEPT · Mountain" or "VARIANT · لمر · Kohat" on each entry.
+- **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
+- **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
+- **Timestamps**: each entry shows an absolute date/time.
+- **Action badge colours**: all 9 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`) have distinct colours.
+
+---
+
 ## Stack Summary
 
 | Layer | Technology | Notable choice |
@@ -367,9 +437,9 @@ Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client
 | Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
 | Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
-| Auth | AWS Cognito + `aws-jwt-verify` + `@aws-amplify/auth` | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role` |
-| Hosting | AWS Amplify (frontend) · Lambda + API Gateway (backend) | `serverless-http` wraps Express with zero business logic changes |
-| CI/CD | GitHub Actions | Test gate on PRs; auto-deploy Lambda on merge to `main` |
+| Auth | AWS Cognito + `aws-jwt-verify` (server-side only) | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role`; no Amplify SDK on client |
+| Hosting | AWS Amplify (frontend) · Lambda + API Gateway v2 (backend) | `serverless-http` wraps Express; all resources owned by CloudFormation stack `pashto-dictionary` |
+| CI/CD | GitHub Actions + AWS SAM | Test gate on PRs; `sam build && sam deploy` on merge to `main` |
 | Validation | express-validator | All mutation endpoints validated before DB access |
 | Normalisation | Native JS `.normalize('NFC')` + string methods | No external library; set via Mongoose pre-save hooks |
 | Testing | Vitest + RTL (client) · Jest + MongoMemoryServer (server) · Playwright (E2E) | In-memory DB for server integration tests |

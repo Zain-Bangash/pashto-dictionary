@@ -2,9 +2,6 @@ import { Schema, model } from 'mongoose';
 import { IModerationLog } from '../types/models';
 
 const moderationLogSchema = new Schema<IModerationLog>({
-  // Legacy field kept for existing Entry log records
-  entry: { type: Schema.Types.ObjectId, ref: 'Entry' },
-  // New polymorphic target fields
   targetModel: { type: String, enum: ['Concept', 'Variant', 'User'] },
   targetId: { type: Schema.Types.ObjectId },
   action: {

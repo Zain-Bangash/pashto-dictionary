@@ -55,6 +55,16 @@ export default function ConceptDetail() {
                   </span>
                 )}
               </div>
+              {concept.submittedBy?.username && (
+                <p className="text-[11px] font-ui text-muted/50">
+                  Submitted by {concept.submittedBy.username}
+                  {(concept.submittedBy.village || concept.submittedBy.region) && (
+                    <span className="ml-1">
+                      ({[concept.submittedBy.village, concept.submittedBy.region].filter(Boolean).join(', ')})
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Regional variants */}
@@ -107,6 +117,17 @@ export default function ConceptDetail() {
                         <p className="font-ui text-warm/80 text-sm leading-relaxed">{selected.definition}</p>
                         {selected.example && (
                           <p className="font-ui text-muted text-sm italic">{selected.example}</p>
+                        )}
+
+                        {selected.submittedBy?.username && (
+                          <p className="text-[11px] font-ui text-muted/40">
+                            Added by {selected.submittedBy.username}
+                            {(selected.submittedBy.village || selected.submittedBy.region) && (
+                              <span className="ml-1">
+                                ({[selected.submittedBy.village, selected.submittedBy.region].filter(Boolean).join(', ')})
+                              </span>
+                            )}
+                          </p>
                         )}
 
                         <button
