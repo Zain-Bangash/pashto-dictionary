@@ -248,7 +248,7 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
     req.user!.role === 'moderator' &&
     (status === 'approved' || status === 'rejected') &&
     concept.submittedBy &&
-    concept.submittedBy.equals(req.user!.id)
+    concept.submittedBy === req.user!.id
   ) {
     res.status(403).json({
       success: false,
@@ -281,7 +281,7 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
   }
 
   concept.status       = status as IConcept['status'];
-  concept.reviewedBy   = new mongoose.Types.ObjectId(req.user!.id);
+  concept.reviewedBy   = req.user!.id;
   if (moderatorNote) concept.moderatorNote = moderatorNote;
   await concept.save();
 
@@ -303,7 +303,7 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
       variantsToDelete.map(async (v) => {
         v.isDeleted = true;
         v.deletedAt = new Date();
-        v.deletedBy = new mongoose.Types.ObjectId(req.user!.id);
+        v.deletedBy = req.user!.id;
         await v.save();
         await new ModerationLog({
           targetModel: 'Variant',
@@ -366,7 +366,7 @@ async function deleteConcept(req: Request, res: Response): Promise<void> {
 
   concept.isDeleted  = true;
   concept.deletedAt  = new Date();
-  concept.deletedBy  = new mongoose.Types.ObjectId(req.user!.id);
+  concept.deletedBy  = req.user!.id;
   await concept.save();
 
   await new ModerationLog({
@@ -499,7 +499,7 @@ async function mergeConcepts(req: Request, res: Response): Promise<void> {
 
   sourceConcept.isDeleted = true;
   sourceConcept.deletedAt = new Date();
-  sourceConcept.deletedBy = new mongoose.Types.ObjectId(req.user!.id);
+  sourceConcept.deletedBy = req.user!.id;
   await sourceConcept.save();
 
   await new ModerationLog({

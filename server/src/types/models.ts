@@ -16,12 +16,12 @@ export interface IConcept extends Document {
   normalizedGloss?: string;
   partOfSpeech: 'noun' | 'verb' | 'adjective' | 'adverb' | 'phrase' | 'other';
   status: 'pending' | 'approved' | 'rejected' | 'published';
-  submittedBy?: Types.ObjectId;
-  reviewedBy?: Types.ObjectId;
+  submittedBy?: string;
+  reviewedBy?: string;
   moderatorNote?: string;
   isDeleted: boolean;
   deletedAt?: Date;
-  deletedBy?: Types.ObjectId;
+  deletedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,12 +37,12 @@ export interface IVariant extends Document {
   example?: string;
   submissionNote?: string;
   status: 'pending' | 'approved' | 'rejected' | 'published';
-  submittedBy?: Types.ObjectId;
-  reviewedBy?: Types.ObjectId;
+  submittedBy?: string;
+  reviewedBy?: string;
   moderatorNote?: string;
   isDeleted: boolean;
   deletedAt?: Date;
-  deletedBy?: Types.ObjectId;
+  deletedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,7 +61,7 @@ export interface IModerationLog extends Document {
     | 'deleted'
     | 'edited'
     | 'merged';
-  performedBy: Types.ObjectId;
+  performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;
   timestamp: Date;
