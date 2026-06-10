@@ -21,12 +21,12 @@ const variantSchema = new Schema<IVariant>(
       enum: ['pending', 'approved', 'rejected', 'published'],
       default: 'pending',
     },
-    submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    submittedBy: { type: String },
+    reviewedBy: { type: String },
     moderatorNote: { type: String },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date },
-    deletedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    deletedBy: { type: String },
   },
   { timestamps: true }
 );

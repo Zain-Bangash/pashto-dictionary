@@ -112,6 +112,8 @@ All API responses must use this shape. Never return a raw object or array.
 - Use `express-async-errors` or wrap async handlers — never let unhandled promise rejections crash the server
 - Authentication middleware goes on routes, not inside controllers
 - Role checks use `requireRole()` middleware, not `if (req.user.role === ...)` inside controllers
+- **Role resolution**: `auth.ts` middleware looks up `role` from the MongoDB `User` doc (by `cognitoSub`) on every authenticated request — do NOT read role from the Cognito token, because Access Tokens never include custom user attributes
+- **Actor fields** (`submittedBy`, `reviewedBy`, `deletedBy`, `performedBy`): stored as `String` (Cognito sub UUID), not `ObjectId` — never pass `new mongoose.Types.ObjectId(req.user.id)` for these fields
 
 ---
 
@@ -176,17 +178,22 @@ chore(deps): add express-rate-limit to server
 # server/.env
 PORT=5000
 MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.oq0rk.mongodb.net/
-JWT_SECRET=your_secret_here
+COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=ap-southeast-1
 NODE_ENV=development
 
 # client/.env
 VITE_API_URL=http://localhost:5000
 ```
 
-### Production (Lambda environment variables — set in AWS Console)
+### Production (Lambda environment variables — managed by SAM template.yaml from Phase 14)
 ```
 MONGODB_URI=mongodb+srv://...
-JWT_SECRET=...
+COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 NODE_ENV=production
 ```
 
@@ -213,3 +220,4 @@ Keep `.env.example` files updated whenever a new variable is added.
 - Phase 11: TypeScript migration (server only — all `.js` → `.ts`, strict mode)
 - Phase 12: AWS deployment (Amplify hosting, Lambda + API Gateway, GitHub Actions CI/CD)
 - Phase 13: AWS Cognito migration (replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client)
+- Post-13 fixes: actor fields (`submittedBy` etc.) changed from ObjectId to String for Cognito sub compatibility; auth middleware now resolves role from MongoDB instead of token claims (Access Tokens don't carry custom attributes)

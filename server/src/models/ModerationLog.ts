@@ -12,7 +12,7 @@ const moderationLogSchema = new Schema<IModerationLog>({
     enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged'],
     required: true,
   },
-  performedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  performedBy: { type: String, required: true },
   note: { type: String },
   changes: { type: Schema.Types.Mixed },
   timestamp: { type: Date, default: Date.now },

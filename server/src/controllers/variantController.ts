@@ -256,7 +256,7 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
     req.user!.role === 'moderator' &&
     (status === 'approved' || status === 'rejected') &&
     variant.submittedBy &&
-    variant.submittedBy.equals(req.user!.id)
+    variant.submittedBy === req.user!.id
   ) {
     res.status(403).json({
       success: false,
@@ -300,7 +300,7 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
   }
 
   variant.status     = status as IVariant['status'];
-  variant.reviewedBy = new mongoose.Types.ObjectId(req.user!.id);
+  variant.reviewedBy = req.user!.id;
   if (moderatorNote) variant.moderatorNote = moderatorNote;
   if (status === 'rejected') {
     variant.isDeleted = true;
@@ -376,7 +376,7 @@ async function deleteVariant(req: Request, res: Response): Promise<void> {
 
   variant.isDeleted = true;
   variant.deletedAt = new Date();
-  variant.deletedBy = new mongoose.Types.ObjectId(req.user!.id);
+  variant.deletedBy = req.user!.id;
   await variant.save();
 
   await new ModerationLog({

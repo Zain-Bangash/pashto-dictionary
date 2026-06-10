@@ -15,25 +15,25 @@ async function clean(): Promise<void> {
 
   // Find all test accounts
   const testUsers = await User.find({ email: /@test\.local$/ }).lean();
-  const testUserIds = testUsers.map((u) => u._id);
+  const testUserSubs = testUsers.map((u) => u.cognitoSub).filter(Boolean) as string[];
 
   // Find concepts submitted by test users
-  const testConcepts = await Concept.find({ submittedBy: { $in: testUserIds } }).lean();
+  const testConcepts = await Concept.find({ submittedBy: { $in: testUserSubs } }).lean();
   const testConceptIds = testConcepts.map((c) => c._id);
 
   // Delete variants for those concepts OR submitted by test users
   const deletedVariants = await Variant.deleteMany({
     $or: [
       { concept: { $in: testConceptIds } },
-      { submittedBy: { $in: testUserIds } },
+      { submittedBy: { $in: testUserSubs } },
     ],
   });
 
   // Delete moderation logs referencing test users or test concepts/variants
   const deletedLogs = await ModerationLog.deleteMany({
     $or: [
-      { performedBy: { $in: testUserIds } },
-      { targetId: { $in: [...testUserIds, ...testConceptIds] } },
+      { performedBy: { $in: testUserSubs } },
+      { targetId: { $in: testConceptIds } },
     ],
   });
 
