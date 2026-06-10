@@ -11,5 +11,6 @@ parallel = true
 [default.deploy.parameters]
 capabilities      = "CAPABILITY_IAM"
 confirm_changeset = false
-resolve_s3        = true
+resolve_s3        = false
+s3_bucket         = "pashto-dictionary-sam-artifacts"
 region            = "ap-southeast-1"
