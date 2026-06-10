@@ -34,6 +34,7 @@ const variantsRouter = require('../routes/variants');
 const Concept = require('../models/Concept');
 const Variant = require('../models/Variant');
 const ModerationLog = require('../models/ModerationLog');
+const User = require('../models/User');
 
 const app = express();
 app.use(express.json());
@@ -50,10 +51,13 @@ const request = supertest(app);
 
 let mongoServer;
 
-function makeToken(overrides = {}) {
+async function makeToken(overrides = {}) {
   const secret = process.env.JWT_SECRET || 'test-secret-for-jest';
+  const id = overrides.id ?? new mongoose.Types.ObjectId().toString();
+  const role = overrides.role ?? 'user';
+  await User.create({ cognitoSub: id, username: `user-${id.slice(-6)}`, email: `${id.slice(-6)}@test.local`, role });
   return jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), username: 'testuser', role: 'user', ...overrides },
+    { id, username: 'testuser', role, ...overrides },
     secret,
     { expiresIn: '7d' }
   );
@@ -166,7 +170,7 @@ describe('PATCH /api/concepts/:id/edit — auth and role', () => {
 
   test('returns 403 when role is user', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request
       .patch(`/api/concepts/${fakeId}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -179,7 +183,7 @@ describe('PATCH /api/concepts/:id/edit — auth and role', () => {
 describe('PATCH /api/concepts/:id/edit — not found', () => {
   test('returns 404 when concept does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${fakeId}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -196,7 +200,7 @@ describe('PATCH /api/concepts/:id/edit — not found', () => {
       deletedAt: new Date(),
       deletedBy: new mongoose.Types.ObjectId(),
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -214,7 +218,7 @@ describe('PATCH /api/concepts/:id/edit — moderator self-edit restriction', () 
       partOfSpeech: 'noun',
       submittedBy: new mongoose.Types.ObjectId(modId),
     });
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -230,7 +234,7 @@ describe('PATCH /api/concepts/:id/edit — moderator self-edit restriction', () 
       partOfSpeech: 'noun',
       submittedBy: new mongoose.Types.ObjectId(adminId),
     });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -243,7 +247,7 @@ describe('PATCH /api/concepts/:id/edit — moderator self-edit restriction', () 
 describe('PATCH /api/concepts/:id/edit — validation', () => {
   test('returns 400 when note is missing', async () => {
     const concept = await Concept.create({ englishGloss: 'note-required-concept', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -256,7 +260,7 @@ describe('PATCH /api/concepts/:id/edit — validation', () => {
 describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => {
   test('updates englishGloss on the EXISTING document — same _id, no new doc created', async () => {
     const concept = await Concept.create({ englishGloss: 'original gloss', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -273,7 +277,7 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
 
   test('updates partOfSpeech on the EXISTING document', async () => {
     const concept = await Concept.create({ englishGloss: 'pos-edit-concept', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -286,7 +290,7 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
 
   test('returns updated concept in the success envelope', async () => {
     const concept = await Concept.create({ englishGloss: 'envelope-test', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -300,7 +304,7 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
   test('writes a ModerationLog entry with action "edited" and targetModel "Concept"', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
     const concept = await Concept.create({ englishGloss: 'log-test-concept', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -314,7 +318,7 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
 
   test('ModerationLog changes contains only changed fields with before/after values', async () => {
     const concept = await Concept.create({ englishGloss: 'changes-diff-concept', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -329,7 +333,7 @@ describe('PATCH /api/concepts/:id/edit — happy path and ModerationLog', () => 
 
   test('fields that were NOT changed do not appear in the changes diff', async () => {
     const concept = await Concept.create({ englishGloss: 'unchanged-fields-concept', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/concepts/${concept._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -356,7 +360,7 @@ describe('PATCH /api/variants/:id/edit — auth and role', () => {
 
   test('returns 403 when role is user', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request
       .patch(`/api/variants/${fakeId}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -369,7 +373,7 @@ describe('PATCH /api/variants/:id/edit — auth and role', () => {
 describe('PATCH /api/variants/:id/edit — not found', () => {
   test('returns 404 when variant does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${fakeId}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -389,7 +393,7 @@ describe('PATCH /api/variants/:id/edit — not found', () => {
       deletedAt: new Date(),
       deletedBy: new mongoose.Types.ObjectId(),
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -410,7 +414,7 @@ describe('PATCH /api/variants/:id/edit — moderator self-edit restriction', () 
       definition: 'test',
       submittedBy: new mongoose.Types.ObjectId(modId),
     });
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -429,7 +433,7 @@ describe('PATCH /api/variants/:id/edit — moderator self-edit restriction', () 
       definition: 'test',
       submittedBy: new mongoose.Types.ObjectId(adminId),
     });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -448,7 +452,7 @@ describe('PATCH /api/variants/:id/edit — validation', () => {
       region: 'Kohat',
       definition: 'test',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -472,7 +476,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'original definition',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -493,7 +497,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'old definition',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -512,7 +516,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'test',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -529,7 +533,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'test',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -548,7 +552,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'test',
     });
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -567,7 +571,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'test',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -587,7 +591,7 @@ describe('PATCH /api/variants/:id/edit — happy path and ModerationLog', () => 
       region: 'Kohat',
       definition: 'unchanged definition',
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -617,7 +621,7 @@ describe('PATCH /api/variants/:id/edit — concept reassignment', () => {
   });
 
   test('reassigns variant to target concept when concept field is provided', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -628,7 +632,7 @@ describe('PATCH /api/variants/:id/edit — concept reassignment', () => {
   });
 
   test('returns 404 when target concept does not exist', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const fakeConceptId = new mongoose.Types.ObjectId().toString();
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
@@ -647,7 +651,7 @@ describe('PATCH /api/variants/:id/edit — concept reassignment', () => {
       definition: 'already exists on target',
     });
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -659,7 +663,7 @@ describe('PATCH /api/variants/:id/edit — concept reassignment', () => {
 
   test('ModerationLog changes.concept includes from/to with id and englishGloss', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     await request
       .patch(`/api/variants/${variant._id}/edit`)
       .set('Authorization', `Bearer ${token}`)
@@ -691,7 +695,7 @@ describe('POST /api/concepts/:sourceId/merge — auth and role', () => {
 
   test('returns 403 when role is user', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request
       .post(`/api/concepts/${fakeId}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -705,7 +709,7 @@ describe('POST /api/concepts/:sourceId/merge — validation', () => {
   test('returns 404 when source concept does not exist', async () => {
     const fakeSrcId = new mongoose.Types.ObjectId().toString();
     const target = await Concept.create({ englishGloss: 'merge-target-exist', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${fakeSrcId}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -723,7 +727,7 @@ describe('POST /api/concepts/:sourceId/merge — validation', () => {
       deletedBy: new mongoose.Types.ObjectId(),
     });
     const target = await Concept.create({ englishGloss: 'merge-target-active', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -735,7 +739,7 @@ describe('POST /api/concepts/:sourceId/merge — validation', () => {
   test('returns 404 when target concept does not exist', async () => {
     const source = await Concept.create({ englishGloss: 'merge-source-active', partOfSpeech: 'noun' });
     const fakeTargetId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -746,7 +750,7 @@ describe('POST /api/concepts/:sourceId/merge — validation', () => {
 
   test('returns 400 when merging a concept into itself', async () => {
     const concept = await Concept.create({ englishGloss: 'self-merge', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${concept._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -758,7 +762,7 @@ describe('POST /api/concepts/:sourceId/merge — validation', () => {
   test('returns 400 when note is missing', async () => {
     const source = await Concept.create({ englishGloss: 'merge-no-note-source', partOfSpeech: 'noun' });
     const target = await Concept.create({ englishGloss: 'merge-no-note-target', partOfSpeech: 'noun' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -783,7 +787,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       { concept: source._id, pashto: 'مینه', region: 'Hangu', definition: 'love hangu' },
     ]);
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -817,7 +821,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       deletedBy: new mongoose.Types.ObjectId(),
     });
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -841,7 +845,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       definition: 'already exists on target',
     });
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -863,7 +867,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       definition: 'in-place update',
     });
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -876,7 +880,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
 
   test('soft-deletes the source concept after merge', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -903,7 +907,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       definition: 'second',
     });
 
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)
@@ -930,7 +934,7 @@ describe('POST /api/concepts/:sourceId/merge — happy path', () => {
       definition: 'test',
     });
 
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .post(`/api/concepts/${source._id}/merge`)
       .set('Authorization', `Bearer ${token}`)

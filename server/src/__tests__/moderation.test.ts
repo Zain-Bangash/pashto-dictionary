@@ -28,6 +28,7 @@ const variantsRouter = require('../routes/variants');
 const Concept = require('../models/Concept');
 const Variant = require('../models/Variant');
 const ModerationLog = require('../models/ModerationLog');
+const User = require('../models/User');
 
 const app = express();
 app.use(express.json());
@@ -45,10 +46,13 @@ const request = supertest(app);
 
 let mongoServer;
 
-function makeToken(overrides = {}) {
+async function makeToken(overrides = {}) {
   const secret = process.env.JWT_SECRET || 'test-secret-for-jest';
+  const id = overrides.id ?? new mongoose.Types.ObjectId().toString();
+  const role = overrides.role ?? 'user';
+  await User.create({ cognitoSub: id, username: `user-${id.slice(-6)}`, email: `${id.slice(-6)}@test.local`, role });
   return jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), username: 'testuser', role: 'user', ...overrides },
+    { id, username: 'testuser', role, ...overrides },
     secret,
     { expiresIn: '7d' }
   );
@@ -83,21 +87,21 @@ describe('GET /api/moderation/concepts/queue', () => {
   });
 
   test('returns 403 when role is user', async () => {
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 200 for moderator', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
   test('returns 200 for admin', async () => {
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -109,7 +113,7 @@ describe('GET /api/moderation/concepts/queue', () => {
       { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'approved' },
       { englishGloss: 'water', partOfSpeech: 'noun', status: 'published' },
     ]);
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
@@ -117,7 +121,7 @@ describe('GET /api/moderation/concepts/queue', () => {
   });
 
   test('response has envelope shape with meta', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
@@ -128,7 +132,7 @@ describe('GET /api/moderation/concepts/queue', () => {
   });
 
   test('defaults page to 1 and limit to 20', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.body.meta.page).toBe(1);
     expect(res.body.meta.limit).toBe(20);
@@ -146,7 +150,7 @@ describe('GET /api/moderation/variants/queue', () => {
   });
 
   test('returns 403 when role is user', async () => {
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get('/api/moderation/variants/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
@@ -157,7 +161,7 @@ describe('GET /api/moderation/variants/queue', () => {
       { concept: concept._id, pashto: 'کور', region: 'Kohat', definition: 'house', status: 'pending' },
       { concept: concept._id, pashto: 'کور2', region: 'Hangu', definition: 'house', status: 'approved' },
     ]);
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/variants/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
@@ -176,7 +180,7 @@ describe('GET /api/moderation/stats', () => {
   });
 
   test('returns 403 for user role', async () => {
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get('/api/moderation/stats').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
@@ -186,7 +190,7 @@ describe('GET /api/moderation/stats', () => {
       { englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' },
       { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'published' },
     ]);
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/stats').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -208,19 +212,19 @@ describe('GET /api/moderation/log', () => {
   });
 
   test('returns 403 for moderator role', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
 
   test('returns 403 for user role', async () => {
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
 
   test('returns 200 for admin with envelope shape', async () => {
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -235,7 +239,7 @@ describe('GET /api/moderation/log', () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
     await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: userId });
 
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
@@ -243,14 +247,14 @@ describe('GET /api/moderation/log', () => {
   });
 
   test('defaults page to 1 and limit to 20', async () => {
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.body.meta.page).toBe(1);
     expect(res.body.meta.limit).toBe(20);
   });
 
   test('accepts page and limit query params', async () => {
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/log?page=2&limit=5').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.meta.page).toBe(2);
@@ -262,7 +266,7 @@ describe('GET /api/moderation/log', () => {
     const concept = await Concept.create({ englishGloss: 'test', partOfSpeech: 'noun', status: 'pending' });
     await ModerationLog.create({ targetModel: 'Concept', targetId: concept._id, action: 'submitted', performedBy: userId });
 
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/moderation/log').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     const rawJson = JSON.stringify(res.body);
@@ -277,7 +281,7 @@ describe('GET /api/moderation/log', () => {
 describe('Concept state machine — invalid transitions', () => {
   test('returns 400 when approving an already-approved concept', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -285,7 +289,7 @@ describe('Concept state machine — invalid transitions', () => {
 
   test('returns 400 when approving a published concept', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -293,7 +297,7 @@ describe('Concept state machine — invalid transitions', () => {
 
   test('returns 400 when publishing a pending concept', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -307,7 +311,7 @@ describe('Concept state machine — invalid transitions', () => {
 describe('ModerationLog integrity', () => {
   test('approve concept creates exactly one log record', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     const logs = await ModerationLog.find({ targetId: concept._id, targetModel: 'Concept' });
     expect(logs).toHaveLength(1);
@@ -315,7 +319,7 @@ describe('ModerationLog integrity', () => {
 
   test('approve log has correct targetId and targetModel', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     const log = await ModerationLog.findOne({ targetId: concept._id, targetModel: 'Concept', action: 'approved' });
     expect(log).not.toBeNull();
@@ -326,7 +330,7 @@ describe('ModerationLog integrity', () => {
   test('approve log performedBy matches token user id', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     const log = await ModerationLog.findOne({ targetId: concept._id, action: 'approved' });
     expect(log.performedBy.toString()).toBe(modId);
@@ -334,7 +338,7 @@ describe('ModerationLog integrity', () => {
 
   test('reject log has note field', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'rejected', moderatorNote: 'not suitable' });
     const log = await ModerationLog.findOne({ targetId: concept._id, action: 'rejected' });
     expect(log).not.toBeNull();
@@ -343,7 +347,7 @@ describe('ModerationLog integrity', () => {
 
   test('publish concept creates exactly one log record', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
     const logs = await ModerationLog.find({ targetId: concept._id, targetModel: 'Concept' });
     expect(logs).toHaveLength(1);
@@ -358,7 +362,7 @@ describe('GET /api/moderation/concepts/queue — excludes soft-deleted concepts'
   test('does not return a soft-deleted pending concept in the queue', async () => {
     await Concept.create({ englishGloss: 'visible', partOfSpeech: 'noun', status: 'pending' });
     await Concept.create({ englishGloss: 'hidden', partOfSpeech: 'noun', status: 'pending', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/concepts/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     const glosses = res.body.data.map((c) => c.englishGloss);
@@ -372,7 +376,7 @@ describe('GET /api/moderation/variants/queue — excludes soft-deleted variants'
     const concept = await Concept.create({ englishGloss: 'tree', partOfSpeech: 'noun', status: 'published' });
     await Variant.create({ concept: concept._id, pashto: 'ونه', region: 'Kohat', definition: 'tree visible', status: 'pending' });
     await Variant.create({ concept: concept._id, pashto: 'وني', region: 'Hangu', definition: 'tree hidden', status: 'pending', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/moderation/variants/queue').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     const definitions = res.body.data.map((v) => v.definition);
@@ -388,7 +392,7 @@ describe('GET /api/moderation/variants/queue — excludes soft-deleted variants'
 describe('Moderator self-approval — concept status transitions (moderation context)', () => {
   test('moderator cannot approve their own pending concept', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const concept = await Concept.create({
       englishGloss: 'modselfreview1',
       partOfSpeech: 'noun',
@@ -406,7 +410,7 @@ describe('Moderator self-approval — concept status transitions (moderation con
 
   test('moderator cannot reject their own pending concept', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const concept = await Concept.create({
       englishGloss: 'modselfreject2',
       partOfSpeech: 'noun',
@@ -424,7 +428,7 @@ describe('Moderator self-approval — concept status transitions (moderation con
 
   test('admin is NOT restricted — can approve their own concept', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const concept = await Concept.create({
       englishGloss: 'adminownsubmit2',
       partOfSpeech: 'noun',
@@ -454,7 +458,7 @@ describe('Concept-variant integrity — publish guard', () => {
       definition: 'test',
       status: 'approved',
     });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request
       .patch(`/api/variants/${variant._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -473,7 +477,7 @@ describe('Concept-variant integrity — publish guard', () => {
       definition: 'happy',
       status: 'approved',
     });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request
       .patch(`/api/variants/${variant._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -492,7 +496,7 @@ describe('Concept-variant integrity — cascade reject', () => {
     const concept = await Concept.create({ englishGloss: 'cascade-pending', partOfSpeech: 'noun', status: 'pending' });
     const v1 = await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Kohat', definition: 'home', status: 'pending' });
     const v2 = await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Hangu', definition: 'home', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -507,7 +511,7 @@ describe('Concept-variant integrity — cascade reject', () => {
   test('rejecting a pending concept also soft-deletes its already-approved variants', async () => {
     const concept = await Concept.create({ englishGloss: 'cascade-approved-variant', partOfSpeech: 'noun', status: 'pending' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'سیند', region: 'Kohat', definition: 'river', status: 'approved' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request
       .patch(`/api/concepts/${concept._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -520,7 +524,7 @@ describe('Concept-variant integrity — cascade reject', () => {
   test('rejecting a pending concept writes ModerationLog entries for cascaded variants', async () => {
     const concept = await Concept.create({ englishGloss: 'cascade-log', partOfSpeech: 'noun', status: 'pending' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'غر', region: 'Kohat', definition: 'mountain', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/concepts/${concept._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -545,7 +549,7 @@ describe('Concept-variant integrity — cascade reject', () => {
       isDeleted: true,
       deletedAt: new Date(),
     });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request
       .patch(`/api/concepts/${concept._id}/status`)
       .set('Authorization', `Bearer ${token}`)
@@ -564,7 +568,7 @@ describe('Moderator self-approval — variant status transitions (moderation con
 
   test('moderator cannot approve a variant they submitted', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const variant = await Variant.create({
       concept: modConcept._id,
       pashto: 'سیند',
@@ -585,7 +589,7 @@ describe('Moderator self-approval — variant status transitions (moderation con
   test('a different moderator CAN approve a variant submitted by another moderator', async () => {
     const submitterModId = new mongoose.Types.ObjectId().toString();
     const reviewerModId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const token = await makeToken({ role: 'moderator', id: reviewerModId });
     const variant = await Variant.create({
       concept: modConcept._id,
       pashto: 'سیند',

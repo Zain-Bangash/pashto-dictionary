@@ -28,6 +28,7 @@ const variantsRouter = require('../routes/variants');
 const Concept = require('../models/Concept');
 const Variant = require('../models/Variant');
 const ModerationLog = require('../models/ModerationLog');
+const User = require('../models/User');
 
 const app = express();
 app.use(express.json());
@@ -44,10 +45,13 @@ const request = supertest(app);
 
 let mongoServer;
 
-function makeToken(overrides = {}) {
+async function makeToken(overrides = {}) {
   const secret = process.env.JWT_SECRET || 'test-secret-for-jest';
+  const id = overrides.id ?? new mongoose.Types.ObjectId().toString();
+  const role = overrides.role ?? 'user';
+  await User.create({ cognitoSub: id, username: `user-${id.slice(-6)}`, email: `${id.slice(-6)}@test.local`, role });
   return jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), username: 'testuser', role: 'user', ...overrides },
+    { id, username: 'testuser', role, ...overrides },
     secret,
     { expiresIn: '7d' }
   );
@@ -128,7 +132,7 @@ describe('GET /api/concepts', () => {
       { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
       { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'pending' },
     ]);
-    const modToken = makeToken({ role: 'moderator' });
+    const modToken = await makeToken({ role: 'moderator' });
     const res = await request
       .get('/api/concepts?status=pending')
       .set('Authorization', `Bearer ${modToken}`);
@@ -220,28 +224,28 @@ describe('POST /api/concepts', () => {
   });
 
   test('returns 400 when englishGloss is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ partOfSpeech: 'noun' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 400 when partOfSpeech is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 400 when partOfSpeech is invalid', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house', partOfSpeech: 'emoji' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 201 with created concept on valid input', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
@@ -249,14 +253,14 @@ describe('POST /api/concepts', () => {
   });
 
   test('sets status to pending on creation', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('pending');
   });
 
   test('creates a ModerationLog entry with action "submitted"', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     const log = await ModerationLog.findOne({ targetId: res.body.data._id, targetModel: 'Concept' });
@@ -266,14 +270,14 @@ describe('POST /api/concepts', () => {
 
   test('sets submittedBy from the token user id', async () => {
     const userId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ id: userId });
+    const token = await makeToken({ id: userId });
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.data.submittedBy).toBe(userId);
   });
 
   test('response uses envelope shape', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
@@ -305,7 +309,7 @@ describe('POST /api/variants', () => {
   });
 
   test('returns 400 when pashto is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const { pashto: _p, ...body } = valid();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
     expect(res.status).toBe(400);
@@ -313,7 +317,7 @@ describe('POST /api/variants', () => {
   });
 
   test('returns 400 when region is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const { region: _r, ...body } = valid();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
     expect(res.status).toBe(400);
@@ -321,7 +325,7 @@ describe('POST /api/variants', () => {
   });
 
   test('returns 400 when definition is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const { definition: _d, ...body } = valid();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(body);
     expect(res.status).toBe(400);
@@ -329,14 +333,14 @@ describe('POST /api/variants', () => {
   });
 
   test('returns 400 when region is invalid', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send({ ...valid(), region: 'Kandahar' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 201 with created variant on valid input', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
@@ -344,14 +348,14 @@ describe('POST /api/variants', () => {
   });
 
   test('sets status to pending on creation', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('pending');
   });
 
   test('returns 409 when pashto word already exists', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(409);
@@ -360,7 +364,7 @@ describe('POST /api/variants', () => {
   });
 
   test('creates a ModerationLog entry with action "submitted"', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(201);
     const log = await ModerationLog.findOne({ targetId: res.body.data._id, targetModel: 'Variant' });
@@ -372,7 +376,7 @@ describe('POST /api/variants', () => {
     const regions = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
     let pashtoCounter = 0;
     for (const region of regions) {
-      const token = makeToken();
+      const token = await makeToken();
       const res = await request.post('/api/variants').set('Authorization', `Bearer ${token}`).send({
         ...valid(), region, pashto: `کور${pashtoCounter++}`,
       });
@@ -487,20 +491,20 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('returns 403 for user role', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.patch(`/api/concepts/${fakeId}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(403);
   });
 
   test('returns 400 for invalid ObjectId', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch('/api/concepts/bad-id/status').set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(400);
   });
 
   test('returns 200 and approves a pending concept', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('approved');
@@ -508,7 +512,7 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('returns 400 when rejecting without moderatorNote', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'rejected' });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -516,7 +520,7 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('returns 200 and rejects with a note', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'rejected', moderatorNote: 'Not accurate' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('rejected');
@@ -525,14 +529,14 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('returns 403 when non-admin tries to publish', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
     expect(res.status).toBe(403);
   });
 
   test('admin can publish an approved concept', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'approved' });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'published' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('published');
@@ -540,7 +544,7 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('writes ModerationLog on status transition', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     const log = await ModerationLog.findOne({ targetId: concept._id, targetModel: 'Concept', action: 'approved' });
     expect(log).not.toBeNull();
@@ -548,7 +552,7 @@ describe('PATCH /api/concepts/:id/status', () => {
 
   test('returns 400 for invalid status transition', async () => {
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.patch(`/api/concepts/${concept._id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'approved' });
     expect(res.status).toBe(400);
   });
@@ -561,7 +565,7 @@ describe('PATCH /api/concepts/:id/status', () => {
 describe('DELETE /api/concepts/:id', () => {
   test('returns 403 when role is moderator', async () => {
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -569,7 +573,7 @@ describe('DELETE /api/concepts/:id', () => {
 
   test('returns 403 when role is user', async () => {
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -584,7 +588,7 @@ describe('DELETE /api/concepts/:id', () => {
 
   test('returns 404 when concept does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.delete(`/api/concepts/${fakeId}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
@@ -593,7 +597,7 @@ describe('DELETE /api/concepts/:id', () => {
   test('admin soft-deletes the concept and returns 200 with updated doc', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -605,7 +609,7 @@ describe('DELETE /api/concepts/:id', () => {
   test('soft-delete sets isDeleted, deletedAt, deletedBy on the document in the database', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     const updated = await Concept.findById(concept._id);
     expect(updated.isDeleted).toBe(true);
@@ -616,7 +620,7 @@ describe('DELETE /api/concepts/:id', () => {
   test('writes a ModerationLog entry with action "deleted"', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     const log = await ModerationLog.findOne({ targetId: concept._id, targetModel: 'Concept', action: 'deleted' });
     expect(log).not.toBeNull();
@@ -625,7 +629,7 @@ describe('DELETE /api/concepts/:id', () => {
 
   test('response uses the envelope shape', async () => {
     const concept = await Concept.create({ englishGloss: 'fire', partOfSpeech: 'noun', status: 'published' });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.delete(`/api/concepts/${concept._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('data');
@@ -645,7 +649,7 @@ describe('DELETE /api/variants/:id', () => {
 
   test('returns 403 when role is moderator', async () => {
     const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -660,7 +664,7 @@ describe('DELETE /api/variants/:id', () => {
 
   test('returns 404 when variant does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.delete(`/api/variants/${fakeId}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
@@ -669,7 +673,7 @@ describe('DELETE /api/variants/:id', () => {
   test('admin soft-deletes the variant and returns 200 with updated doc', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const res = await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -681,7 +685,7 @@ describe('DELETE /api/variants/:id', () => {
   test('soft-delete sets isDeleted, deletedAt, deletedBy on the document in the database', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     const updated = await Variant.findById(variant._id);
     expect(updated.isDeleted).toBe(true);
@@ -692,7 +696,7 @@ describe('DELETE /api/variants/:id', () => {
   test('writes a ModerationLog entry with action "deleted"', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
     const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'water', status: 'published' });
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     await request.delete(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     const log = await ModerationLog.findOne({ targetId: variant._id, targetModel: 'Variant', action: 'deleted' });
     expect(log).not.toBeNull();
@@ -783,7 +787,7 @@ describe('POST /api/concepts — normalized duplicate detection', () => {
   const valid = () => ({ englishGloss: 'house', partOfSpeech: 'noun' });
 
   test('returns 409 when concept with exact same englishGloss already exists', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send(valid());
     expect(res.status).toBe(409);
@@ -792,7 +796,7 @@ describe('POST /api/concepts — normalized duplicate detection', () => {
   });
 
   test('returns 409 when concept with same gloss but different case already exists (normalized match)', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Concept.create({ englishGloss: 'House', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'house', partOfSpeech: 'noun' });
     expect(res.status).toBe(409);
@@ -801,7 +805,7 @@ describe('POST /api/concepts — normalized duplicate detection', () => {
   });
 
   test('returns 409 when concept with same gloss but extra whitespace already exists (normalized match)', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: '  house  ', partOfSpeech: 'noun' });
     expect(res.status).toBe(409);
@@ -810,7 +814,7 @@ describe('POST /api/concepts — normalized duplicate detection', () => {
   });
 
   test('returns 201 when concept with a different gloss is submitted', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'pending', normalizedGloss: 'house' });
     const res = await request.post('/api/concepts').set('Authorization', `Bearer ${token}`).send({ englishGloss: 'water', partOfSpeech: 'noun' });
     expect(res.status).toBe(201);
@@ -831,7 +835,7 @@ describe('POST /api/variants — normalized duplicate detection', () => {
   });
 
   test('returns 409 when variant with same pashto + concept + region already exists (normalized)', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Variant.create({
       concept: conceptIdForDupTest,
       pashto: 'کور',
@@ -850,7 +854,7 @@ describe('POST /api/variants — normalized duplicate detection', () => {
   });
 
   test('returns 201 when same pashto word is submitted for a different region', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Variant.create({
       concept: conceptIdForDupTest,
       pashto: 'کور',
@@ -868,7 +872,7 @@ describe('POST /api/variants — normalized duplicate detection', () => {
   });
 
   test('returns 201 when resubmitting the same pashto + region after prior rejection (rejected does not block)', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     await Variant.create({
       concept: conceptIdForDupTest,
       pashto: 'کور',
@@ -895,7 +899,7 @@ describe('POST /api/variants — normalized duplicate detection', () => {
 describe('PATCH /api/concepts/:id/status — moderator self-approval restriction', () => {
   test('moderator gets 403 when trying to approve a concept they submitted', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const concept = await Concept.create({
       englishGloss: 'selfapprovetest1',
       partOfSpeech: 'noun',
@@ -913,7 +917,7 @@ describe('PATCH /api/concepts/:id/status — moderator self-approval restriction
 
   test('moderator gets 403 when trying to reject a concept they submitted', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const concept = await Concept.create({
       englishGloss: 'selfrejecttest1',
       partOfSpeech: 'noun',
@@ -932,7 +936,7 @@ describe('PATCH /api/concepts/:id/status — moderator self-approval restriction
   test('a different moderator (not the submitter) can approve the concept', async () => {
     const submitterModId = new mongoose.Types.ObjectId().toString();
     const reviewerModId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const token = await makeToken({ role: 'moderator', id: reviewerModId });
     const concept = await Concept.create({
       englishGloss: 'othermodapprove1',
       partOfSpeech: 'noun',
@@ -949,7 +953,7 @@ describe('PATCH /api/concepts/:id/status — moderator self-approval restriction
 
   test('admin can approve a concept they submitted themselves', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'admin', id: adminId });
+    const token = await makeToken({ role: 'admin', id: adminId });
     const concept = await Concept.create({
       englishGloss: 'adminselfapprove1',
       partOfSpeech: 'noun',
@@ -978,7 +982,7 @@ describe('PATCH /api/variants/:id/status — moderator self-approval restriction
 
   test('moderator gets 403 when trying to approve a variant they submitted', async () => {
     const modId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: modId });
+    const token = await makeToken({ role: 'moderator', id: modId });
     const variant = await Variant.create({
       concept: variantSelfApprovalConcept._id,
       pashto: 'باد',
@@ -999,7 +1003,7 @@ describe('PATCH /api/variants/:id/status — moderator self-approval restriction
   test('a different moderator can approve a variant they did not submit', async () => {
     const submitterModId = new mongoose.Types.ObjectId().toString();
     const reviewerModId = new mongoose.Types.ObjectId().toString();
-    const token = makeToken({ role: 'moderator', id: reviewerModId });
+    const token = await makeToken({ role: 'moderator', id: reviewerModId });
     const variant = await Variant.create({
       concept: variantSelfApprovalConcept._id,
       pashto: 'باد',
@@ -1024,7 +1028,7 @@ describe('PATCH /api/variants/:id/status — moderator self-approval restriction
 describe('Soft-delete DB persistence — Concept', () => {
   test('soft-deleted concept still exists in DB with isDeleted:true', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
-    const adminToken = makeToken({ role: 'admin', id: adminId });
+    const adminToken = await makeToken({ role: 'admin', id: adminId });
     const concept = await Concept.create({ englishGloss: 'persistence-concept', partOfSpeech: 'noun' });
 
     await request
@@ -1042,7 +1046,7 @@ describe('Soft-delete DB persistence — Concept', () => {
 describe('Soft-delete DB persistence — Variant', () => {
   test('soft-deleted variant still exists in DB with isDeleted:true', async () => {
     const adminId = new mongoose.Types.ObjectId().toString();
-    const adminToken = makeToken({ role: 'admin', id: adminId });
+    const adminToken = await makeToken({ role: 'admin', id: adminId });
     const concept = await Concept.create({ englishGloss: 'persistence-variant-concept', partOfSpeech: 'noun' });
     const variant = await Variant.create({
       concept: concept._id,
@@ -1069,8 +1073,8 @@ describe('Soft-delete DB persistence — Variant', () => {
 
 describe('Soft-delete enables Concept reuse', () => {
   test('same englishGloss can be submitted again after the original is soft-deleted', async () => {
-    const adminToken = makeToken({ role: 'admin' });
-    const userToken = makeToken({ role: 'user' });
+    const adminToken = await makeToken({ role: 'admin' });
+    const userToken = await makeToken({ role: 'user' });
 
     const original = await Concept.create({ englishGloss: 'Rebirth Test', partOfSpeech: 'noun' });
     await request
@@ -1089,8 +1093,8 @@ describe('Soft-delete enables Concept reuse', () => {
 
 describe('Soft-delete enables Variant reuse', () => {
   test('same pashto+concept+region can be submitted again after the original is soft-deleted', async () => {
-    const adminToken = makeToken({ role: 'admin' });
-    const userToken = makeToken({ role: 'user' });
+    const adminToken = await makeToken({ role: 'admin' });
+    const userToken = await makeToken({ role: 'user' });
 
     const concept = await Concept.create({ englishGloss: 'reuse-variant-concept', partOfSpeech: 'noun' });
 

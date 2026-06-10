@@ -55,10 +55,13 @@ const request = supertest(app);
 
 let mongoServer;
 
-function makeToken(overrides = {}) {
+async function makeToken(overrides = {}) {
+  const id = overrides.id ?? new mongoose.Types.ObjectId().toString();
+  const role = overrides.role ?? 'user';
+  await User.create({ cognitoSub: id, username: `user-${id.slice(-6)}`, email: `${id.slice(-6)}@test.local`, role });
   return jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), username: 'testuser', role: 'user', ...overrides },
-    process.env.JWT_SECRET,
+    { id, username: 'testuser', role, ...overrides },
+    process.env.JWT_SECRET || 'test-secret-for-jest',
     { expiresIn: '7d' }
   );
 }
@@ -158,28 +161,28 @@ describe('GET /api/variants', () => {
   });
 
   test('returns 403 when role is user', async () => {
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
   });
 
   test('returns 200 for moderator', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
   test('returns 200 for admin', async () => {
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
   test('response uses envelope shape with meta', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.body).toHaveProperty('success', true);
     expect(Array.isArray(res.body.data)).toBe(true);
@@ -189,14 +192,14 @@ describe('GET /api/variants', () => {
   });
 
   test('defaults page to 1 and limit to 20', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.body.meta.page).toBe(1);
     expect(res.body.meta.limit).toBe(20);
   });
 
   test('caps limit at 50', async () => {
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants?limit=100').set('Authorization', `Bearer ${token}`);
     expect(res.body.meta.limit).toBe(50);
   });
@@ -207,7 +210,7 @@ describe('GET /api/variants', () => {
       { concept: concept._id, pashto: 'کور',  region: 'Kohat', definition: 'house', status: 'pending' },
       { concept: concept._id, pashto: 'کور۲', region: 'Hangu', definition: 'house', status: 'published' },
     ]);
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.body.data).toHaveLength(2);
   });
@@ -218,7 +221,7 @@ describe('GET /api/variants', () => {
       { concept: concept._id, pashto: 'ونه',  region: 'Kohat', definition: 'tree', status: 'pending' },
       { concept: concept._id, pashto: 'وني', region: 'Hangu', definition: 'tree', status: 'published' },
     ]);
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants?status=pending').set('Authorization', `Bearer ${token}`);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].pashto).toBe('ونه');
@@ -228,7 +231,7 @@ describe('GET /api/variants', () => {
     const concept = await Concept.create({ englishGloss: 'stone', partOfSpeech: 'noun', status: 'published' });
     await Variant.create({ concept: concept._id, pashto: 'ډبره', region: 'Kohat', definition: 'stone', status: 'published' });
     await Variant.create({ concept: concept._id, pashto: 'ډبره۲', region: 'Hangu', definition: 'stone', status: 'published', isDeleted: true, deletedAt: new Date(), deletedBy: new mongoose.Types.ObjectId() });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get('/api/variants').set('Authorization', `Bearer ${token}`);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].pashto).toBe('ډبره');
@@ -281,7 +284,7 @@ describe('GET /api/variants/:id', () => {
   test('returns 403 for a non-published variant when role is user', async () => {
     const concept = await Concept.create({ englishGloss: 'cloud', partOfSpeech: 'noun', status: 'published' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'وریځ', region: 'Kohat', definition: 'cloud', status: 'pending' });
-    const token = makeToken({ role: 'user' });
+    const token = await makeToken({ role: 'user' });
     const res = await request.get(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -290,7 +293,7 @@ describe('GET /api/variants/:id', () => {
   test('returns 200 for a pending variant when role is moderator', async () => {
     const concept = await Concept.create({ englishGloss: 'road', partOfSpeech: 'noun', status: 'published' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'لار', region: 'Kohat', definition: 'road', status: 'pending' });
-    const token = makeToken({ role: 'moderator' });
+    const token = await makeToken({ role: 'moderator' });
     const res = await request.get(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -300,7 +303,7 @@ describe('GET /api/variants/:id', () => {
   test('returns 200 for a pending variant when role is admin', async () => {
     const concept = await Concept.create({ englishGloss: 'bridge', partOfSpeech: 'noun', status: 'published' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'دهلیز', region: 'Kohat', definition: 'bridge', status: 'pending' });
-    const token = makeToken({ role: 'admin' });
+    const token = await makeToken({ role: 'admin' });
     const res = await request.get(`/api/variants/${variant._id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);

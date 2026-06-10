@@ -89,6 +89,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import authRouter from '../routes/auth';
 import { verifyToken } from '../middleware/auth';
 import { requireRole } from '../middleware/requireRole';
+import User from '../models/User';
 
 // ---------------------------------------------------------------------------
 // Test Express app
@@ -682,6 +683,13 @@ describe('requireRole middleware', () => {
   );
 
   const roleRequest = supertest(roleApp);
+
+  beforeEach(async () => {
+    await User.create([
+      { cognitoSub: 'uid1', username: 'testuser1', email: 'uid1@test.local', role: 'user' },
+      { cognitoSub: 'uid2', username: 'testuser2', email: 'uid2@test.local', role: 'admin' },
+    ]);
+  });
 
   it('returns 403 when custom:role = "user" hits admin-only route', async () => {
     mockVerify.mockResolvedValue({ sub: 'uid1', 'custom:role': 'user' });

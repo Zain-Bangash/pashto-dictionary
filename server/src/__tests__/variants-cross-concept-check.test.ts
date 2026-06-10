@@ -49,6 +49,7 @@ require('express-async-errors');
 const variantsRouter = require('../routes/variants');
 const Concept = require('../models/Concept');
 const Variant = require('../models/Variant');
+const User = require('../models/User');
 
 const app = express();
 app.use(express.json());
@@ -64,10 +65,13 @@ const request = supertest(app);
 
 let mongoServer: any;
 
-function makeToken(overrides: Record<string, unknown> = {}) {
+async function makeToken(overrides: Record<string, unknown> = {}) {
+  const id = (overrides.id as string) ?? new mongoose.Types.ObjectId().toString();
+  const role = (overrides.role as string) ?? 'user';
+  await User.create({ cognitoSub: id, username: `user-${id.slice(-6)}`, email: `${id.slice(-6)}@test.local`, role });
   return jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), username: 'testuser', role: 'user', ...overrides },
-    process.env.JWT_SECRET,
+    { id, username: 'testuser', role, ...overrides },
+    process.env.JWT_SECRET || 'test-secret-for-jest',
     { expiresIn: '7d' }
   );
 }
@@ -108,7 +112,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Input validation ----------------------------------------------------
 
   it('returns 400 when pashto query param is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const conceptId = new mongoose.Types.ObjectId().toString();
     const res = await request
       .get(`/api/variants/cross-concept-check?conceptId=${conceptId}`)
@@ -118,7 +122,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   });
 
   it('returns 400 when pashto query param is an empty string', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const conceptId = new mongoose.Types.ObjectId().toString();
     const res = await request
       .get(`/api/variants/cross-concept-check?pashto=&conceptId=${conceptId}`)
@@ -128,7 +132,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   });
 
   it('returns 400 when conceptId query param is missing', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request
       .get('/api/variants/cross-concept-check?pashto=کور')
       .set('Authorization', `Bearer ${token}`);
@@ -137,7 +141,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   });
 
   it('returns 400 when conceptId is not a valid ObjectId', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const res = await request
       .get('/api/variants/cross-concept-check?pashto=کور&conceptId=not-a-valid-id')
       .set('Authorization', `Bearer ${token}`);
@@ -148,7 +152,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Happy path: no conflicts anywhere -----------------------------------
 
   it('returns 200 with empty conflicts array when the pashto word does not exist at all', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
 
     const res = await request
@@ -165,7 +169,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Happy path: pashto exists but ONLY under the same concept -----------
 
   it('returns 200 with empty conflicts when the same normalizedPashto exists only under the supplied concept', async () => {
-    const token = makeToken();
+    const token = await makeToken();
     const concept = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
 
     // Two regions, same concept — should NOT be a conflict
@@ -186,7 +190,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Happy path: conflict detected under a different concept -------------
 
   it('returns 200 with one conflict entry when the same normalizedPashto exists under a different concept', async () => {
-    const token = makeToken();
+    const token = await makeToken();
 
     const conceptA = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
     const conceptB = await Concept.create({ englishGloss: 'home', partOfSpeech: 'noun', status: 'published' });
@@ -218,7 +222,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Deduplication by concept --------------------------------------------
 
   it('deduplicates conflicts so multiple regions under the same other concept count as one entry', async () => {
-    const token = makeToken();
+    const token = await makeToken();
 
     const conceptA = await Concept.create({ englishGloss: 'dwelling', partOfSpeech: 'noun', status: 'published' });
     const conceptB = await Concept.create({ englishGloss: 'home', partOfSpeech: 'noun', status: 'published' });
@@ -243,7 +247,7 @@ describe('GET /api/variants/cross-concept-check', () => {
   // ---- Normalisation -------------------------------------------------------
 
   it('normalises the pashto param (trims whitespace) before matching', async () => {
-    const token = makeToken();
+    const token = await makeToken();
 
     const conceptA = await Concept.create({ englishGloss: 'house', partOfSpeech: 'noun', status: 'published' });
     const conceptB = await Concept.create({ englishGloss: 'home', partOfSpeech: 'noun', status: 'published' });
