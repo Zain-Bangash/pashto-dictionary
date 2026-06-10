@@ -376,11 +376,25 @@ Parameters:
     NoEcho: true
 
 Resources:
+  PashtoApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Tags: {}   # empty tags prevent CloudFormation from calling apigateway:TagResource
+
   PashtoBackend:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda.lambdaHandler
       CodeUri: server/
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:SignUp
+                - cognito-idp:AdminConfirmSignUp
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:InitiateAuth
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
       Environment:
         Variables:
           NODE_ENV: production
@@ -392,6 +406,7 @@ Resources:
         Api:
           Type: HttpApi
           Properties:
+            ApiId: !Ref PashtoApi
             Path: /{proxy+}
             Method: ANY
     Metadata:
@@ -405,7 +420,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Value: !Sub 'https://${PashtoApi}.execute-api.${AWS::Region}.amazonaws.com'
 ```
 
 **`samconfig.toml`** (project root — committed to repo):
@@ -493,6 +508,7 @@ Split into four statements to follow least-privilege on PassRole and S3:
       "cloudformation:GetTemplateSummary", "cloudformation:ListStackResources",
       "iam:CreateRole", "iam:AttachRolePolicy", "iam:GetRole",
       "iam:DeleteRole", "iam:DetachRolePolicy", "iam:TagRole",
+      "iam:PutRolePolicy", "iam:DeleteRolePolicy",
       "apigateway:*",
       "s3:CreateBucket", "s3:GetBucketLocation"
     ],

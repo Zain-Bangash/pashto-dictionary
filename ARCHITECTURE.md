@@ -383,9 +383,50 @@ sam build → sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
 
 Environment variables (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`) are passed as CloudFormation parameters sourced from GitHub Secrets — never stored in the template.
 
+### Lambda execution role — Cognito permissions
+
+SAM creates the Lambda execution role automatically but only grants it basic Lambda permissions (CloudWatch Logs). The register and login handlers call Cognito admin APIs (`AdminConfirmSignUp`, `AdminDeleteUser`) which require explicit IAM grants on the execution role. These are declared in the `Policies` block of the `PashtoBackend` resource in `template.yaml`, scoped to the specific User Pool ARN via `!Sub`. Without this, registration returns a 403 from Cognito at the `AdminConfirmSignUp` step.
+
+Adding `Policies` to the function requires `iam:PutRolePolicy` and `iam:DeleteRolePolicy` in the `github-actions-deploy` IAM policy, on top of the standard `iam:CreateRole` / `iam:AttachRolePolicy` set.
+
 ### Why `--no-fail-on-empty-changeset`
 
 Pushes that change only documentation or client code still trigger the deploy workflow. Without this flag, SAM exits with code 1 when there is nothing to update on the Lambda side, which would mark the Actions run as failed. The flag makes "nothing changed" a clean success.
+
+---
+
+## Post-Phase-14 Polish
+
+### Username resolution — `enrichActors` utility
+
+Actor fields (`submittedBy`, `reviewedBy`, `performedBy`, `deletedBy`) are stored as plain strings (the Cognito `sub` UUID). This is correct — storing them as `ObjectId` references would require passing `new mongoose.Types.ObjectId(req.user.id)` for a UUID string, which the schema intentionally avoids.
+
+The consequence is that Mongoose's `.populate()` silently no-ops on String fields. Endpoints that called `.populate('submittedBy', 'username')` were returning the raw UUID string with no user data attached, making every "by username" display blank.
+
+The fix is `server/src/utils/enrichActors.ts` — a batch lookup utility:
+
+```ts
+// After fetching docs, collect unique cognitoSubs and resolve them in one query
+const users = await User.find({ cognitoSub: { $in: subs } }, projection).lean();
+const byId  = Object.fromEntries(users.map(u => [u.cognitoSub, u]));
+return docs.map(d => ({ ...d, [field]: byId[d[field]] ?? d[field] }));
+```
+
+This is called after the main query in any endpoint that needs to surface user details:
+- `moderationController.ts` — `getConceptQueue`, `getVariantQueue`, `getLog`
+- `conceptController.ts` — `getConcept` (concept + variants on the public detail page)
+
+Usernames now appear in: the admin moderation queue, the audit log, public concept detail pages (concept submitter + per-variant submitter that updates when switching region tabs), and the My Submissions page header.
+
+### Audit log improvements
+
+The `GET /api/moderation/log` endpoint was extended with:
+
+- **Target population**: after fetching log entries, concept and variant names are batch-loaded (`englishGloss` for concepts, `pashto + region` for variants) and attached as a `target` field. The frontend renders "CONCEPT · Mountain" or "VARIANT · لمر · Kohat" on each entry.
+- **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
+- **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
+- **Timestamps**: each entry shows an absolute date/time.
+- **Action badge colours**: all 9 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`) have distinct colours.
 
 ---
 

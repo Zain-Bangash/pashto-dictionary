@@ -212,7 +212,7 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 > Update this line as you progress through the build plan.
 
-**Active phase:** Phase 14 complete — no active phase
+**Active phase:** Post-phase-14 polish complete — project is feature-complete
 **Branch:** dev
 
 ### Completed phases
@@ -222,3 +222,4 @@ Keep `.env.example` files updated whenever a new variable is added.
 - Phase 13: AWS Cognito migration (replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client)
 - Post-13 fixes: actor fields (`submittedBy` etc.) changed from ObjectId to String for Cognito sub compatibility; auth middleware now resolves role from MongoDB instead of token claims (Access Tokens don't carry custom attributes)
 - Phase 14: SAM infrastructure as code — `template.yaml` + `samconfig.toml`; deploy pipeline uses `sam build && sam deploy`; all backend resources owned by CloudFormation stack `pashto-dictionary`
+- Post-14 polish: fixed broken username resolution (`.populate()` silently no-ops on String fields; replaced with `enrichActors` batch-lookup utility); usernames now display in admin queue, audit log, concept detail page, variant cards, and My Submissions; removed legacy `ModerationLog.entry` field and dead `-passwordHash` projection in userController; audit log upgraded with target name population, inline diffs for edited/merged actions, absolute timestamps, action-type and model-type filters, and pagination
