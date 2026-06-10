@@ -30,7 +30,7 @@ jobs:
       - run: sam build
 
       - run: |
-          sam deploy --no-confirm-changeset \
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --parameter-overrides \
               MongodbUri="${{ secrets.MONGODB_URI }}" \
               CognitoUserPoolId="${{ secrets.COGNITO_USER_POOL_ID }}" \
