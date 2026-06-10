@@ -15,7 +15,6 @@
   "type": "commonjs",
   "devDependencies": {
     "@jest/globals": "^30.3.0",
-    "esbuild": "^0.24.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
@@ -32,6 +31,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1064.0",
+    "esbuild": "^0.24.0",
     "aws-jwt-verify": "^5.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
