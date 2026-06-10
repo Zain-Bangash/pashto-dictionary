@@ -212,7 +212,7 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 > Update this line as you progress through the build plan.
 
-**Active phase:** Phase 14 — SAM Infrastructure as Code
+**Active phase:** Phase 14 complete — no active phase
 **Branch:** dev
 
 ### Completed phases
@@ -221,3 +221,4 @@ Keep `.env.example` files updated whenever a new variable is added.
 - Phase 12: AWS deployment (Amplify hosting, Lambda + API Gateway, GitHub Actions CI/CD)
 - Phase 13: AWS Cognito migration (replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client)
 - Post-13 fixes: actor fields (`submittedBy` etc.) changed from ObjectId to String for Cognito sub compatibility; auth middleware now resolves role from MongoDB instead of token claims (Access Tokens don't carry custom attributes)
+- Phase 14: SAM infrastructure as code — `template.yaml` + `samconfig.toml`; deploy pipeline uses `sam build && sam deploy`; all backend resources owned by CloudFormation stack `pashto-dictionary`
