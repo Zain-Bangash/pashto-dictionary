@@ -52,7 +52,11 @@ As a user I should be able to view My Submissions, which lists all my submitted 
 
 As a moderator I should be able to log in and access the Dashboard. Refreshing the page should not log me out.
 
-As a moderator I should be able to see the Moderation Queue with two tabs: Concepts and Variants.
+As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking it expands a dropdown listing that concept's variants awaiting review.
+
+As a moderator I should not be able to approve a variant while its concept is still pending. The variant's Approve button is disabled with the hint "Approve the concept first", and the server rejects the attempt with a 400. Once the concept is approved, its variants can be approved.
+
+As a moderator, when a variant is submitted for a concept that is already approved or published, I still see the concept as a row in the queue with that variant in its dropdown. The concept row has no Approve/Reject buttons, and only the variant can be acted on.
 
 As a moderator I should only see items in the pending state. I cannot see approved items because I have no publish action — approved items are waiting for an admin.
 
@@ -60,7 +64,7 @@ As a moderator I should be able to approve a pending concept, which moves it to 
 
 As a moderator I should be able to reject a pending concept with a note, which moves it to the rejected state and writes a ModerationLog record.
 
-As a moderator I should be able to approve a pending variant. Each variant card shows the Pashto word, phonetic, region, definition, example, the parent concept's English gloss and status, and who submitted it (username, village, region).
+As a moderator I should be able to approve a pending variant from its concept's dropdown. Each variant row shows the Pashto word, phonetic, region, definition, example, and who submitted it (username, village, region). The parent concept's English gloss and status are shown on the concept row above it.
 
 As a moderator I should be able to reject a pending variant with a note.
 
@@ -86,7 +90,9 @@ As a moderator or admin, after I approve, reject, or publish an item, the modera
 
 As an admin I should be able to do everything a moderator can do.
 
-As an admin I should see a Pending / Approved filter toggle above the moderation queue list. Moderators do not see this toggle. Each filter button shows a count so I know how many items are waiting at each stage.
+As an admin I should see a Pending / Approved filter toggle above the moderation queue list. Moderators do not see this toggle. Each filter button shows a count of concepts plus variants, so I know how many items are waiting at each stage.
+
+As an admin, the Pending / Approved filter applies to concepts and their variants together. Under Approved, I see every concept that is approved or has approved variants, with only the approved variants in its dropdown. A variant's Publish button stays disabled with the hint "Publish the concept first" until its concept is published.
 
 As an admin I should be able to switch to the Approved filter to see all approved concepts and variants that are ready to publish.
 

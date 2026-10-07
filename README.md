@@ -108,8 +108,9 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/variants` | Token | Submit variant for a concept |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
+| GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish |
-| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish |
+| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept |
 | GET | `/api/moderation/log` | Admin | Audit log |
 
 ---

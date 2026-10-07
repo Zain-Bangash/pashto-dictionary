@@ -73,6 +73,8 @@ Every transition on either a Concept or a Variant writes a record to `Moderation
 
 Invalid transitions (e.g. `published → pending`) are rejected with a 400 — the state machine is enforced at the controller level, not left to the client to honour.
 
+A variant's transitions are also gated on its parent concept: approving a variant requires the concept to be `approved` or `published`, and publishing a variant requires the concept to be `published`. Both return a 400 otherwise. The moderation queue (`GET /api/moderation/queue`) reflects this by grouping waiting variants under their concept, so the concept is always reviewed first.
+
 ### Governance: Moderator Self-Approval Restriction
 
 A moderator who is also an active contributor faces an inherent conflict of interest: they could submit an entry and then immediately approve it themselves, bypassing independent review entirely. To prevent this, the system enforces a submitter-separation rule at the controller level before any transition is applied.
