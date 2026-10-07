@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   /* Typography */
   --font-display: "Cormorant Garamond", serif;
   --font-ui:      "DM Sans", sans-serif;
-  --font-pashto:  "Noto Nastaliq Urdu", serif;
+  --font-pashto:  "Noto Naskh Arabic", serif;
 
   /* Colours */
   --color-charcoal:   #13130e;
@@ -93,8 +93,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ─── Nastaliq: prevent descender clipping ──────────────────── */
-.font-pashto { line-height: 1.7 !important; }
+/* ─── Naskh: prevent descender clipping ─────────────────────── */
+.font-pashto { line-height: 1.6 !important; }
 
 /* ─── Shimmer text ──────────────────────────────────────────── */
 .shimmer-text {
@@ -175,8 +175,8 @@ body {
 /* ─── Ghost watermark (CSS-generated — invisible to test queries) ── */
 .ghost-word::before {
   content: attr(data-word);
-  font-family: "Noto Nastaliq Urdu", serif;
-  line-height: 1.7;
+  font-family: "Noto Naskh Arabic", serif;
+  line-height: 1.6;
 }
 
 /* ─── Film grain overlay ────────────────────────────────────── */
