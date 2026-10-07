@@ -8,8 +8,9 @@ import ModerationLog from '../models/ModerationLog';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
-  approved: ['published'],
-  rejected: ['pending'],
+  approved:  ['published'],
+  rejected:  ['pending'],
+  published: ['rejected'],
 };
 
 function invalidId(res: Response) {
@@ -265,6 +266,11 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
     return;
   }
 
+  if (variant.status === 'published' && status === 'rejected' && req.user!.role !== 'admin') {
+    res.status(403).json({ success: false, error: { message: 'Only admins can reject published entries' } });
+    return;
+  }
+
   const allowed = VALID_TRANSITIONS[variant.status] || [];
 
   if (!allowed.includes(status)) {
@@ -415,6 +421,11 @@ async function editVariant(req: Request, res: Response): Promise<void> {
 
   if (req.user!.role === 'moderator' && variant.submittedBy && variant.submittedBy.toString() === req.user!.id) {
     res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
+    return;
+  }
+
+  if (req.user!.role === 'moderator' && variant.status === 'published') {
+    res.status(403).json({ success: false, error: { message: 'Only admins can edit published entries' } });
     return;
   }
 

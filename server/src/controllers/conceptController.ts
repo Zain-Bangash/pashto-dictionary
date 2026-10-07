@@ -11,8 +11,9 @@ type Doc = Record<string, unknown>;
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
-  approved: ['published'],
-  rejected: ['pending'],
+  approved:  ['published'],
+  rejected:  ['pending'],
+  published: ['rejected'],
 };
 
 function escapeRegex(str: string): string {
@@ -263,6 +264,11 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
     return;
   }
 
+  if (concept.status === 'published' && status === 'rejected' && req.user!.role !== 'admin') {
+    res.status(403).json({ success: false, error: { message: 'Only admins can reject published entries' } });
+    return;
+  }
+
   const allowed = VALID_TRANSITIONS[concept.status] || [];
 
   if (!allowed.includes(status)) {
@@ -302,11 +308,15 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
   if (status === 'rejected') {
     const variantsToDelete = await Variant.find({
       concept: concept._id,
-      status: { $in: ['pending', 'approved'] },
+      status: { $in: ['pending', 'approved', 'published'] },
       isDeleted: { $ne: true },
     });
+    const cascadeNote = `Concept "${concept.englishGloss}" was rejected: ${moderatorNote}`;
     await Promise.all(
       variantsToDelete.map(async (v) => {
+        v.status = 'rejected';
+        v.reviewedBy = req.user!.id;
+        v.moderatorNote = cascadeNote;
         v.isDeleted = true;
         v.deletedAt = new Date();
         v.deletedBy = req.user!.id;
@@ -400,6 +410,11 @@ async function editConcept(req: Request, res: Response): Promise<void> {
 
   if (req.user!.role === 'moderator' && concept.submittedBy && concept.submittedBy.toString() === req.user!.id) {
     res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
+    return;
+  }
+
+  if (req.user!.role === 'moderator' && concept.status === 'published') {
+    res.status(403).json({ success: false, error: { message: 'Only admins can edit published entries' } });
     return;
   }
 
