@@ -288,6 +288,17 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
     return;
   }
 
+  if (status === 'approved') {
+    const parentConcept = await Concept.findById(variant.concept, 'status');
+    if (!parentConcept || !['approved', 'published'].includes(parentConcept.status)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Cannot approve a variant whose concept has not been approved yet.' },
+      });
+      return;
+    }
+  }
+
   if (status === 'published') {
     const parentConcept = await Concept.findById(variant.concept, 'status');
     if (!parentConcept || parentConcept.status !== 'published') {

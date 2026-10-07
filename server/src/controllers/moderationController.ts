@@ -4,6 +4,7 @@ import Concept from '../models/Concept';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import { enrichActors } from '../utils/enrichActors';
+import { getGroupedQueuePage, countQueueItems, QueueStatus } from '../utils/groupedQueue';
 
 type Doc = Record<string, unknown>;
 
@@ -45,6 +46,23 @@ async function getVariantQueue(req: Request, res: Response): Promise<void> {
     isAdmin ? Variant.countDocuments({ status: 'approved', isDeleted: { $ne: true } }) : Promise.resolve(0),
   ]);
   const data = await enrichActors(rawData as unknown as Doc[], 'submittedBy');
+
+  res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
+}
+
+async function getGroupedQueue(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+  const skip  = (page - 1) * limit;
+
+  const isAdmin = req.user!.role === 'admin';
+  const status: QueueStatus = isAdmin && req.query.status === 'approved' ? 'approved' : 'pending';
+
+  const [{ data, total }, pendingCount, approvedCount] = await Promise.all([
+    getGroupedQueuePage(status, skip, limit),
+    countQueueItems('pending'),
+    isAdmin ? countQueueItems('approved') : Promise.resolve(0),
+  ]);
 
   res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
 }
@@ -128,4 +146,4 @@ async function getLog(req: Request, res: Response): Promise<void> {
   res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
-export { getConceptQueue, getVariantQueue, getStats, getLog };
+export { getConceptQueue, getVariantQueue, getGroupedQueue, getStats, getLog };

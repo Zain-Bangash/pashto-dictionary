@@ -4,6 +4,7 @@ import { requireRole, requireModeratorOrAdmin } from '../middleware/requireRole'
 import {
   getConceptQueue,
   getVariantQueue,
+  getGroupedQueue,
   getStats,
   getLog,
 } from '../controllers/moderationController';
@@ -14,6 +15,7 @@ router.use(verifyToken);
 
 router.get('/concepts/queue', requireModeratorOrAdmin, getConceptQueue);
 router.get('/variants/queue', requireModeratorOrAdmin, getVariantQueue);
+router.get('/queue', requireModeratorOrAdmin, getGroupedQueue);
 router.get('/stats', requireModeratorOrAdmin, getStats);
 router.get('/log', requireRole('admin'), getLog);
 
