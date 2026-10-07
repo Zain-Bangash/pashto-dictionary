@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * E2E tests for the Admin section of USER-FLOWS.md.
+ * E2E tests for the Admin section of docs/USER-FLOWS.md.
  *
  * Flows covered:
  *   1. Publish approved concept — card leaves the Approved queue; API confirms published status
@@ -351,7 +351,7 @@ test.describe('Admin — Moderation Log page', () => {
 // ---------------------------------------------------------------------------
 // Flow 6 — Admin edits a variant field via the inline form; log shows "edited"
 //
-// USER-FLOWS.md: "As an admin I should be able to edit any submission including
+// docs/USER-FLOWS.md: "As an admin I should be able to edit any submission including
 // my own, using the same inline Edit form available to moderators."
 // ---------------------------------------------------------------------------
 
@@ -433,7 +433,7 @@ test.describe('Admin — inline edit variant field; log shows "edited" entry', (
 // ---------------------------------------------------------------------------
 // Flow 7 — Admin reassigns a variant to a different concept
 //
-// USER-FLOWS.md: "As an admin I should be able to reassign a variant to a
+// docs/USER-FLOWS.md: "As an admin I should be able to reassign a variant to a
 // different concept by using the Concept search field inside the variant Edit
 // form."
 // ---------------------------------------------------------------------------

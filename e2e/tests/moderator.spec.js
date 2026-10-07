@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * E2E tests for the Moderator section of USER-FLOWS.md.
+ * E2E tests for the Moderator section of docs/USER-FLOWS.md.
  *
  * Flows covered:
  *   1.  Approve pending concept — card leaves queue; ModerationLog records "approved"
@@ -269,7 +269,7 @@ test.describe('Moderator — approved-filter toggle absent', () => {
 // ---------------------------------------------------------------------------
 // Flow 7 — Session persistence after full page reload
 //
-// USER-FLOWS.md: "As a moderator I should be able to log in and access the
+// docs/USER-FLOWS.md: "As a moderator I should be able to log in and access the
 // Dashboard. Refreshing the page should not log me out."
 // ---------------------------------------------------------------------------
 
@@ -295,7 +295,7 @@ test.describe('Moderator — session persists across page reloads', () => {
 // ---------------------------------------------------------------------------
 // Flow 8 — Reject pending concept via modal; submitter sees reason
 //
-// USER-FLOWS.md: "As a moderator I should be able to reject a pending item by
+// docs/USER-FLOWS.md: "As a moderator I should be able to reject a pending item by
 // clicking Reject, which opens a modal requiring me to type a reason before
 // confirming. The reason is stored and shown to the submitter in their
 // My Submissions page."
@@ -367,7 +367,7 @@ test.describe('Moderator — reject pending concept via modal', () => {
 // ---------------------------------------------------------------------------
 // Flow 9 — Reject pending variant via modal; submitter sees reason
 //
-// USER-FLOWS.md: "As a moderator I should be able to reject a pending variant
+// docs/USER-FLOWS.md: "As a moderator I should be able to reject a pending variant
 // with a note."
 // ---------------------------------------------------------------------------
 
@@ -458,7 +458,7 @@ test.describe('Moderator — reject pending variant via modal', () => {
 // ---------------------------------------------------------------------------
 // Flow 10 — Merge duplicate concept from the queue
 //
-// USER-FLOWS.md: "As a moderator I should see a 'Similar concepts' panel on
+// docs/USER-FLOWS.md: "As a moderator I should see a 'Similar concepts' panel on
 // each concept card in the queue… I can click 'Merge into this' to open a
 // confirmation modal, enter a note, and merge the pending concept into the
 // existing one."
@@ -542,7 +542,7 @@ test.describe('Moderator — merge duplicate concept from queue', () => {
 // ---------------------------------------------------------------------------
 // Flow 11 — Merge concept from the Concepts list page
 //
-// USER-FLOWS.md: "As a moderator I should be able to trigger a merge from the
+// docs/USER-FLOWS.md: "As a moderator I should be able to trigger a merge from the
 // Concepts list page in the dashboard, not only from the queue."
 //
 // The DashboardConcepts page renders a "Merge" button on every concept row.

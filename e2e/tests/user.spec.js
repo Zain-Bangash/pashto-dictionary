@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * E2E tests for the User section of USER-FLOWS.md.
+ * E2E tests for the User section of docs/USER-FLOWS.md.
  *
  * Flows covered:
  *   1. 2-step submit: new concept + variant (no autocomplete match)
@@ -350,7 +350,7 @@ test.describe('User — duplicate concept gloss shows inline error and stays on 
 // ---------------------------------------------------------------------------
 // Flow 7 — Duplicate variant (same Pashto + region) shows inline error on /submit
 //
-// USER-FLOWS.md: "As a user I should not be able to submit a variant with the
+// docs/USER-FLOWS.md: "As a user I should not be able to submit a variant with the
 // same Pashto word and region under the same concept — the server rejects it
 // with a clear message. However, the same Pashto word from a different region
 // is allowed."
@@ -438,7 +438,7 @@ test.describe('User — duplicate variant shows inline error on /submit', () => 
 // ---------------------------------------------------------------------------
 // Flow 8 — Moderator note in Step 2: visible in queue, hidden on public page
 //
-// USER-FLOWS.md: "As a user, in Step 2 of the Submit form, I can optionally
+// docs/USER-FLOWS.md: "As a user, in Step 2 of the Submit form, I can optionally
 // add a note to the moderators… This note is visible to moderators and admins
 // in the moderation queue but is not shown on the public concept detail page."
 //

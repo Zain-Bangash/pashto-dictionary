@@ -240,7 +240,7 @@ test.describe('Auth — Protected route redirect', () => {
 // ---------------------------------------------------------------------------
 // Flow 9 — Register with optional region and village fields
 //
-// USER-FLOWS.md: "As a user I should be able to register with a username,
+// docs/USER-FLOWS.md: "As a user I should be able to register with a username,
 // email, and password. I can optionally add my region (Kohat, Hangu, Tirah,
 // Thal, or Parachinar) and village."
 // Flow 1 covers the required-fields-only path; this covers the optional path.
