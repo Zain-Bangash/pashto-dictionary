@@ -29,9 +29,9 @@ expand scope, guess at intent, or make opportunistic cleanups.
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` | Code conventions, naming, commit format, what NOT to do |
-| `client/DESIGN-SYSTEM.md` | Colour tokens, typography, glass card pattern, radius hierarchy, animations, button variants, per-page checklist |
-| `USER-FLOWS.md` | Eight core flows and route map — don't break any flow |
-| `BuildPlan.md` | Phase history and architecture decisions |
+| `docs/DESIGN-SYSTEM.md` | Colour tokens, typography, glass card pattern, radius hierarchy, animations, button variants, per-page checklist |
+| `docs/USER-FLOWS.md` | Eight core flows and route map — don't break any flow |
+| `docs/BuildHistory.md` · `docs/ARCHITECTURE.md` | Phase history · architecture decisions |
 | `client/src/index.css` | All theme tokens (`@theme`) and global CSS — add tokens here, never inline |
 
 ---
@@ -56,7 +56,7 @@ expand scope, guess at intent, or make opportunistic cleanups.
 3. Read the relevant test file(s) in `client/src/__tests__/` in full so you
    know what is currently asserted.
 4. For backend changes: read the controller, the model, and the route file.
-5. For UI changes: check `client/DESIGN-SYSTEM.md` to confirm tokens and
+5. For UI changes: check `docs/DESIGN-SYSTEM.md` to confirm tokens and
    patterns to reuse.
 6. Use `TodoWrite` to list every file to change and every test file at risk.
 
@@ -80,7 +80,7 @@ Do not write a single line of implementation until this step is complete.
 - If a component exceeds ~150 lines after your change, split it.
 
 ### UI / design changes
-- Follow `client/DESIGN-SYSTEM.md` exactly:
+- Follow `docs/DESIGN-SYSTEM.md` exactly:
   - Colour tokens: `charcoal`, `warm`, `gold`, `terracotta`, `mint` (status only), `muted`
   - Radius hierarchy: `rounded-[48px]` focal hero · `rounded-3xl` secondary · `rounded-[16px]` grid items
   - Glass card pattern: `bento-card bg-white/[0.03-0.04] backdrop-blur-[24-40px] border border-white/[0.07-0.08]`

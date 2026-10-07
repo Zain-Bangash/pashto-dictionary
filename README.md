@@ -37,10 +37,17 @@ Browser
                                AWS Lambda (Node.js 22)
                                Express + serverless-http
                                       │
-                                      └── MongoDB Atlas M0
+                                      ├── MongoDB Atlas M0
+                                      └── AWS Cognito (auth)
 ```
 
-For a detailed walkthrough of architectural decisions — the Concept/Variant data model, the ranked search implementation, normalisation and duplicate detection, and the moderation state machine — see [ARCHITECTURE.md](ARCHITECTURE.md).
+Backend infrastructure is declared in `template.yaml` (AWS SAM) and owned by the CloudFormation stack `pashto-dictionary`.
+
+**Further reading**
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — why: the Concept/Variant data model, ranked search, normalisation and duplicate detection, the moderation state machine
+- [docs/BuildHistory.md](docs/BuildHistory.md) — how: the original phase-by-phase plan and what actually happened
+- [docs/USER-FLOWS.md](docs/USER-FLOWS.md) — what each role can do
+- [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) — the visual language
 
 ---
 
@@ -48,11 +55,11 @@ For a detailed walkthrough of architectural decisions — the Concept/Variant da
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, Tailwind CSS v4 |
+| Frontend | React 19, Vite, Tailwind CSS v4 |
 | Backend | Node.js 22, Express, TypeScript |
 | Database | MongoDB Atlas via Mongoose |
-| Auth | JWT (jsonwebtoken + bcryptjs) |
-| Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway (backend) |
+| Auth | AWS Cognito (server-side SDK + `aws-jwt-verify`); roles stored in MongoDB |
+| Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway, managed by AWS SAM (backend) |
 | CI/CD | GitHub Actions — test gate on PRs, auto-deploy on merge to `main` |
 | Testing | Vitest + RTL (client) · Jest + MongoMemoryServer (server) · Playwright (E2E) |
 
@@ -91,14 +98,14 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 |---|---|---|---|
 | GET | `/api/health` | — | Health check |
 | POST | `/api/auth/register` | — | Register user |
-| POST | `/api/auth/login` | — | Login, returns JWT |
-| GET | `/api/auth/me` | JWT | Current user |
+| POST | `/api/auth/login` | — | Login, returns Cognito access token |
+| GET | `/api/auth/me` | Token | Current user |
 | GET | `/api/concepts` | — | List published concepts (paginated) |
 | GET | `/api/concepts/search?q=` | — | Ranked search (gloss + phonetic) |
 | GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
 | GET | `/api/concepts/:id` | — | Concept + its published variants |
-| POST | `/api/concepts` | JWT | Submit new concept |
-| POST | `/api/variants` | JWT | Submit variant for a concept |
+| POST | `/api/concepts` | Token | Submit new concept |
+| POST | `/api/variants` | Token | Submit variant for a concept |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish |
@@ -116,7 +123,7 @@ cd pashto-dictionary
 
 # Server
 cd server && npm install
-cp .env.example .env   # fill in MONGODB_URI and JWT_SECRET
+cp .env.example .env   # fill in MONGODB_URI and the COGNITO_* values
 npm run dev            # ts-node src/index.ts on :5000
 
 # Client (separate terminal)
@@ -133,7 +140,10 @@ npm run dev            # Vite on :5173
 # server/.env
 PORT=5000
 MONGODB_URI=mongodb+srv://<user>:<password>@cluster0.oq0rk.mongodb.net/pashto
-JWT_SECRET=your_secret_here
+COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
+AWS_REGION=ap-southeast-1
 NODE_ENV=development
 
 # client/.env
@@ -144,7 +154,7 @@ VITE_API_URL=http://localhost:5000
 
 ## CI/CD
 
-Every pull request to `main` triggers the test suite (server + client). Every merge to `main` automatically packages and deploys the Lambda backend. The Amplify frontend deploys on every push to the connected branch.
+Every pull request to `main` triggers the test suite (server + client). Every merge to `main` runs `sam build && sam deploy` to update the Lambda backend. The Amplify frontend deploys on every push to the connected branch.
 
 To run tests locally:
 ```bash
@@ -159,4 +169,4 @@ cd e2e && npx playwright test  # Playwright E2E
 
 - **Start with TypeScript** — migrating an existing JS codebase to TypeScript is straightforward but tedious. Starting typed from day one costs nothing and saves refactor time later.
 - **Design the data model earlier** — the shift from a flat Entry model to Concept/Variant was the right call, but it required rewriting routes, controllers, and a significant portion of the tests. Having that two-collection design from the start would have been cleaner.
-- **Infrastructure-as-code from the start** — the Lambda and API Gateway were set up manually through the AWS Console. A SAM template describing the infra as code would make it reproducible and deployable from a single command.
+- **Infrastructure-as-code from the start** — the Lambda and API Gateway were first set up manually through the AWS Console and only moved to a SAM template in Phase 14. Starting with SAM would have avoided the Console-only state entirely.

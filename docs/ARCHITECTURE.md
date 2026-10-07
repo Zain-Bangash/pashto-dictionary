@@ -2,6 +2,8 @@
 
 This document traces the key engineering decisions made during the development of this project, including the reasoning behind them, the problems they solved, and the tradeoffs that were considered. It is intended to give a sense of how the system evolved, not just what it looks like today.
 
+For the phase-by-phase plan, setup steps and AWS/IAM configuration, see [BuildHistory.md](BuildHistory.md).
+
 ---
 
 ## The Starting Point
@@ -77,11 +79,17 @@ A moderator who is also an active contributor faces an inherent conflict of inte
 
 If the acting user's role is `moderator` and their ID matches the `submittedBy` field on the target document, the request is rejected with a 403:
 
-```js
-if (req.user.role === 'moderator' && entry.submittedBy.equals(req.user._id)) {
-  return res.status(403).json({ success: false, error: { message: 'Moderators cannot approve their own submissions' } });
+```ts
+if (
+  req.user!.role === 'moderator' &&
+  (status === 'approved' || status === 'rejected') &&
+  concept.submittedBy === req.user!.id
+) {
+  res.status(403).json({ success: false, error: { message: 'Moderators cannot approve or reject their own submissions' } });
 }
 ```
+
+Actor fields hold the Cognito `sub` as a plain string, so a direct `===` comparison is all that's needed.
 
 Admins are exempt from this restriction. The rationale is that admins operate at a higher trust level and are accountable for overall system integrity in a way that moderators are not. This rule was chosen over more complex alternatives (e.g. blocking anyone who touched the document at any prior stage) because it is simple to reason about, auditable in the ModerationLog, and covers the primary conflict-of-interest case without introducing ambiguous edge cases.
 
@@ -136,7 +144,7 @@ Concepts and Variants support soft deletion rather than hard deletion. When an a
 ```
 isDeleted  Boolean   default: false
 deletedAt  Date
-deletedBy  ObjectId  ref: User
+deletedBy  String    (Cognito sub)
 ```
 
 All list endpoints, search queries, and the Word of the Day algorithm include `{ isDeleted: false }` as an implicit filter. From the perspective of any public-facing request, soft-deleted content does not exist.
@@ -387,7 +395,7 @@ Environment variables (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID
 
 SAM creates the Lambda execution role automatically but only grants it basic Lambda permissions (CloudWatch Logs). The register and login handlers call Cognito admin APIs (`AdminConfirmSignUp`, `AdminDeleteUser`) which require explicit IAM grants on the execution role. These are declared in the `Policies` block of the `PashtoBackend` resource in `template.yaml`, scoped to the specific User Pool ARN via `!Sub`. Without this, registration returns a 403 from Cognito at the `AdminConfirmSignUp` step.
 
-Adding `Policies` to the function requires `iam:PutRolePolicy` and `iam:DeleteRolePolicy` in the `github-actions-deploy` IAM policy, on top of the standard `iam:CreateRole` / `iam:AttachRolePolicy` set.
+The full deploy-user IAM policy and the other SAM gotchas are recorded in [BuildHistory.md › Phase 14](BuildHistory.md#phase-14--sam-infrastructure-as-code).
 
 ### Why `--no-fail-on-empty-changeset`
 
@@ -434,7 +442,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 
 | Layer | Technology | Notable choice |
 |---|---|---|
-| Frontend | React 18 + Vite + Tailwind CSS v4 | No component library |
+| Frontend | React 19 + Vite + Tailwind CSS v4 | No component library |
 | Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
 | Auth | AWS Cognito + `aws-jwt-verify` (server-side only) | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role`; no Amplify SDK on client |

@@ -27,7 +27,7 @@ until the user explicitly tells you to continue.
 ## Phase sequence
 
 Read the full specification for each phase from:
-`BuildPlan.md`
+`docs/BuildHistory.md`
 
 | Phase | Name | Primary deliverable |
 |---|---|---|
@@ -157,7 +157,7 @@ style     Tailwind / formatting only
 ## How to implement a phase
 
 ### Step 1 — Read before building
-Read the phase specification from `BuildPlan.md`. Identify every
+Read the phase specification from `docs/BuildHistory.md`. Identify every
 deliverable. Check existing files with Glob/Grep before creating anything new.
 
 ### Step 2 — Build in order

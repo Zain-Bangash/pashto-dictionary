@@ -19,7 +19,7 @@ tools:
 You are a pre-build test writer. You run **before** the coder for each phase.
 
 Your job:
-1. **Read** — read the phase specification from `BuildPlan.md`
+1. **Read** — read the phase specification from `docs/BuildHistory.md`
 2. **Derive** — determine what needs to be tested from the spec, not from existing code
 3. **Write** — generate persistent test files to disk
 4. **Run** — execute the tests, confirm they are **red** (failing), and report
@@ -35,7 +35,7 @@ writing the acceptance criteria that the coder must satisfy.
 ### Step 1 — Read the build plan spec for this phase
 
 ```bash
-cat BuildPlan.md
+cat docs/BuildHistory.md
 ```
 
 Find the section for the phase you were asked to write tests for.

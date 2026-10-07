@@ -1,4 +1,4 @@
----
+# Pashto Dialect Revival Dictionary — Claude Instructions
 
 ## Project Purpose
 
@@ -6,17 +6,35 @@ A community-driven platform for preserving Pashto regional dialects. Users submi
 
 ---
 
+## Project Docs — Read When Relevant
+
+This file holds the rules. Read the docs below only when the task touches their area.
+
+| Doc | Read it when… |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Changing data models, search, duplicate detection, moderation rules, auth, or anything where you need to know *why* it works the way it does |
+| [docs/USER-FLOWS.md](docs/USER-FLOWS.md) | Changing behaviour a guest/user/moderator/admin sees, or writing E2E tests — don't break a flow listed here |
+| [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) | Any UI work — colour tokens, typography, glass cards, Pashto RTL rules, animations |
+| [docs/BuildHistory.md](docs/BuildHistory.md) | Planning a new phase, touching AWS/SAM/IAM/CI, or needing the history of a feature |
+| [To-Do.md](To-Do.md) | Asked what's next — holds the backlog |
+| [docs/PROMPTS.md](docs/PROMPTS.md) | Change templates per layer and ready prompts for each backlog item |
+| `.claude/skills/frontend-design/` | Skill for building new UI — loaded automatically when relevant |
+| `.claude/agents/` | `tester` → `coder` TDD loop per phase; `refactor` for scoped changes; `e2e-tester` for Playwright |
+
+---
+
 ## Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, Tailwind CSS |
-| Backend | Node.js, Express |
+| Frontend | React 19, Vite, Tailwind CSS v4 |
+| Backend | Node.js 22, Express, TypeScript (strict) |
 | Database | MongoDB via Mongoose |
-| Auth | AWS Cognito (aws-jwt-verify on server · @aws-amplify/auth on client) |
+| Auth | AWS Cognito — server-side only (Cognito SDK in authController · aws-jwt-verify in middleware). Client calls `/api/auth/*` via axios and keeps the access token in `sessionStorage`; no Amplify SDK on the client |
 | Validation | express-validator (server), native React state (client) |
-| CI/CD | GitHub Actions (test gate on PRs + Lambda deploy on merge to main) |
-| Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway (backend) |
+| CI/CD | GitHub Actions (test gate on PRs + `sam build && sam deploy` on merge to main) |
+| Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway via SAM, stack `pashto-dictionary` (backend) |
+| Testing | Vitest + RTL (client) · Jest + MongoMemoryServer (server) · Playwright (E2E) |
 
 ---
 
@@ -27,7 +45,10 @@ pashto-dictionary/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml         # Test gate — runs on push to dev and PRs to main
-│       └── deploy.yml     # Lambda deploy — runs on push to main
+│       └── deploy.yml     # SAM deploy — runs on push to main
+├── .claude/
+│   ├── agents/            # tester, coder, refactor, e2e-tester
+│   └── skills/            # frontend-design
 ├── client/
 │   └── src/
 │       ├── components/    # Reusable UI components
@@ -36,6 +57,7 @@ pashto-dictionary/
 │       ├── services/      # API call functions (axios)
 │       ├── context/       # React Context providers
 │       └── utils/         # Pure helper functions
+├── docs/                  # ARCHITECTURE, BuildHistory, USER-FLOWS, DESIGN-SYSTEM
 ├── e2e/                   # Playwright end-to-end tests
 ├── server/
 │   └── src/
@@ -48,7 +70,10 @@ pashto-dictionary/
 │       ├── index.ts       # Local dev entry point (calls app.listen)
 │       └── lambda.ts      # AWS Lambda entry point (serverless-http wrapper)
 ├── amplify.yml            # AWS Amplify frontend build config
+├── template.yaml          # SAM — Lambda, HTTP API, IAM role
+├── samconfig.toml         # SAM deploy config (no secrets)
 ├── CLAUDE.md
+├── To-Do.md
 └── README.md
 ```
 
@@ -59,14 +84,14 @@ pashto-dictionary/
 This is the core logic of the platform. Enforce it strictly — invalid transitions are errors, not silent no-ops.
 
 ```
-submitted → pending    (automatic on POST /api/entries)
+submitted → pending    (automatic on POST /api/concepts or /api/variants)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Every state transition **must** write a record to the ModerationLog collection.
+Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on both `Concept` and `Variant`. Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
 
 ---
 
@@ -97,8 +122,8 @@ All API responses must use this shape. Never return a raw object or array.
 
 ### Naming
 - Files: `camelCase.ts` for server utilities and services, `PascalCase.jsx` for React components
-- MongoDB models: PascalCase singular (`Entry`, `User`, `ModerationLog`)
-- API routes: lowercase plural kebab (`/api/entries`, `/api/moderation`)
+- MongoDB models: PascalCase singular (`Concept`, `Variant`, `User`, `ModerationLog`)
+- API routes: lowercase plural kebab (`/api/concepts`, `/api/moderation`)
 - React components: PascalCase, one component per file
 
 ### Frontend
@@ -114,6 +139,7 @@ All API responses must use this shape. Never return a raw object or array.
 - Role checks use `requireRole()` middleware, not `if (req.user.role === ...)` inside controllers
 - **Role resolution**: `auth.ts` middleware looks up `role` from the MongoDB `User` doc (by `cognitoSub`) on every authenticated request — do NOT read role from the Cognito token, because Access Tokens never include custom user attributes
 - **Actor fields** (`submittedBy`, `reviewedBy`, `deletedBy`, `performedBy`): stored as `String` (Cognito sub UUID), not `ObjectId` — never pass `new mongoose.Types.ObjectId(req.user.id)` for these fields
+- **Resolving actor usernames**: `.populate()` silently no-ops on String fields — use `utils/enrichActors.ts` (batch lookup by `cognitoSub`) instead
 
 ---
 
@@ -131,14 +157,13 @@ chore     — config, dependencies, tooling
 style     — Tailwind or formatting only
 ```
 
-**Scope examples:** `auth`, `entries`, `moderation`, `client`, `models`, `middleware`
+**Scope examples:** `auth`, `concepts`, `variants`, `moderation`, `client`, `models`, `middleware`, `infra`, `ci`
 
 **Examples:**
 ```
-feat(auth): add JWT middleware for protected routes
 feat(moderation): implement approve/reject state transitions
-fix(entries): handle empty search query returning 500
-refactor(models): add text index to Entry.pashto field
+fix(concepts): handle empty search query returning 500
+refactor(models): add unique index on Variant.normalizedPashto
 docs(readme): add moderation workflow diagram
 chore(deps): add express-rate-limit to server
 ```
@@ -147,6 +172,7 @@ chore(deps): add express-rate-limit to server
 - Commit after each logical unit, not at end of day
 - Never commit broken code to `main`
 - Work on `dev` branch, merge to `main` when a phase is complete and tested
+- Before merging to `main`: endpoints tested manually, frontend renders without console errors, `.env.example` and README updated if affected
 
 ---
 
@@ -188,21 +214,7 @@ NODE_ENV=development
 VITE_API_URL=http://localhost:5000
 ```
 
-### Production (Lambda environment variables — managed by SAM template.yaml from Phase 14)
-```
-MONGODB_URI=mongodb+srv://...
-COGNITO_USER_POOL_ID=ap-southeast-1_xxxxxxx
-COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
-COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-NODE_ENV=production
-```
-
-### GitHub Actions secrets
-```
-AWS_ACCESS_KEY_ID     — IAM user with lambda:UpdateFunctionCode on pashto-backend
-AWS_SECRET_ACCESS_KEY
-AWS_REGION            — region where pashto-backend Lambda lives
-```
+Production values are not stored in files: they live in GitHub Secrets (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`, plus `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` for the deploy user). `deploy.yml` passes them to `template.yaml` as CloudFormation parameters. IAM details are in [docs/BuildHistory.md](docs/BuildHistory.md).
 
 Keep `.env.example` files updated whenever a new variable is added.
 
@@ -210,16 +222,9 @@ Keep `.env.example` files updated whenever a new variable is added.
 
 ## Current Build Phase
 
-> Update this line as you progress through the build plan.
+> Update this section as you progress.
 
-**Active phase:** Post-phase-14 polish complete — project is feature-complete
+**Active phase:** none — Phases 1–14 and post-14 polish are complete; the project is feature-complete. Backlog is in [To-Do.md](To-Do.md).
 **Branch:** dev
 
-### Completed phases
-- Phase 1–10: Core app (models, auth, entries, moderation, frontend, design, polish)
-- Phase 11: TypeScript migration (server only — all `.js` → `.ts`, strict mode)
-- Phase 12: AWS deployment (Amplify hosting, Lambda + API Gateway, GitHub Actions CI/CD)
-- Phase 13: AWS Cognito migration (replaced bcrypt/JWT with Cognito; `aws-jwt-verify` middleware; `@aws-amplify/auth` on the client)
-- Post-13 fixes: actor fields (`submittedBy` etc.) changed from ObjectId to String for Cognito sub compatibility; auth middleware now resolves role from MongoDB instead of token claims (Access Tokens don't carry custom attributes)
-- Phase 14: SAM infrastructure as code — `template.yaml` + `samconfig.toml`; deploy pipeline uses `sam build && sam deploy`; all backend resources owned by CloudFormation stack `pashto-dictionary`
-- Post-14 polish: fixed broken username resolution (`.populate()` silently no-ops on String fields; replaced with `enrichActors` batch-lookup utility); usernames now display in admin queue, audit log, concept detail page, variant cards, and My Submissions; removed legacy `ModerationLog.entry` field and dead `-passwordHash` projection in userController; audit log upgraded with target name population, inline diffs for edited/merged actions, absolute timestamps, action-type and model-type filters, and pagination
+New phases are specified in [docs/BuildHistory.md](docs/BuildHistory.md) and run with the `tester` → `coder` agents.

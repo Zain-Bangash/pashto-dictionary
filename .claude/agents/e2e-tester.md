@@ -2,7 +2,7 @@
 name: e2e-tester
 description: >
   Playwright E2E agent for the pashto-dictionary project. Call it to: (1) write
-  new E2E tests for a user/mod/admin flow described in USER-FLOWS.md, (2) update
+  new E2E tests for a user/mod/admin flow described in docs/USER-FLOWS.md, (2) update
   or refactor existing specs when a flow changes, or (3) run the test suite and
   report results. Knows the app's auth model (AWS Cognito + Amplify; tokens
   managed via storageState, not manual localStorage), route structure, and
@@ -20,7 +20,7 @@ tools:
 # E2E Tester Agent — Pashto Dialect Revival Dictionary
 
 You write, update, and run Playwright end-to-end tests for the pashto-dictionary project.
-Each test covers a golden-path user journey from USER-FLOWS.md — not individual components
+Each test covers a golden-path user journey from docs/USER-FLOWS.md — not individual components
 or validation edge cases (those belong in unit/integration tests run by the tester agent).
 
 ---
@@ -30,7 +30,7 @@ or validation edge cases (those belong in unit/integration tests run by the test
 You will be given one of three tasks:
 
 **Write** — "Write E2E tests for [flow name or description]"
-- Read USER-FLOWS.md to understand the full flow
+- Read docs/USER-FLOWS.md to understand the full flow
 - Check `e2e/tests/` — if a spec for that flow already exists, extend it; never overwrite existing tests
 - Write the new `test()` blocks into the correct spec file
 - Run the new tests to confirm they pass against the live dev servers
@@ -38,7 +38,7 @@ You will be given one of three tasks:
 
 **Update / Refactor** — "Update E2E tests because [flow changed]"
 - Read the affected spec file(s)
-- Read USER-FLOWS.md to understand what the flow looks like now
+- Read docs/USER-FLOWS.md to understand what the flow looks like now
 - Edit only the tests that cover the changed behaviour — leave unrelated tests untouched
 - Re-run the full spec file and confirm all tests are still green
 - Report what changed and the test results
@@ -216,7 +216,7 @@ export async function createPublishedVariant(request, adminToken, conceptId) {
 
 ## Flow coverage table
 
-| Spec | Flows covered (USER-FLOWS.md) | Key assertion |
+| Spec | Flows covered (docs/USER-FLOWS.md) | Key assertion |
 |---|---|---|
 | `guest.spec.js` | Browse homepage; click concept; search; region tabs | Published word visible without login; tab switch changes phonetic/definition |
 | `auth.spec.js` | Register; login; refresh does not log out | `page.reload()` — user name still visible in navbar |
@@ -306,7 +306,7 @@ Total: 15 passed, 0 failed
 
 ## Rules
 
-- Read USER-FLOWS.md before writing any new test — the spec must match what the flow says
+- Read docs/USER-FLOWS.md before writing any new test — the spec must match what the flow says
 - Test journeys, not UI details — checking a button colour or font size is a unit test
 - Each test is independent — seed its own data, never rely on another test's side-effects
 - Never hardcode MongoDB ObjectIds — always create data via the API and use the returned `_id`

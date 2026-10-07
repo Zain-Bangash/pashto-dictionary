@@ -27,9 +27,11 @@ Copy classes and patterns directly — do not invent new tokens.
 |---|---|---|
 | Cormorant Garamond | `font-display` | Definitions, examples, phonetics — italic always preferred |
 | DM Sans | `font-ui` | All UI labels, buttons, metadata, form inputs |
-| Noto Nastaliq Urdu | `font-pashto` | Pashto script only — always `dir="rtl"` + `style={{ lineHeight: 1.7 }}` |
+| Noto Naskh Arabic | `font-pashto` | Pashto script only — always `dir="rtl"`; line-height 1.6 is enforced by `.font-pashto` in `index.css` |
 
-**Pashto text rule**: always wrap in `<div dir="rtl" className="font-pashto" style={{ lineHeight: 1.7 }}>`. Never apply `font-pashto` to English text.
+**Pashto text rule**: always wrap in `<div dir="rtl" className="font-pashto">`. Never apply `font-pashto` to English text.
+
+**Line-height**: `.font-pashto { line-height: 1.6 !important; }` overrides any inline `lineHeight`. Naskh ink descends ~0.52em below the baseline, so anything under ~1.5 clips descenders (ښ ږ ې ۍ) inside `overflow-hidden` parents.
 
 **English in mixed blocks**: use `dir="ltr"` explicitly on any English paragraph inside an RTL parent.
 
@@ -69,7 +71,7 @@ Every surface in the app is a glass panel. Base class: `bento-card`.
 Add class `pashto-bloom` to any Pashto word inside a `.bento-card`. On card hover it scales 1.05× and switches to a metallic gold/cream/terracotta shimmer gradient via `background-clip: text`.
 
 ```jsx
-<div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold" style={{ lineHeight: 1.7 }}>
+<div dir="rtl" className="pashto-bloom font-pashto text-warm font-bold">
   {entry.pashto}
 </div>
 ```
@@ -178,7 +180,7 @@ Grid for multi-column card layouts:
 
 ## Ambient Background
 
-`AmbientBackground` (currently in `Home.jsx`) should be extracted to `client/src/components/AmbientBackground.jsx` and imported on every page. It renders:
+`AmbientBackground` lives in `client/src/pages/Home.jsx` (not yet extracted to `components/`). It renders:
 - 72 floating bezier paths (CSS animated, `floatingPathPulse`)
 - Two radial gradient blobs (terracotta top-left, gold bottom-right)
 - Grain overlay (`grain-overlay`)
@@ -193,7 +195,7 @@ All three are `fixed inset-0 pointer-events-none -z-10`.
 - [ ] Content in `relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8`
 - [ ] Cards use the glass pattern (`bento-card bg-white/[0.03-0.04] backdrop-blur-[24-40px] border border-white/[0.07-0.08]`)
 - [ ] Correct radius for the card's visual weight (48px hero, 24px secondary, 16px grid)
-- [ ] Pashto words have `dir="rtl" className="pashto-bloom font-pashto"` + `lineHeight: 1.7`
+- [ ] Pashto words have `dir="rtl" className="pashto-bloom font-pashto"`
 - [ ] English text inside RTL parents has `dir="ltr"` explicitly
 - [ ] CTAs use `bg-terracotta text-warm`, not mint
 - [ ] Mint reserved for system status only (approved, published, active filter)
