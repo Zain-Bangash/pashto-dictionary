@@ -3,7 +3,7 @@
  *
  * Tests for:
  *  - /dashboard          summary stats page
- *  - /dashboard/queue    moderation queue with approve/reject actions (Concepts + Variants tabs)
+ *  - /dashboard/queue    moderation queue with approve/reject actions (concept rows + variant dropdowns)
  *  - /dashboard/entries  all concepts with status filter
  *  - /dashboard/users    user list (admin only)
  *  - /dashboard/log      moderation audit log (admin only)
@@ -94,15 +94,13 @@ const mockLogEntry = (overrides = {}) => ({
 
 // Helper: queue page mocks two API calls (concepts queue + variants queue)
 function mockQueueBothEmpty() {
-  api.get
-    .mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } })
-    .mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } });
+  mockQueueWithConcepts([], []);
 }
 
+// Grouped /api/moderation/queue response — variants nest under the concept they belong to
 function mockQueueWithConcepts(concepts = [], variants = []) {
-  api.get
-    .mockResolvedValueOnce({ data: { success: true, data: concepts, meta: { page: 1, limit: 20, total: concepts.length } } })
-    .mockResolvedValueOnce({ data: { success: true, data: variants, meta: { page: 1, limit: 20, total: variants.length } } });
+  const data = concepts.map((c) => ({ ...c, variants: variants.filter((v) => v.concept === c._id) }));
+  api.get.mockResolvedValueOnce({ data: { success: true, data, meta: { page: 1, limit: 20, total: data.length } } });
 }
 
 beforeEach(() => {
@@ -307,7 +305,7 @@ describe('DashboardQueue page — moderation queue', () => {
     expect(await screen.findByText(/no entries|empty|nothing/i)).toBeInTheDocument();
   });
 
-  it('renders concept englishGloss in the concepts tab', async () => {
+  it('renders concept englishGloss for each queued concept', async () => {
     asModerator();
     mockQueueWithConcepts(
       [mockConcept({ englishGloss: 'house' }), mockConcept({ _id: 'e2', englishGloss: 'water' })],
@@ -336,7 +334,7 @@ describe('DashboardQueue page — moderation queue', () => {
     ).toBeInTheDocument();
   });
 
-  it('calls PATCH /api/concepts/:id/status when Approve is clicked in concepts tab', async () => {
+  it('calls PATCH /api/concepts/:id/status when Approve is clicked on a concept row', async () => {
     const user = userEvent.setup();
     asModerator();
     mockQueueWithConcepts([mockConcept({ _id: 'concept123' })], []);
@@ -353,7 +351,7 @@ describe('DashboardQueue page — moderation queue', () => {
     });
   });
 
-  it('calls PATCH /api/concepts/:id/status when Reject is clicked in concepts tab', async () => {
+  it('calls PATCH /api/concepts/:id/status when Reject is clicked on a concept row', async () => {
     const user = userEvent.setup();
     asModerator();
     mockQueueWithConcepts([mockConcept({ _id: 'concept456' })], []);
@@ -404,16 +402,13 @@ describe('DashboardQueue page — moderation queue', () => {
     expect(await screen.findByText(/action failed|error/i)).toBeInTheDocument();
   });
 
-  it('calls /api/moderation/concepts/queue and /api/moderation/variants/queue to fetch queue', async () => {
+  it('calls /api/moderation/queue to fetch the grouped queue', async () => {
     asModerator();
     mockQueueBothEmpty();
     renderQueue();
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/moderation\/concepts\/queue/)
-      );
-      expect(api.get).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/moderation\/variants\/queue/)
+        expect.stringMatching(/\/api\/moderation\/queue\?status=pending/)
       );
     });
   });

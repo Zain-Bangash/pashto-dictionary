@@ -2,8 +2,8 @@
  * Phase 9.5 — Moderation Enhancements (Frontend)
  *
  * Tests for:
- *  - Rejection note modal in DashboardQueue (Concepts + Variants tabs)
- *  - Inline edit form in DashboardQueue (Concepts + Variants tabs)
+ *  - Rejection note modal in DashboardQueue (concept rows + variant dropdowns)
+ *  - Inline edit form in DashboardQueue (concept rows + variant dropdowns)
  *  - Variant concept reassignment search in the edit form
  *  - Similar concepts panel in DashboardQueue (Concepts tab)
  *  - Merge confirmation modal in DashboardQueue
@@ -78,14 +78,27 @@ const mockVariant = (overrides = {}) => ({
 // ---------------------------------------------------------------------------
 // Queue render helpers
 // ---------------------------------------------------------------------------
-function mockQueueWithConcepts(concepts = [], variants = []) {
-  api.get
-    .mockResolvedValueOnce({
-      data: { success: true, data: concepts, meta: { page: 1, limit: 20, total: concepts.length, pendingCount: concepts.length, approvedCount: 0 } },
-    })
-    .mockResolvedValueOnce({
-      data: { success: true, data: variants, meta: { page: 1, limit: 20, total: variants.length, pendingCount: variants.length, approvedCount: 0 } },
-    });
+// Builds the grouped /api/moderation/queue response: variants nest under their concept,
+// and a variant whose concept is not in `concepts` gets a group built from its populated concept.
+function groupQueue(concepts = [], variants = []) {
+  const groups = concepts.map((c) => ({ ...c, variants: [] }));
+  for (const v of variants) {
+    const parent = v.concept || {};
+    let group = groups.find((g) => g._id === parent._id);
+    if (!group) {
+      group = { partOfSpeech: 'noun', submittedBy: { username: 'testuser' }, ...parent, variants: [] };
+      groups.push(group);
+    }
+    group.variants.push({ ...v, concept: parent._id });
+  }
+  return groups;
+}
+
+function mockQueueWithConcepts(concepts = [], variants = [], meta = {}) {
+  const data = groupQueue(concepts, variants);
+  api.get.mockResolvedValueOnce({
+    data: { success: true, data, meta: { page: 1, limit: 20, total: data.length, pendingCount: concepts.length + variants.length, approvedCount: 0, ...meta } },
+  });
 }
 
 function mockQueueBothEmpty() {
@@ -105,6 +118,12 @@ const renderConcepts = () =>
       <DashboardConcepts />
     </MemoryRouter>
   );
+
+// Opens the first concept's variant dropdown and returns the dropdown region
+async function expandVariants(user) {
+  await user.click(await screen.findByRole('button', { name: /variants? waiting/i }));
+  return screen.getByRole('region', { name: /variants of/i });
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -224,10 +243,7 @@ describe('Rejection note modal — Concepts tab', () => {
 // ===========================================================================
 
 describe('Rejection note modal — Variants tab', () => {
-  const switchToVariantsTab = async (user) => {
-    const variantsTab = await screen.findByRole('button', { name: /variants/i });
-    await user.click(variantsTab);
-  };
+  const switchToVariantsTab = expandVariants;
 
   it('opens a modal when Reject is clicked on a variant', async () => {
     const user = userEvent.setup();
@@ -452,10 +468,11 @@ describe('Inline edit form — Concepts tab', () => {
     if (saveBtn && !saveBtn.disabled) await user.click(saveBtn);
 
     // api.get should NOT have been called again (no full reload).
-    // Count is 3: 2 initial queue loads + 1 from SimilarConceptsPanel's suggestConcepts call.
+    // Count is 2: 1 queue load + 1 from SimilarConceptsPanel's suggestConcepts call.
     await waitFor(() => {
+      expect(screen.getByText('new gloss')).toBeInTheDocument();
       const getCallCount = api.get.mock.calls.length;
-      expect(getCallCount).toBe(3);
+      expect(getCallCount).toBe(2);
     });
   });
 });
@@ -465,10 +482,7 @@ describe('Inline edit form — Concepts tab', () => {
 // ===========================================================================
 
 describe('Inline edit form — Variants tab', () => {
-  const switchToVariantsTab = async (user) => {
-    const variantsTab = await screen.findByRole('button', { name: /variants/i });
-    await user.click(variantsTab);
-  };
+  const switchToVariantsTab = expandVariants;
 
   it('renders an Edit button for each variant in the queue', async () => {
     const user = userEvent.setup();
@@ -476,8 +490,8 @@ describe('Inline edit form — Variants tab', () => {
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
-    await switchToVariantsTab(user);
-    expect(await screen.findByRole('button', { name: /edit/i })).toBeInTheDocument();
+    const region = await switchToVariantsTab(user);
+    expect(await within(region).findByRole('button', { name: /edit/i })).toBeInTheDocument();
   });
 
   it('pre-populates the variant edit form with pashto field', async () => {
@@ -486,9 +500,9 @@ describe('Inline edit form — Variants tab', () => {
     mockQueueWithConcepts([], [mockVariant({ pashto: 'کور', definition: 'a house' })]);
 
     renderQueue();
-    await switchToVariantsTab(user);
+    const region = await switchToVariantsTab(user);
     await screen.findByText('کور');
-    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.click(within(region).getByRole('button', { name: /edit/i }));
 
     const pashtoInput =
       screen.queryByDisplayValue('کور') ||
@@ -502,9 +516,9 @@ describe('Inline edit form — Variants tab', () => {
     mockQueueWithConcepts([], [mockVariant({ pashto: 'کور', definition: 'a dwelling place' })]);
 
     renderQueue();
-    await switchToVariantsTab(user);
+    const region = await switchToVariantsTab(user);
     await screen.findByText('کور');
-    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.click(within(region).getByRole('button', { name: /edit/i }));
 
     const defInput =
       screen.queryByDisplayValue('a dwelling place') ||
@@ -518,8 +532,8 @@ describe('Inline edit form — Variants tab', () => {
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
-    await switchToVariantsTab(user);
-    await user.click(await screen.findByRole('button', { name: /edit/i }));
+    const region = await switchToVariantsTab(user);
+    await user.click(await within(region).findByRole('button', { name: /edit/i }));
 
     const saveBtn = screen.queryByRole('button', { name: /save|update/i });
     expect(saveBtn).toBeDisabled();
@@ -534,9 +548,9 @@ describe('Inline edit form — Variants tab', () => {
     });
 
     renderQueue();
-    await switchToVariantsTab(user);
+    const region = await switchToVariantsTab(user);
     await screen.findByText('کور');
-    await user.click(screen.getByRole('button', { name: /edit/i }));
+    await user.click(within(region).getByRole('button', { name: /edit/i }));
 
     const noteInput = screen.queryByLabelText(/note/i) || screen.queryByPlaceholderText(/note/i);
     if (noteInput) await user.type(noteInput, 'Fixed definition');
@@ -558,10 +572,7 @@ describe('Inline edit form — Variants tab', () => {
 // ===========================================================================
 
 describe('Variant concept reassignment field in edit form', () => {
-  const switchToVariantsTab = async (user) => {
-    const variantsTab = await screen.findByRole('button', { name: /variants/i });
-    await user.click(variantsTab);
-  };
+  const switchToVariantsTab = expandVariants;
 
   it('shows a concept search input inside the variant edit form', async () => {
     const user = userEvent.setup();
@@ -569,8 +580,8 @@ describe('Variant concept reassignment field in edit form', () => {
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
-    await switchToVariantsTab(user);
-    await user.click(await screen.findByRole('button', { name: /edit/i }));
+    const region = await switchToVariantsTab(user);
+    await user.click(await within(region).findByRole('button', { name: /edit/i }));
 
     const conceptSearch =
       screen.queryByLabelText(/concept/i) ||
@@ -587,8 +598,8 @@ describe('Variant concept reassignment field in edit form', () => {
     });
 
     renderQueue();
-    await switchToVariantsTab(user);
-    await user.click(await screen.findByRole('button', { name: /edit/i }));
+    const region = await switchToVariantsTab(user);
+    await user.click(await within(region).findByRole('button', { name: /edit/i }));
 
     const conceptSearch =
       screen.queryByLabelText(/concept/i) ||
@@ -611,8 +622,8 @@ describe('Variant concept reassignment field in edit form', () => {
     });
 
     renderQueue();
-    await switchToVariantsTab(user);
-    await user.click(await screen.findByRole('button', { name: /edit/i }));
+    const region = await switchToVariantsTab(user);
+    await user.click(await within(region).findByRole('button', { name: /edit/i }));
 
     const conceptSearch =
       screen.queryByLabelText(/concept/i) ||
@@ -635,8 +646,8 @@ describe('Variant concept reassignment field in edit form', () => {
     });
 
     renderQueue();
-    await switchToVariantsTab(user);
-    await user.click(await screen.findByRole('button', { name: /edit/i }));
+    const region = await switchToVariantsTab(user);
+    await user.click(await within(region).findByRole('button', { name: /edit/i }));
 
     const conceptSearch =
       screen.queryByLabelText(/concept/i) ||
