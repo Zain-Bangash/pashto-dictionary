@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
-export default function RejectModal({ onConfirm, onCancel }) {
+export default function RejectModal({ onConfirm, onCancel, warning }) {
   const [note, setNote] = useState('');
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-charcoal border border-white/[0.12] rounded-[20px] p-6 w-full max-w-md mx-4">
         <h2 className="text-warm font-display text-lg font-semibold mb-4">Rejection Reason</h2>
+        {warning && <p className="mb-4 text-sm font-ui text-amber-300/90">{warning}</p>}
         <label htmlFor="reject-reason" className="block text-xs font-ui text-muted uppercase tracking-wider mb-1">
           Reason for rejection
         </label>

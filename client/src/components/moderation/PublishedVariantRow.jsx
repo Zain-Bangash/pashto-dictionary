@@ -1,0 +1,39 @@
+import { useState } from 'react';
+import VariantEditForm from './VariantEditForm';
+import { REJECT_BTN, EDIT_BTN } from './queueButtons';
+
+export default function PublishedVariantRow({ variant, concept, onReject, onSave }) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <li className="bg-white/[0.025] border border-white/[0.06] rounded-[14px] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div dir="rtl" className="font-pashto text-warm text-2xl leading-[1.7]">{variant.pashto}</div>
+            {variant.phonetic && <span className="font-ui text-sm text-muted">/{variant.phonetic}/</span>}
+            <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
+              {variant.region}
+            </span>
+          </div>
+          <p className="text-sm font-ui text-muted">{variant.definition}</p>
+          {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
+          {variant.submittedBy?.username && (
+            <p className="text-xs font-ui text-muted/60">by {variant.submittedBy.username}</p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => onReject(variant)} aria-label={`Reject variant ${variant.pashto}`} className={REJECT_BTN}>Reject</button>
+          <button onClick={() => setEditing((e) => !e)} aria-label={`Edit variant ${variant.pashto}`} className={EDIT_BTN}>Edit</button>
+        </div>
+      </div>
+      {editing && (
+        <VariantEditForm
+          item={{ ...variant, concept }}
+          onSave={(updated) => { setEditing(false); onSave(updated); }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+    </li>
+  );
+}

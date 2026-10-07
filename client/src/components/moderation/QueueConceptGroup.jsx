@@ -15,7 +15,10 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
 
   return (
     <li className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5">
-      <div className="flex items-start justify-between gap-4">
+      <div
+        onClick={count > 0 ? () => setExpanded((x) => !x) : undefined}
+        className={`flex items-start justify-between gap-4 ${count > 0 ? 'cursor-pointer' : ''}`}
+      >
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <p className="text-warm font-display text-lg font-semibold">{concept.englishGloss}</p>
@@ -31,7 +34,7 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
             )}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div onClick={(e) => e.stopPropagation()} className="flex gap-2 shrink-0">
           {concept.status === 'pending' && (
             <>
               <button onClick={() => onAction('concepts', concept._id, 'approved')} className={APPROVE_BTN}>Approve</button>

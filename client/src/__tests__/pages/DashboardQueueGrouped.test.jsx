@@ -130,6 +130,46 @@ describe('Grouped queue — concept rows with variant dropdowns', () => {
     expect(screen.getByText('کوټه')).toBeInTheDocument();
   });
 
+  it('expands and collapses when the concept row itself is clicked', async () => {
+    const user = userEvent.setup();
+    asModerator();
+    mockQueue([mockGroup({}, [mockVariant({ _id: 'v1', pashto: 'کور' })])]);
+
+    renderQueue();
+    await user.click(await screen.findByText('house'));
+    const toggle = screen.getByRole('button', { name: /1 variant waiting/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('کور')).toBeInTheDocument();
+
+    await user.click(screen.getByText('noun'));
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('کور')).not.toBeInTheDocument();
+  });
+
+  it('does not toggle the row when a concept action button is clicked', async () => {
+    const user = userEvent.setup();
+    asModerator();
+    mockQueue([mockGroup({}, [mockVariant({ _id: 'v1', pashto: 'کور' })])]);
+
+    renderQueue();
+    const toggle = await screen.findByRole('button', { name: /1 variant waiting/i });
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+
+    expect(screen.getByRole('form', { name: /edit concept/i })).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('کور')).not.toBeInTheDocument();
+  });
+
+  it('does not open a dropdown when a row without waiting variants is clicked', async () => {
+    const user = userEvent.setup();
+    asModerator();
+    mockQueue([mockGroup()]);
+
+    renderQueue();
+    await user.click(await screen.findByText('house'));
+    expect(screen.queryByRole('region', { name: /variants of/i })).not.toBeInTheDocument();
+  });
+
   it('shows "No variants waiting" for a concept without waiting variants', async () => {
     asModerator();
     mockQueue([mockGroup()]);

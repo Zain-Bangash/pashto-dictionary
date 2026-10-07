@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import PublishedConceptPanel from '../../components/moderation/PublishedConceptPanel';
 
 // Use api.get/post directly so vi.fn() mocks on api.* work in tests
 const suggestConcepts = (q) => api.get(`/api/concepts/suggest?q=${encodeURIComponent(q)}`);
@@ -134,6 +136,8 @@ export default function DashboardConcepts() {
   const [search, setSearch]     = useState('');
   const [mergeSource, setMergeSource] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const isAdmin = useAuth()?.user?.role === 'admin';
 
   const fetchConcepts = (statusFilter, searchQuery) => {
     setLoading(true);
@@ -176,6 +180,17 @@ export default function DashboardConcepts() {
       setActionError(msg);
       setMergeSource(null);
     }
+  };
+
+  const toggleExpanded = (id) => setExpandedId((cur) => (cur === id ? null : id));
+
+  const handleConceptEdited = (updated) => {
+    setConcepts((cs) => cs.map((c) => (c._id === updated._id ? { ...c, ...updated } : c)));
+  };
+
+  const handleConceptRejected = () => {
+    setExpandedId(null);
+    fetchConcepts(status, search);
   };
 
   if (loading) return <div className="text-muted font-ui text-sm animate-pulse">Loading…</div>;
@@ -223,31 +238,54 @@ export default function DashboardConcepts() {
         <ul className="space-y-3">
           {concepts.map((concept) => {
             const s = STATUS_COLORS[concept.status] ?? STATUS_COLORS.pending;
+            const manageable = isAdmin && concept.status === 'published';
+            const expanded = manageable && expandedId === concept._id;
             return (
-              <li key={concept._id} className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-4 flex items-center justify-between gap-3">
-                <div className="flex flex-col gap-0.5 overflow-hidden">
-                  <p className="text-warm font-display font-semibold text-lg">{concept.englishGloss}</p>
-                  {concept.partOfSpeech && (
-                    <p className="text-sm font-ui text-muted truncate">{concept.partOfSpeech}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {!mergeSource && (
-                    <button
-                      onClick={() => setMergeSource(concept)}
-                      className="px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-ui font-semibold rounded-[8px] hover:bg-amber-400/20 transition-colors"
+              <li key={concept._id} className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-4">
+                <div
+                  onClick={manageable ? () => toggleExpanded(concept._id) : undefined}
+                  className={`flex items-center justify-between gap-3 ${manageable ? 'cursor-pointer' : ''}`}
+                >
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <p className="text-warm font-display font-semibold text-lg">{concept.englishGloss}</p>
+                    {concept.partOfSpeech && (
+                      <p className="text-sm font-ui text-muted truncate">{concept.partOfSpeech}</p>
+                    )}
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 shrink-0">
+                    {manageable && (
+                      <button
+                        onClick={() => toggleExpanded(concept._id)}
+                        aria-expanded={expanded}
+                        className="px-3 py-1.5 bg-white/[0.05] border border-white/[0.08] text-muted text-xs font-ui font-semibold rounded-[8px] hover:bg-white/[0.08] transition-colors"
+                      >
+                        Manage
+                      </button>
+                    )}
+                    {!mergeSource && (
+                      <button
+                        onClick={() => setMergeSource(concept)}
+                        className="px-3 py-1.5 bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-ui font-semibold rounded-[8px] hover:bg-amber-400/20 transition-colors"
+                      >
+                        Merge
+                      </button>
+                    )}
+                    <span
+                      className="text-[10px] font-ui font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"
+                      style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}
+                      data-testid="status-badge"
                     >
-                      Merge
-                    </button>
-                  )}
-                  <span
-                    className="text-[10px] font-ui font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"
-                    style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}
-                    data-testid="status-badge"
-                  >
-                    {concept.status}
-                  </span>
+                      {concept.status}
+                    </span>
+                  </div>
                 </div>
+                {expanded && (
+                  <PublishedConceptPanel
+                    concept={concept}
+                    onConceptEdited={handleConceptEdited}
+                    onConceptRejected={handleConceptRejected}
+                  />
+                )}
               </li>
             );
           })}
