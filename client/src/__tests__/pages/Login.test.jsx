@@ -88,15 +88,46 @@ describe('Login page', () => {
 
   it('shows an error message when credentials are invalid', async () => {
     const user = userEvent.setup();
-    const err = Object.assign(new Error('Incorrect username or password.'), {
-      name: 'NotAuthorizedException',
-    });
-    mockLogin.mockRejectedValue(err);
+    mockLogin.mockRejectedValue(new Error('Invalid email or password'));
     renderLogin();
     await user.type(screen.getByLabelText(/email/i), 'wrong@test.com');
     await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
     await user.click(screen.getByRole('button', { name: /log in/i }));
     expect(await screen.findByText(/invalid email or password/i)).toBeInTheDocument();
+  });
+
+  it('announces the login error in an alert and keeps the entered email', async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValue(new Error('Invalid email or password'));
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'wrong@test.com');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid email or password/i);
+    expect(screen.getByLabelText(/email/i)).toHaveValue('wrong@test.com');
+    expect(screen.getByRole('button', { name: /log in/i })).toBeEnabled();
+  });
+
+  it('clears the login error when the user edits a field', async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValue(new Error('Invalid email or password'));
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'wrong@test.com');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    await screen.findByRole('alert');
+    await user.type(screen.getByLabelText(/password/i), 'x');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows other server messages (e.g. rate limit) as given', async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValue(new Error('Too many requests, please try again later.'));
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'test@test.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/too many requests/i);
   });
 
   it('shows a loading/disabled state on the submit button while the request is in flight', async () => {

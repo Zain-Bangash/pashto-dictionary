@@ -21,9 +21,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function login(email, password) {
-    const res = await api.post('/api/auth/login', { email, password });
-    setToken(res.data.data.token);
-    setUser(res.data.data.user);
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      setToken(res.data.data.token);
+      setUser(res.data.data.user);
+    } catch (err) {
+      if (err?.response?.status === 401) throw new Error('Invalid email or password');
+      throw new Error(err?.response?.data?.error?.message ?? err?.message ?? 'Login failed');
+    }
   }
 
   async function register(username, email, password, region, village) {

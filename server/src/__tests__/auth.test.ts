@@ -499,6 +499,34 @@ describe('POST /api/auth/login', () => {
     expect(res.body.success).toBe(false);
   });
 
+  it('401 on wrong password carries a non-empty error.message in the envelope', async () => {
+    const { NotAuthorizedException } = await import(
+      '@aws-sdk/client-cognito-identity-provider'
+    );
+    mockCognitoSend.mockRejectedValue(
+      new (NotAuthorizedException as unknown as new (args: { message: string; $metadata: object }) => Error)(
+        { message: 'Incorrect username or password.', $metadata: {} }
+      )
+    );
+
+    const res = await request
+      .post('/api/auth/login')
+      .send({ ...creds, password: 'wrongpassword' });
+    expect(res.status).toBe(401);
+    expect(typeof res.body.error.message).toBe('string');
+    expect(res.body.error.message.length).toBeGreaterThan(0);
+    expect(res.body).not.toHaveProperty('data');
+  });
+
+  it('returns 401 with a message when Cognito accepts but no MongoDB user exists', async () => {
+    setupLoginMock('ghost-sub', 'ghost-access-token');
+
+    const res = await request.post('/api/auth/login').send(creds);
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toBeTruthy();
+  });
+
   it('returns 400 when email field is missing', async () => {
     const res = await request
       .post('/api/auth/login')

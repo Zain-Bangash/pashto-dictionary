@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const TOKEN_KEY = 'auth_token';
+const AUTH_ATTEMPT_PATHS = ['/api/auth/login', '/api/auth/register'];
 
 // Initialise from sessionStorage so token survives a page refresh within the tab.
 let _token = sessionStorage.getItem(TOKEN_KEY) ?? null;
@@ -34,7 +35,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthAttempt = AUTH_ATTEMPT_PATHS.some((p) => err.config?.url?.endsWith(p));
+    if (err.response?.status === 401 && !isAuthAttempt) {
       clearToken();
       if (_logoutHandler) _logoutHandler();
       window.location.replace('/login');

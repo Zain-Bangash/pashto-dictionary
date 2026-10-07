@@ -26,6 +26,8 @@ As a user I should be able to register with a username, email, and password. I c
 
 As a user I should be able to log in with my email and password. My session should survive a page refresh — I should not be logged out when I reload the browser.
 
+As a user, if I enter an incorrect email or password on the Login page, I stay on the page and see a visible error message ("Invalid email or password"). My entered email stays in the field, and the message clears when I start typing again. Other failures, such as too many attempts, show the server's message in the same place.
+
 As a user I should be able to view all the same pages a guest can.
 
 As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, phonetic, region, definition, and example.

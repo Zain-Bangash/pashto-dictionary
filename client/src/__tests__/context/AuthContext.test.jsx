@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
@@ -61,6 +62,47 @@ describe('AuthContext', () => {
     await act(async () => { screen.getByRole('button', { name: /logout/i }).click(); });
     expect(screen.getByTestId('user')).toHaveTextContent('null');
     expect(clearToken).toHaveBeenCalled();
+  });
+
+  describe('login() errors', () => {
+    function ErrorConsumer() {
+      const { login } = useAuth();
+      const [msg, setMsg] = useState('');
+      return (
+        <div>
+          <button onClick={() => login('a@b.com', 'pw').catch((e) => setMsg(e.message))}>Go</button>
+          <span data-testid="msg">{msg}</span>
+        </div>
+      );
+    }
+
+    const loginWith = async (response) => {
+      api.post.mockRejectedValue({ message: 'Request failed', response });
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <ErrorConsumer />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+      await act(async () => { screen.getByRole('button', { name: /go/i }).click(); });
+    };
+
+    it('throws "Invalid email or password" on a 401', async () => {
+      await loginWith({ status: 401, data: { error: { message: 'Invalid credentials' } } });
+      expect(screen.getByTestId('msg')).toHaveTextContent('Invalid email or password');
+      expect(setToken).not.toHaveBeenCalled();
+    });
+
+    it('throws the server message on a 429', async () => {
+      await loginWith({ status: 429, data: { error: { message: 'Too many requests, please try again later.' } } });
+      expect(screen.getByTestId('msg')).toHaveTextContent('Too many requests, please try again later.');
+    });
+
+    it('throws the server message on a 400', async () => {
+      await loginWith({ status: 400, data: { error: { message: 'valid email is required', field: 'email' } } });
+      expect(screen.getByTestId('msg')).toHaveTextContent('valid email is required');
+    });
   });
 
   it('restores user from existing session on mount', async () => {

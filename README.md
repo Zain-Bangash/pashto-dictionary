@@ -98,7 +98,7 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 |---|---|---|---|
 | GET | `/api/health` | — | Health check |
 | POST | `/api/auth/register` | — | Register user |
-| POST | `/api/auth/login` | — | Login, returns Cognito access token |
+| POST | `/api/auth/login` | — | Login, returns Cognito access token. `401` on wrong email/password, `429` when rate-limited |
 | GET | `/api/auth/me` | Token | Current user |
 | GET | `/api/concepts` | — | List published concepts (paginated) |
 | GET | `/api/concepts/search?q=` | — | Ranked search (gloss + phonetic) |

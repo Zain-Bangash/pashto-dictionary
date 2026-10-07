@@ -34,12 +34,7 @@ export default function Login() {
       await login(email, password);
       navigate(location.state?.from?.pathname || '/');
     } catch (err) {
-      const name = err?.name ?? '';
-      if (name === 'NotAuthorizedException' || name === 'UserNotFoundException') {
-        setApiError('Invalid email or password');
-      } else {
-        setApiError(err?.message ?? 'Login failed');
-      }
+      setApiError(err?.message ?? 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -53,7 +48,11 @@ export default function Login() {
           <p className="text-sm font-ui text-muted">Welcome back to پښتو Dictionary</p>
         </div>
 
-        {apiError && <p className="text-red-400 text-sm font-ui">{apiError}</p>}
+        {apiError && (
+          <div role="alert" className="bg-red-500/10 border border-red-400/40 rounded-[12px] px-3.5 py-2.5 text-red-300 text-sm font-ui">
+            {apiError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -62,7 +61,7 @@ export default function Login() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setApiError(''); }}
               className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all"
             />
             {errors.email && <p className="text-red-400 text-xs font-ui mt-1">{errors.email}</p>}
@@ -74,7 +73,7 @@ export default function Login() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setApiError(''); }}
               className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all"
             />
             {errors.password && <p className="text-red-400 text-xs font-ui mt-1">{errors.password}</p>}
