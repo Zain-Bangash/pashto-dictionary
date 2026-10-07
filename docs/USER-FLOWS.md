@@ -46,13 +46,15 @@ As a user, in Step 2 of the Submit form, I can optionally add a note to the mode
 
 As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
 
+As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published).
+
 ---
 
 ## Moderator
 
 As a moderator I should be able to log in and access the Dashboard. Refreshing the page should not log me out.
 
-As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking it expands a dropdown listing that concept's variants awaiting review.
+As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking anywhere on the concept row, or on the toggle, expands or collapses a dropdown listing that concept's variants awaiting review. Clicking the row's Approve, Reject, Publish, or Edit buttons does not toggle it.
 
 As a moderator I should not be able to approve a variant while its concept is still pending. The variant's Approve button is disabled with the hint "Approve the concept first", and the server rejects the attempt with a 400. Once the concept is approved, its variants can be approved.
 
@@ -74,13 +76,15 @@ As a moderator I should not be able to access the Users or Log pages — those a
 
 As a moderator I should be able to reject a pending item by clicking Reject, which opens a modal requiring me to type a reason before confirming. The reason is stored and shown to the submitter in their My Submissions page.
 
-As a moderator I should be able to edit any submission that was not submitted by me, at any point in its lifecycle, using the Edit button on the queue card. The inline form opens pre-populated with the current values. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change.
+As a moderator I should be able to edit any submission that was not submitted by me and is not yet published, using the Edit button on the queue card. The inline form opens pre-populated with the current values. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change.
 
 As a moderator I should see a "Similar concepts" panel on each concept card in the queue, populated by the suggest endpoint using that concept's English gloss. If a match is found I can click "Merge into this" to open a confirmation modal, enter a note, and merge the pending concept into the existing one. All variants are moved to the target; the source concept is soft-deleted.
 
 As a moderator I should be able to trigger a merge from the Concepts list page in the dashboard, not only from the queue.
 
-As a moderator, when I reject a concept, all of that concept's pending or approved variants are automatically rejected and removed from the variant queue. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
+As a moderator, when I reject a concept, all of that concept's pending, approved, or published variants are automatically rejected and removed from the variant queue. Each variant's submitter sees "Concept "X" was rejected: <reason>" in My Submissions and can resubmit. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
+
+As a moderator I cannot edit or reject a published concept or variant — only admins can. The server rejects the attempt with a 403.
 
 As a moderator or admin, after I approve, reject, or publish an item, the moderation queue automatically refreshes from the server to reflect the latest state — including any cascade effects from concept rejection.
 
@@ -107,3 +111,11 @@ As an admin I should be able to edit any submission including my own, using the 
 As an admin I should be able to reassign a variant to a different concept by using the Concept search field inside the variant Edit form. Suggestions show the concept's English gloss and ID. Selecting one and saving moves the variant to the new concept in place.
 
 As an admin, I cannot publish a variant whose parent concept has not yet been published. If I attempt to do so, I see an error message. I must publish the concept first, then publish its variants.
+
+As an admin, on the dashboard Concepts page, I can click a published concept's row (or its Manage button) to expand it. The panel shows the concept's published variants, and both the concept and each variant have Edit and Reject buttons. Moderators do not see the Manage button and cannot expand rows.
+
+As an admin I can edit a published concept or variant from that panel using the same inline Edit form as the queue. A note is required, the item stays published, and an `edited` ModerationLog record is written.
+
+As an admin I can reject a published concept from that panel. The Reject modal requires a reason and warns how many variants will also be rejected. On confirm, the concept leaves the public site, every one of its variants is rejected with the note "Concept "X" was rejected: <reason>", and the Concepts list refreshes.
+
+As an admin I can reject a single published variant from that panel with a required reason. It disappears from the panel and the public concept page, and its submitter sees the reason in My Submissions.

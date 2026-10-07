@@ -109,8 +109,10 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
-| PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish |
-| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept |
+| PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting a published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
+| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting a published variant is admin-only |
+| PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
+| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required). Published variants are admin-only |
 | GET | `/api/moderation/log` | Admin | Audit log |
 
 ---

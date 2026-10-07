@@ -66,10 +66,15 @@ submitted → pending    (automatic on POST)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
 Every transition on either a Concept or a Variant writes a record to `ModerationLog` with the target model, target ID, action, performer, and optional note. This creates a full audit trail that the admin dashboard exposes.
+
+`published → rejected` lets an admin take down a live entry so its submitter can fix and resubmit it; it then goes through normal review again. A moderator attempting it gets a 403.
+
+Rejecting a concept (from any status) also rejects its live pending, approved and published variants: each is set to `rejected`, soft-deleted, and given the note `Concept "<gloss>" was rejected: <note>`, so its submitter sees the reason in My Submissions and can resubmit.
 
 Invalid transitions (e.g. `published → pending`) are rejected with a 400 — the state machine is enforced at the controller level, not left to the client to honour.
 
@@ -107,7 +112,7 @@ The system has two distinct mechanisms for changing a submission's content, and 
 
 **User resubmission** (`PUT /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
 
-**Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status. A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
+**Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status, except that only admins may edit a `published` entry (moderators get a 403). A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
 
 Keeping these as two different routes with different semantics prevents ambiguity about who changed what and why. A `resubmitted` log entry always means the original submitter took action; an `edited` entry always means staff did.
 

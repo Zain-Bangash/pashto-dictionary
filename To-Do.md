@@ -8,15 +8,17 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-1. ~~Change the smoothness of admin dashboard~~ — done: moderation queue grouped by concept with variant dropdowns (see Completed)
-  
+1. ~~clicking the concept row should expand it rather than pressing 'N varient waiting'~~ — done (see Completed)
+2. ~~I should be able edit or reject (in which can its user can resubmit it) an already published concept or variant~~ — done (see Completed)
 
 2. Add more things to a variant such as plural ete and other vital stuff
 3. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
 4. see if database is 3nf (admin can edit part of speech and region) (can admin edit the whole variant section to add or remove things from it)
 5. Have an an alert tab for admin to see what a variant is missing, admin can either edit those words or make them highlighted in a tab for customers (have a 'attention' tab for customer,) (what should mod's job here be?)
 6. admin should be promote users to mod or demote mods
-7. mod should only be able to set am edit request  user's published concept or variant to the admin with a note ofc (admin press tick and edit is finalized), similarly make the merge as a request as well
+7. Change mod functionality
+  - mod can approve or reject with a note
+  - anything else discuss with me
 
 ## Backlog
 
@@ -68,5 +70,6 @@ _No active phase._
 - Post-14 polish: usernames via `enrichActors` (shown on concept/variant detail, queue, audit log, My Submissions); audit log filters, diffs, timestamps
 - GitHub Actions CI badge in README
 - Grouped moderation queue: concept rows with waiting-variant dropdowns (`GET /api/moderation/queue`); variant approve now requires an approved/published concept; `DashboardQueue.jsx` split into `components/moderation/`
+- Queue concept rows expand on click; admin edit/reject of published concepts and variants from the dashboard Concepts page (`published → rejected`, admin only); concept rejection now marks cascaded variants `rejected` with a note naming the concept; moderators can no longer edit published entries
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

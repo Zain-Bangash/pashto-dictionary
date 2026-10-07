@@ -88,6 +88,7 @@ submitted → pending    (automatic on POST /api/concepts or /api/variants)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
