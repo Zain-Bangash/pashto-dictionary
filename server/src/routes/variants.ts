@@ -3,6 +3,7 @@ import { body, query } from 'express-validator';
 import { verifyToken, optionalVerifyToken } from '../middleware/auth';
 import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
 import { activeLookup, lookupFormat } from '../utils/lookups';
+import { formsValidators } from '../utils/variantForms';
 import {
   createVariant,
   listVariants,
@@ -27,15 +28,17 @@ const createValidators = [
   body('definition').trim().notEmpty().withMessage('definition is required'),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
   extraFormat,
+  ...formsValidators,
 ];
 
 const updateValidators = [
   lookupFormat('region', true),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
   extraFormat,
+  ...formsValidators,
 ];
 
-const editValidators = [lookupFormat('region', true), extraFormat];
+const editValidators = [lookupFormat('region', true), extraFormat, ...formsValidators];
 
 const statusValidators = [
   body('status')

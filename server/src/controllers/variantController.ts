@@ -7,6 +7,7 @@ import { IVariant } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
+import { validateForms, applyForms } from '../utils/variantForms';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -52,9 +53,15 @@ async function createVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const conceptExists = await Concept.exists({ _id: conceptId });
-  if (!conceptExists) {
+  const concept = await Concept.findById(conceptId, 'partOfSpeech').lean();
+  if (!concept) {
     res.status(404).json({ success: false, error: { message: 'Concept not found' } });
+    return;
+  }
+
+  const forms = validateForms(req.body.forms, concept.partOfSpeech);
+  if (forms.error) {
+    res.status(400).json({ success: false, error: forms.error });
     return;
   }
 
@@ -84,6 +91,7 @@ async function createVariant(req: Request, res: Response): Promise<void> {
       example,
       submissionNote,
       extra: initialExtra(extra.values),
+      forms: forms.forms?.length ? forms.forms : undefined,
       submittedBy: req.user!.id,
       status: 'pending',
     }).save();
@@ -209,6 +217,13 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const concept = await Concept.findById(variant.concept, 'partOfSpeech').lean();
+  const forms = validateForms(req.body.forms, concept?.partOfSpeech, variant.forms);
+  if (forms.error) {
+    res.status(400).json({ success: false, error: forms.error });
+    return;
+  }
+
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
   if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
@@ -236,6 +251,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
   if (example !== undefined)         variant.example        = example;
   if (submissionNote !== undefined)  variant.submissionNote = submissionNote;
   applyExtra(variant, extra.values);
+  applyForms(variant, forms.forms);
   variant.status = 'pending';
   variant.moderatorNote = undefined;
   variant.isDeleted = false;
@@ -392,7 +408,7 @@ async function getMyVariantSubmissions(req: Request, res: Response): Promise<voi
   };
 
   const [data, total] = await Promise.all([
-    Variant.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('concept', 'englishGloss').lean(),
+    Variant.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('concept', 'englishGloss partOfSpeech').lean(),
     Variant.countDocuments(filter),
   ]);
 
@@ -520,13 +536,20 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     variant.concept = new mongoose.Types.ObjectId(newConceptId);
   }
 
+  const formsConcept = await Concept.findById(variant.concept, 'partOfSpeech').lean();
+  const forms = validateForms(req.body.forms, formsConcept?.partOfSpeech, variant.forms);
+  if (forms.error) {
+    res.status(400).json({ success: false, error: forms.error });
+    return;
+  }
+
   // Apply simple field updates
   for (const field of simpleFields) {
     if (req.body[field as string] !== undefined) {
       (variant[field] as unknown) = req.body[field as string];
     }
   }
-  Object.assign(changes, applyExtra(variant, extra.values));
+  Object.assign(changes, applyExtra(variant, extra.values), applyForms(variant, forms.forms));
 
   await variant.save();
 

@@ -142,7 +142,7 @@ async function getConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const rawVariants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }).lean();
+  const rawVariants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }, { 'forms.normalizedPashto': 0 }).lean();
 
   const [enrichedConcept] = await enrichActors([found as unknown as Doc], 'submittedBy');
   const variants = await enrichActors(rawVariants as unknown as Doc[], 'submittedBy');
@@ -183,17 +183,32 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
 
   const ql    = q.toLowerCase();
   const regex = new RegExp(escapeRegex(q), 'i');
+  const pashtoQ     = q.normalize('NFC');
+  const pashtoRegex = new RegExp(escapeRegex(pashtoQ));
 
-  function scoreText(text: string | undefined): number {
+  function scoreText(text: string | undefined, query = ql): number {
     const t = (text || '').toLowerCase();
-    if (t === ql)          return 3;
-    if (t.startsWith(ql)) return 2;
+    if (t === query)          return 3;
+    if (t.startsWith(query)) return 2;
     return 1;
   }
 
-  const [glossMatches, phoneticVariants] = await Promise.all([
+  // A form scores half a tier below the same match on the headword, so exact > prefix > contains still holds
+  function scorePashto(v: { normalizedPashto?: string; forms?: { normalizedPashto?: string }[] }): number {
+    const scores = (v.forms ?? [])
+      .filter((f) => pashtoRegex.test(f.normalizedPashto ?? ''))
+      .map((f) => scoreText(f.normalizedPashto, pashtoQ) - 0.5);
+    if (pashtoRegex.test(v.normalizedPashto ?? '')) scores.push(scoreText(v.normalizedPashto, pashtoQ));
+    return Math.max(0, ...scores);
+  }
+
+  const [glossMatches, phoneticVariants, pashtoVariants] = await Promise.all([
     Concept.find({ englishGloss: regex, status: 'published', isDeleted: { $ne: true } }, '_id englishGloss').lean(),
     Variant.find({ phonetic: regex, status: 'published', isDeleted: { $ne: true } }, 'concept phonetic').lean(),
+    Variant.find(
+      { $or: [{ normalizedPashto: pashtoRegex }, { 'forms.normalizedPashto': pashtoRegex }], status: 'published', isDeleted: { $ne: true } },
+      'concept normalizedPashto forms.normalizedPashto'
+    ).lean(),
   ]);
 
   const scoreMap = new Map<string, number>();
@@ -206,6 +221,11 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
   for (const v of phoneticVariants) {
     const id = (v.concept as mongoose.Types.ObjectId).toString();
     scoreMap.set(id, Math.max(scoreMap.get(id) ?? 0, scoreText(v.phonetic as string | undefined)));
+  }
+
+  for (const v of pashtoVariants) {
+    const id = (v.concept as mongoose.Types.ObjectId).toString();
+    scoreMap.set(id, Math.max(scoreMap.get(id) ?? 0, scorePashto(v)));
   }
 
   if (scoreMap.size === 0) {
