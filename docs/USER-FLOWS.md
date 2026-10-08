@@ -16,6 +16,8 @@ As a guest I should be able to click a concept card to go to its detail page, wh
 
 As a guest, a concept's detail page also shows any extra field values admins have defined: concept fields under the concept heading, and variant fields in each region's panel. Fields an admin has deactivated are not shown.
 
+As a guest, under each regional variant on a concept page I can expand a "Forms" list showing the word's grammatical forms (for example masculine plural direct, or past tense), each with its Pashto text, phonetic and example sentence. Searching for any form's Pashto text, such as a plural, finds the word.
+
 As a guest I should be able to click Register in the navbar to go to the Register page.
 
 As a guest I should be able to click Login in the navbar to go to the Login page.
@@ -36,6 +38,8 @@ As a user I should be able to go to the Submit page to submit a new entry. The f
 
 As a user, the Submit form also shows any extra fields admins have added: concept fields when I create a new concept, and variant fields in Step 2. Fields not marked optional are required, and I cannot submit until they are filled. These fields are not required when I resubmit an existing entry.
 
+As a user, in Step 2 of the Submit form, if the concept is a noun or adjective I can add gendered forms (masculine/feminine × singular/plural × direct/oblique); if it is a verb I can add infinitive, past, present and imperative forms. Each form needs its Pashto text; phonetic and an example are optional. I cannot add the same form twice, and other parts of speech have no forms.
+
 As a user I should be able to submit a new concept and its first variant together. After submission both are placed in the pending state awaiting a moderator.
 
 As a user I should be able to submit a new variant for an existing concept by selecting it from the autocomplete in Step 1, then completing Step 2 for my variant.
@@ -50,7 +54,9 @@ As a user, in Step 2 of the Submit form, I can optionally add a note to the mode
 
 As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
 
-As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published). The resubmit form includes the entry's extra fields, so I can fix those values too.
+As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published). The resubmit form includes the entry's extra fields and grammatical forms, so I can fix, add or remove those too.
+
+As a user I cannot change the forms of my pending or published variant — the server rejects it. To add forms to a published word, I ask an admin, who adds them through the Edit form while the word stays published.
 
 ---
 
@@ -82,7 +88,9 @@ As a moderator I should be able to reject a pending item by clicking Reject, whi
 
 As a moderator I should be able to edit any submission that was not submitted by me and is not yet published, using the Edit button on the queue card. The inline form opens pre-populated with the current values, including any extra fields. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change. Changes to extra fields appear in the edit's Moderation Log diff under the field's name. If the server rejects the edit, its message is shown in the form.
 
-As a moderator, each concept row and variant row in the queue shows the entry's extra field values, so I can review them without opening the Edit form.
+As a moderator, each concept row and variant row in the queue shows the entry's extra field values, so I can review them without opening the Edit form. Variant rows also have a collapsible Forms list.
+
+As a moderator, the variant Edit form includes the variant's grammatical forms, which I can add, change or remove. Each changed form appears in the Moderation Log diff under its name (for example "form (Masculine plural, direct)"). If the concept's part of speech changed after forms were added, forms that no longer match are labelled so I can remove them; the server only rejects new or changed forms that do not match.
 
 As a moderator I should see a "Similar concepts" panel on each concept card in the queue, populated by the suggest endpoint using that concept's English gloss. If a match is found I can click "Merge into this" to open a confirmation modal, enter a note, and merge the pending concept into the existing one. All variants are moved to the target; the source concept is soft-deleted.
 

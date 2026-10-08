@@ -114,7 +114,7 @@ The same self-separation rule extends to moderator edits (see *Moderator and Adm
 
 The system has two distinct mechanisms for changing a submission's content, and it is important that they remain separate:
 
-**User resubmission** (`PUT /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
+**User resubmission** (`PATCH /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
 
 **Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status, except that only admins may edit a `published` entry (moderators get a 403). A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
 
@@ -142,6 +142,9 @@ changes: { op: 'option_added', appliesTo: 'variant', key: 'register', option: { 
 
 // edited — custom field values appear alongside core fields
 changes: { definition: { from: 'a', to: 'b' }, 'extra.plural': { from: 'لمرونه', to: '' } }
+
+// edited — grammatical forms, one key per changed slot; null means the form was added or removed
+changes: { 'forms.masculine.plural.direct': { from: null, to: { pashto: 'لمرونه', phonetic: 'lmaruna' } } }
 ```
 
 Only fields that actually changed appear in the diff — unchanged fields are omitted. This keeps the log readable and ensures the admin dashboard can show meaningful diffs without storing noise.
@@ -202,6 +205,7 @@ To address the first problem, three normalized fields are derived automatically 
 | `Concept.normalizedGloss` | `englishGloss` | `.toLowerCase().trim()` |
 | `Variant.normalizedPashto` | `pashto` | `.trim().normalize('NFC')` |
 | `Variant.normalizedPhonetic` | `phonetic` | `.toLowerCase().trim()` |
+| `Variant.forms[].normalizedPashto` | `forms[].pashto` | `.trim().normalize('NFC')` (search only, never part of the duplicate check) |
 
 The NFC normalization on `normalizedPashto` deserves specific attention. Arabic-script keyboards — particularly on Android and iOS — can produce different Unicode byte sequences for the same visual character. One keyboard may output a precomposed code point; another may output a base character with a combining diacritical mark. Both render identically on screen but are not equal as strings. Without NFC normalization, two users submitting the same Pashto word from different phones would both pass the duplicate check. `.normalize('NFC')` collapses all representations to their canonical composed form, making the comparison encoding-independent. It requires no external library — it is a native JavaScript method.
 
@@ -257,16 +261,17 @@ The initial search used MongoDB's `$text` operator against an index on `Concept.
 
 ### The new approach
 
-Search now runs two parallel regex queries against separate collections:
+Search now runs three parallel regex queries:
 
 ```js
-const [glossMatches, phoneticVariants] = await Promise.all([
+const [glossMatches, phoneticVariants, pashtoVariants] = await Promise.all([
   Concept.find({ englishGloss: regex, status: 'published' }, '_id englishGloss').lean(),
   Variant.find({ phonetic: regex, status: 'published' }, 'concept phonetic').lean(),
+  Variant.find({ $or: [{ normalizedPashto: pashtoRegex }, { 'forms.normalizedPashto': pashtoRegex }], status: 'published' }, ...).lean(),
 ]);
 ```
 
-The results are unified by concept ID into a score map, where each concept gets the higher of its two scores:
+The Pashto query is NFC-normalized the same way as stored text, so it matches the headword and every grammatical form (searching لمرونه finds *sun* through its plural). The results are unified by concept ID into a score map, where each concept gets the highest of its scores:
 
 | Condition | Score |
 |---|---|
@@ -275,6 +280,8 @@ The results are unified by concept ID into a score map, where each concept gets 
 | Contains query anywhere | 1 |
 
 Searching "love" returns "Love / Affection" (score 3) before "Lovely" (score 2) before "Beloved" (score 1). Searching "mee" returns concepts whose variants have phonetics like "meena" — something the text index approach could never do.
+
+A match on a grammatical form scores half a tier below the same match on the headword (2.5 / 1.5 / 0.5). Exact still beats prefix, and prefix still beats contains, while within a tier the headword ranks above a form. The older `GET /api/variants/search` endpoint (MongoDB `$text` on the headword, unused by the client) is unchanged: a collection can have only one text index, and changing it would need a manual index drop in Atlas.
 
 The results are sorted in-memory by score before pagination, and the internal `_score` field is stripped before the response is returned to the client.
 
@@ -385,6 +392,44 @@ Values show on the concept detail page and in the moderation queue, but they are
 ### Client
 
 `FieldsProvider` loads the active definitions once (`GET /api/fields`, which includes every option with its `active` flag). `ExtraFieldsInputs` renders the inputs on Submit, the moderation edit forms and the My Submissions resubmit forms; a stored retired option shows as "(retired)". `ExtraFieldsDisplay` renders values as plain text on ConceptDetail and in the queue rows. The admin page loads every definition, including inactive ones, from `GET /api/fields/all`.
+
+---
+
+## Variant grammatical forms
+
+A variant can carry grammatical forms: nouns and adjectives get gender × number × case (8 slots), verbs get infinitive, past, present and imperative. Each form has its own Pashto text plus an optional phonetic and example sentence.
+
+```
+Variant.forms: [{ kind: 'noun' | 'verb', gender?, number?, case?, verbForm?, pashto, normalizedPashto, phonetic?, example? }]
+```
+
+### Why embedded subdocuments
+
+Forms belong to exactly one variant and are reviewed with it as one unit, so they are an embedded array (`_id: false`), not a collection. A typed subschema, rather than `Mixed`, gives enum casting and automatic change tracking, and the server rejects unknown keys before they reach it. A form's slot (`masculine.plural.direct` or `past`) is unique within a variant, so it is the form's identity and no `_id` is needed. Audio can be added later as one more optional field on the subschema.
+
+### Why fixed enums, not Lookups
+
+Gender, number, case and verb form are grammar, not community-editable content. Validation, display labels, log diff keys and search ranking all depend on the exact set, so the values are fixed in code (`server/src/utils/variantForms.ts`, mirrored in `client/src/utils/forms.js`). Which kind of forms a concept allows is a code map keyed by the part-of-speech **Lookup key**, not its label: `noun` and `adjective` → noun forms, `verb` → verb forms, anything else (including admin-added parts of speech) → none. Perfective/imperfective verb forms are a later addition to the enum.
+
+### Why the headword stays
+
+Top-level `pashto`, `phonetic` and `example` remain the headword. Duplicate detection, the unique index, cross-concept warnings, the concept page grouping and every existing variant depend on them. Forms are additive and optional, so old variants need no backfill.
+
+### Validation
+
+`validateForms(input, partOfSpeech, current)` runs on create, user resubmit and staff edit, after the express-validator chains in `formsValidators`:
+
+- At most 16 forms (nouns use up to 8 today, leaving room for later verb forms). Pashto is required and at most 100 characters; phonetic at most 100; example at most 500. Control characters are stripped and text is NFC-normalized.
+- A noun form needs gender, number and case and no verb form; a verb form the reverse. Unknown keys, including a client-supplied `normalizedPashto`, are rejected.
+- No slot may appear twice.
+- The kind must match the concept's part of speech. A staff edit that reassigns the variant is checked against the target concept.
+- A form identical to a stored one always passes — the same "unchanged stays valid" rule as S4a/S4b. A concept's part of speech can change, and a variant can be reassigned or merged, without destroying its forms; the edit form labels mismatched forms so staff can remove them.
+
+When `forms` is sent it replaces the whole array (`[]` clears it); when it is omitted nothing changes. Forms are stored in canonical slot order. Staff edits log one `forms.<slot>` diff per changed form. The moderation state machine is unchanged.
+
+### Client
+
+`FormsEditor` (with `FormRow`) renders on Submit Step 2, the My Submissions resubmit form and the moderation edit form. Rows are added one free slot at a time, and each slot select offers only unused slots. `FormsDisplay` is a collapsed "Forms (n)" list on ConceptDetail (per selected region) and in queue rows, rendered as plain text with Pashto in `dir="rtl" font-pashto`.
 
 ---
 

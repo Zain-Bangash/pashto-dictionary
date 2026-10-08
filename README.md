@@ -104,18 +104,19 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/auth/login` | — | Login, returns Cognito access token. `401` on wrong email/password, `429` when rate-limited |
 | GET | `/api/auth/me` | Token | Current user |
 | GET | `/api/concepts` | — | List published concepts (paginated) |
-| GET | `/api/concepts/search?q=` | — | Ranked search (gloss + phonetic) |
+| GET | `/api/concepts/search?q=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms) |
 | GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
 | GET | `/api/concepts/:id` | — | Concept + its published variants |
 | POST | `/api/concepts` | Token | Submit new concept (optional `extra` values for custom fields) |
-| POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields) |
+| POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields; optional `forms` allowed by the concept's part of speech) |
+| PATCH | `/api/variants/:id` | Token (submitter) | Edit and resubmit a rejected variant (rejected → pending), including `extra` and `forms` |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting a published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
 | PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting a published variant is admin-only |
 | PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
-| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required). Published variants are admin-only |
+| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required), including `forms` (replaces the list). Published variants are admin-only |
 | GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`) |
 | GET | `/api/lookups?type=` | — | Region and part-of-speech list values, including inactive ones (`active: false`) |
 | POST | `/api/lookups` | Admin | Add a list value `{ type, label }` — the key is the label at creation and never changes |

@@ -9,7 +9,7 @@ _No active phase._
 ---
 ## Rough Thoughts
 
-2. Add more things to a variant such as plural ete and other vital stuff
+2. audio
 3. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
 5. Have an an alert tab for admin to see what a variant is missing, admin can either edit those words or make them highlighted in a tab for customers (have a 'attention' tab for customer,) (what should mod's job here be?)
 6. admin should be promote users to mod or demote mods
@@ -23,7 +23,7 @@ _No active phase._
 ### Frontend
 - [ ] About page `[F2]`
 - [ ] Extract `AmbientBackground` from `Home.jsx` into `components/` _(suggested)_ `[F3]`
-- [ ] Split oversized components — `Home.jsx` (454), `Submit.jsx` (368), `MySubmissions.jsx` (347) _(suggested)_ `[F4]`
+- [ ] Split oversized components — `Home.jsx` (454), `Submit.jsx` (419), `MySubmissions.jsx` (383) _(suggested)_ `[F4]`
 
 ### Backend
 - [ ] Improve search — fuzzy matching `[B1]`
@@ -37,6 +37,7 @@ _No active phase._
 - [ ] Community page: top contributing users `[S1]`
 - [ ] Region filter on the Concepts browse page _(suggested)_ `[S2]`
 - [ ] Admin trash view — restore soft-deleted concepts/variants _(suggested)_ `[S3]`
+- [ ] Let submitters propose forms for their own published variants without unpublishing (pending suggestion, live word stays visible) — ties into the admin 'attention' tab idea
 - [ ] 
 - [ ] Admin 
 
@@ -70,5 +71,6 @@ _No active phase._
 - Grouped moderation queue: concept rows with waiting-variant dropdowns (`GET /api/moderation/queue`); variant approve now requires an approved/published concept; `DashboardQueue.jsx` split into `components/moderation/`
 - Admin-editable preset lists `[S4a]`: `Lookup` collection for region and part of speech (immutable key, editable label, deactivate-not-delete); admin page at `/dashboard/lists`; `lookup_changed` audit action; built-in values seeded on server start
 - Admin-defined custom fields `[S4b]`: `FieldDefinition` collection (text / long text / dropdown, server-generated keys, deactivate-not-delete); values in `Concept.extra` / `Variant.extra`; shown on Submit, moderation edit and resubmit forms, ConceptDetail and queue rows; admin page at `/dashboard/fields`; `field_changed` audit action; not searchable by design
+- [x] Variant grammatical forms: optional `Variant.forms` (noun/adjective gender × number × case; verb infinitive/past/present/imperative), each with Pashto, phonetic and example; validated against the concept's part of speech; reviewed with the variant; collapsible Forms list on the concept page and queue; form text searchable in ranked search
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)
