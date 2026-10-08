@@ -4,6 +4,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
 import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
+import FormsDisplay from '../components/forms/FormsDisplay';
 
 export default function ConceptDetail() {
   const { id } = useParams();
@@ -123,6 +124,7 @@ export default function ConceptDetail() {
                           <p className="font-ui text-muted text-sm italic">{selected.example}</p>
                         )}
                         <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
+                        <FormsDisplay key={selected._id} forms={selected.forms} />
 
                         {selected.submittedBy?.username && (
                           <p className="text-[11px] font-ui text-muted/40">

@@ -70,13 +70,14 @@ submitted → pending    (automatic on POST)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+approved  → rejected   (admin only, note required)
 published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
 Every transition on either a Concept or a Variant writes a record to `ModerationLog` with the target model, target ID, action, performer, and optional note. This creates a full audit trail that the admin dashboard exposes.
 
-`published → rejected` lets an admin take down a live entry so its submitter can fix and resubmit it; it then goes through normal review again. A moderator attempting it gets a 403.
+`published → rejected` lets an admin take down a live entry so its submitter can fix and resubmit it; it then goes through normal review again. `approved → rejected` lets an admin turn back an item a moderator approved instead of being forced to publish it. A moderator attempting either gets a 403; moderators never see approved items anyway.
 
 Rejecting a concept (from any status) also rejects its live pending, approved and published variants: each is set to `rejected`, soft-deleted, and given the note `Concept "<gloss>" was rejected: <note>`, so its submitter sees the reason in My Submissions and can resubmit.
 
@@ -114,7 +115,7 @@ The same self-separation rule extends to moderator edits (see *Moderator and Adm
 
 The system has two distinct mechanisms for changing a submission's content, and it is important that they remain separate:
 
-**User resubmission** (`PUT /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
+**User resubmission** (`PATCH /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
 
 **Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status, except that only admins may edit a `published` entry (moderators get a 403). A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
 
@@ -142,6 +143,9 @@ changes: { op: 'option_added', appliesTo: 'variant', key: 'register', option: { 
 
 // edited — custom field values appear alongside core fields
 changes: { definition: { from: 'a', to: 'b' }, 'extra.plural': { from: 'لمرونه', to: '' } }
+
+// edited — grammatical forms, one key per changed slot; null means the form was added or removed
+changes: { 'forms.masculine.plural.direct': { from: null, to: { pashto: 'لمرونه', phonetic: 'lmaruna' } } }
 ```
 
 Only fields that actually changed appear in the diff — unchanged fields are omitted. This keeps the log readable and ensures the admin dashboard can show meaningful diffs without storing noise.
@@ -202,6 +206,7 @@ To address the first problem, three normalized fields are derived automatically 
 | `Concept.normalizedGloss` | `englishGloss` | `.toLowerCase().trim()` |
 | `Variant.normalizedPashto` | `pashto` | `.trim().normalize('NFC')` |
 | `Variant.normalizedPhonetic` | `phonetic` | `.toLowerCase().trim()` |
+| `Variant.forms[].normalizedPashto` | `forms[].pashto` | `.trim().normalize('NFC')` (search only, never part of the duplicate check) |
 
 The NFC normalization on `normalizedPashto` deserves specific attention. Arabic-script keyboards — particularly on Android and iOS — can produce different Unicode byte sequences for the same visual character. One keyboard may output a precomposed code point; another may output a base character with a combining diacritical mark. Both render identically on screen but are not equal as strings. Without NFC normalization, two users submitting the same Pashto word from different phones would both pass the duplicate check. `.normalize('NFC')` collapses all representations to their canonical composed form, making the comparison encoding-independent. It requires no external library — it is a native JavaScript method.
 
@@ -215,6 +220,8 @@ To address the race condition, MongoDB unique indexes enforce the identity rules
 - `Variant`: compound unique index on `{ concept, normalizedPashto, region }`
 
 These constraints mean that even if two concurrent requests both pass the application-level pre-check, the database will reject the second insert with an `E11000 duplicate key` error (MongoDB error code 11000). The server catches this error and returns a 409 Conflict rather than letting it surface as a 500. The result is race-condition safety that is guaranteed by the storage layer, not by the timing of application-level queries.
+
+Both unique indexes are **partial on `isDeleted: false`**, and a rejected variant is soft-deleted at rejection. So a rejected variant does not hold its key: someone else can create the same word for the same concept and region, which is intended, because the rejected one may never come back. The clash surfaces when the rejected one is resubmitted, since resubmitting sets `isDeleted` back to `false`. The resubmit path therefore always re-runs the duplicate check (not only when the word or region changed) and also catches E11000, returning a 409 that explains someone may have added the word meanwhile. Staff edits catch E11000 the same way. No mutation path lets the index error surface as a 500.
 
 The identity rule for a variant is deliberately scoped to `concept + pashto + region` rather than globally unique across the entire collection. The same Pashto word can legitimately appear under two different concepts — a form of polysemy that is linguistically valid — and the compound index correctly permits this while still preventing exact duplicates within a single concept and region.
 
@@ -257,16 +264,17 @@ The initial search used MongoDB's `$text` operator against an index on `Concept.
 
 ### The new approach
 
-Search now runs two parallel regex queries against separate collections:
+Search now runs three parallel regex queries:
 
 ```js
-const [glossMatches, phoneticVariants] = await Promise.all([
+const [glossMatches, phoneticVariants, pashtoVariants] = await Promise.all([
   Concept.find({ englishGloss: regex, status: 'published' }, '_id englishGloss').lean(),
   Variant.find({ phonetic: regex, status: 'published' }, 'concept phonetic').lean(),
+  Variant.find({ $or: [{ normalizedPashto: pashtoRegex }, { 'forms.normalizedPashto': pashtoRegex }], status: 'published' }, ...).lean(),
 ]);
 ```
 
-The results are unified by concept ID into a score map, where each concept gets the higher of its two scores:
+The Pashto query is NFC-normalized the same way as stored text, so it matches the headword and every grammatical form (searching لمرونه finds *sun* through its plural). The results are unified by concept ID into a score map, where each concept gets the highest of its scores:
 
 | Condition | Score |
 |---|---|
@@ -275,6 +283,8 @@ The results are unified by concept ID into a score map, where each concept gets 
 | Contains query anywhere | 1 |
 
 Searching "love" returns "Love / Affection" (score 3) before "Lovely" (score 2) before "Beloved" (score 1). Searching "mee" returns concepts whose variants have phonetics like "meena" — something the text index approach could never do.
+
+A match on a grammatical form scores half a tier below the same match on the headword (2.5 / 1.5 / 0.5). Exact still beats prefix, and prefix still beats contains, while within a tier the headword ranks above a form. The older `GET /api/variants/search` endpoint (MongoDB `$text` on the headword, unused by the client) is unchanged: a collection can have only one text index, and changing it would need a manual index drop in Atlas.
 
 The results are sorted in-memory by score before pagination, and the internal `_score` field is stripped before the response is returned to the client.
 
@@ -385,6 +395,106 @@ Values show on the concept detail page and in the moderation queue, but they are
 ### Client
 
 `FieldsProvider` loads the active definitions once (`GET /api/fields`, which includes every option with its `active` flag). `ExtraFieldsInputs` renders the inputs on Submit, the moderation edit forms and the My Submissions resubmit forms; a stored retired option shows as "(retired)". `ExtraFieldsDisplay` renders values as plain text on ConceptDetail and in the queue rows. The admin page loads every definition, including inactive ones, from `GET /api/fields/all`.
+
+---
+
+## Variant grammatical forms
+
+A variant can carry grammatical forms: nouns and adjectives get gender × number × case (8 slots), verbs get infinitive, past, present and imperative. Each form has its own Pashto text plus an optional phonetic and example sentence.
+
+```
+Variant.forms: [{ kind: 'noun' | 'verb', gender?, number?, case?, verbForm?, pashto, normalizedPashto, phonetic?, example? }]
+```
+
+### Why embedded subdocuments
+
+Forms belong to exactly one variant and are reviewed with it as one unit, so they are an embedded array (`_id: false`), not a collection. A typed subschema, rather than `Mixed`, gives enum casting and automatic change tracking, and the server rejects unknown keys before they reach it. A form's slot (`masculine.plural.direct` or `past`) is unique within a variant, so it is the form's identity and no `_id` is needed. Audio can be added later as one more optional field on the subschema.
+
+### Why fixed enums, not Lookups
+
+Gender, number, case and verb form are grammar, not community-editable content. Validation, display labels, log diff keys and search ranking all depend on the exact set, so the values are fixed in code (`server/src/utils/variantForms.ts`, mirrored in `client/src/utils/forms.js`). Which kind of forms a concept allows is a code map keyed by the part-of-speech **Lookup key**, not its label: `noun` and `adjective` → noun forms, `verb` → verb forms, anything else (including admin-added parts of speech) → none. Perfective/imperfective verb forms are a later addition to the enum.
+
+### Why the headword stays
+
+Top-level `pashto`, `phonetic` and `example` remain the headword. Duplicate detection, the unique index, cross-concept warnings, the concept page grouping and every existing variant depend on them. Forms are additive and optional, so old variants need no backfill.
+
+### Validation
+
+`validateForms(input, partOfSpeech, current)` runs on create, user resubmit and staff edit, after the express-validator chains in `formsValidators`:
+
+- At most 16 forms (nouns use up to 8 today, leaving room for later verb forms). Pashto is required and at most 100 characters; phonetic at most 100; example at most 500. Control characters are stripped and text is NFC-normalized.
+- A noun form needs gender, number and case and no verb form; a verb form the reverse. Unknown keys, including a client-supplied `normalizedPashto`, are rejected.
+- No slot may appear twice.
+- The kind must match the concept's part of speech. A staff edit that reassigns the variant is checked against the target concept.
+- A form identical to a stored one always passes — the same "unchanged stays valid" rule as S4a/S4b. A concept's part of speech can change, and a variant can be reassigned or merged, without destroying its forms; the edit form labels mismatched forms so staff can remove them.
+
+When `forms` is sent it replaces the whole array (`[]` clears it); when it is omitted nothing changes. Forms are stored in canonical slot order. Staff edits log one `forms.<slot>` diff per changed form. The moderation state machine is unchanged.
+
+### Client
+
+`FormsEditor` (with `FormRow`) renders on Submit Step 2, the My Submissions resubmit form and the moderation edit form. Rows are added one free slot at a time, and each slot select offers only unused slots. `FormsDisplay` is a collapsed "Forms (n)" list on ConceptDetail (per selected region) and in queue rows, rendered as plain text with Pashto in `dir="rtl" font-pashto`.
+
+---
+
+## Filling gaps: Wanted Words, completion and suggestions
+
+Three linked features help contributors fill holes in the dictionary without weakening review.
+
+### Wanted Words
+
+`GET /api/concepts/wanted?region=` lists published concepts with **no variant in that region**. Any variant hides the gap, whatever its status: pending, approved and published ones are live, and rejected ones are matched by status because rejection soft-deletes them. An abandoned rejection therefore keeps hiding its gap until its owner resubmits it or an admin deletes it. Admin-deleted variants (not rejected) do not hide it.
+
+It runs as two queries rather than an aggregation: `Variant.distinct('concept', { region, … })`, then `Concept.find({ status: 'published', _id: { $nin: ids } })` with skip/limit and a count on the same filter. The `{ region: 1, concept: 1 }` index covers the distinct. At the dataset sizes this project expects, a `$nin` list is cheap and both queries are trivially testable; if it grows into tens of thousands of concepts this is the single place to switch to a `$lookup`.
+
+### Blank fields — one definition
+
+`server/src/utils/blankFields.ts` defines "blank" once, as aggregation stages that add three fields to a variant:
+
+- `missingFields` — gaps, published variants only: `phonetic`, `example`, `forms` when the word has **no** forms and its part of speech allows them, and `extra.<key>` for active, **optional** variant fields. `pashto` and `definition` are required and never blank.
+- `fillableFields` — the gaps plus `forms` when some, but not all, form slots are filled.
+- `formsFilled` / `formsTotal` — for the "Forms 2/8" hint.
+
+Only `missingFields` drives the **Needs completion** count, so the chip stays a short to-do list; a noun with two of eight forms is offered "Add details" quietly rather than flagged. The same stages back the My Submissions filters (`?needs=completion&missing=&region=`) and `getCompletion(id)`. The client never computes blankness itself; it renders what the server returns.
+
+### Suggestions — a separate record
+
+A user may propose values for the blank fields of their **own published** variant. The live word stays published and unchanged until an admin publishes the suggestion. Unpublished variants keep the existing Edit & Resubmit workflow.
+
+```
+VariantSuggestion { variant, proposed: { phonetic?, example?, forms?[], extra?: Map }, status,
+                    submittedBy, reviewedBy, moderatorNote, timestamps }
+```
+
+**Why a separate collection.** Editing the variant in place would either unpublish it during review or put unreviewed text on the public page. An embedded "pending changes" block on the variant would mix two lifecycles in one document, complicate every read of a variant, and make "one open suggestion" an application rule instead of an index. A separate record keeps the variant's state machine untouched, gives the suggestion its own audit trail, and makes the live word's content provably unchanged until publish.
+
+**State machine** (mirrors the variant's, with no `published → …`):
+
+```
+pending  → approved   (moderator or admin; not on your own suggestion)
+pending  → rejected   (moderator or admin, note required)
+approved → published  (admin only — merges into the live word)
+approved → rejected   (admin only, note required)
+rejected → pending    (owner edits and resubmits)
+```
+
+**One open suggestion per variant** is a partial unique index on `{ variant: 1 }` where `status ∈ { pending, approved }` (MongoDB 6.0+), with a pre-check for a clean 409.
+
+**Fill-only, checked four times.** `validateProposal()` (in `utils/suggestions.ts`) runs on submit, resubmit, staff edit and approve, and again at publish. Every proposed value must go into a field that is blank on the live word *now*; otherwise the request fails with 400 and the field named (`phonetic`, `forms.masculine.plural.direct`, `extra.register`). Forms are fill-only **per slot**, so a suggestion can add the empty slots of a partly filled word. Forms are re-validated against the concept's current part of speech, and extra values with `validateExtra`. Core fields (`pashto`, `definition`, `region`, …) are rejected by the route validators.
+
+**Preventing conflicts instead of resolving them.** While a suggestion is open, a staff edit to the word cannot change the fields it proposes (409 naming the field); other fields stay editable. The admin's published-word panel shows a "Suggestion pending" badge, disables those inputs and hides the proposed form slots. Staff fix a suggestion *inside* the review instead (`PATCH /api/suggestions/:id/edit`, note required, logged as `edited` with a diff). The remaining ways a publish can fail — a split-second race, the concept's part of speech changing, a custom field being deactivated — refuse the publish with the field named. The suggestion stays approved, and the admin edits or rejects it.
+
+**Publish merge.** There are no transactions in this codebase (and Jest runs a standalone MongoDB), so publish uses conditional writes:
+
+1. Claim: `findOneAndUpdate({ _id, status: 'approved' }, { status: 'published' })`; a double-click or a second admin gets a 400.
+2. Re-check fill-only against the freshly read word.
+3. Write with `Variant.updateOne({ _id, updatedAt: <read value> }, { $set })`, setting `normalizedPhonetic` and each form's `normalizedPashto` itself because `updateOne` skips the pre-save hook. Forms are merged with the existing ones and stored in canonical order.
+4. If the word changed between read and write, retry once; on any failure, put the suggestion back to `approved`.
+
+**Cascade.** When a word leaves the published state — rejected (directly or through its concept) or deleted — its open suggestions are rejected with a note naming the cause, and each gets a log entry.
+
+**Audit log.** Suggestion transitions log under `targetModel: 'VariantSuggestion'` with the usual actions. Publishing also writes `suggestion_applied` on the **Variant**, with an `edited`-style diff and the suggestion id, so the word's own history shows when and how its content changed.
+
+Create and resubmit share a rate limiter (30 requests per 15 minutes) built the same way as the auth limiter.
 
 ---
 
@@ -545,7 +655,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 - **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
 - **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
 - **Timestamps**: each entry shows an absolute date/time.
-- **Action badge colours**: all 11 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`, `field_changed`) have distinct colours. `lookup_changed` and `field_changed` entries render from their `changes` payload. `extra.<key>` diffs in `edited` entries are shown under the field's label.
+- **Action badge colours**: all 12 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`, `field_changed`, `suggestion_applied`) have distinct colours. Suggestion entries are labelled with the word they complete. `lookup_changed` and `field_changed` entries render from their `changes` payload. `extra.<key>` diffs in `edited` entries are shown under the field's label.
 
 ---
 

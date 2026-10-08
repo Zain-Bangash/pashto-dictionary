@@ -86,8 +86,12 @@ submitted → pending    (automatic on POST)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+approved  → rejected   (admin only, note required)
+published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
+
+Users can also propose missing details (phonetic, example, forms, optional extra fields) for their own published words. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
 
 Every transition on Concept or Variant writes a record to `ModerationLog` with the actor, action, timestamp, and optional note. Invalid transitions return 400. Moderators cannot approve their own submissions.
 
@@ -104,19 +108,27 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/auth/login` | — | Login, returns Cognito access token. `401` on wrong email/password, `429` when rate-limited |
 | GET | `/api/auth/me` | Token | Current user |
 | GET | `/api/concepts` | — | List published concepts (paginated) |
-| GET | `/api/concepts/search?q=` | — | Ranked search (gloss + phonetic) |
+| GET | `/api/concepts/search?q=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms) |
 | GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
+| GET | `/api/concepts/wanted?region=&q=` | — | Published concepts with no variant (any status) in the region; paginated, `meta.total` reflects the filters |
 | GET | `/api/concepts/:id` | — | Concept + its published variants |
 | POST | `/api/concepts` | Token | Submit new concept (optional `extra` values for custom fields) |
-| POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields) |
+| POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields; optional `forms` allowed by the concept's part of speech) |
+| PATCH | `/api/variants/:id` | Token (submitter) | Edit and resubmit a rejected variant (rejected → pending), including `extra` and `forms`. `409` if the word was added meanwhile |
+| GET | `/api/variants/my-submissions?needs=completion&missing=&region=` | Token | My variants with `missingFields`, `fillableFields` and `latestSuggestion`; `meta.needsCompletionCount` |
+| POST | `/api/variants/:id/suggestions` | Token (submitter) | Propose values for blank fields of my published variant `{ phonetic?, example?, forms?, extra? }` — fill-only, one open per variant, rate-limited |
+| PATCH | `/api/suggestions/:id` | Token (submitter) | Edit and resubmit a rejected suggestion (rejected → pending) |
+| PATCH | `/api/suggestions/:id/edit` | Moderator+ | Staff edit of a suggestion (note required, still fill-only). Moderators: pending and not their own; admins: pending or approved |
+| PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
-| PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting a published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
-| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting a published variant is admin-only |
+| GET | `/api/moderation/suggestions?status=&concept=` | Moderator+ | Suggestions with their live word and submitter (admins may pass `status=approved`; `concept=` lists open suggestions on one concept) |
+| PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting an approved or published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
+| PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting an approved or published variant is admin-only. Rejecting a variant also rejects its open suggestion |
 | PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
-| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required). Published variants are admin-only |
-| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`) |
+| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required), including `forms` (replaces the list). Published variants are admin-only. Fields an open suggestion proposes are locked (`409`) |
+| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`, including `VariantSuggestion` and `suggestion_applied`) |
 | GET | `/api/lookups?type=` | — | Region and part-of-speech list values, including inactive ones (`active: false`) |
 | POST | `/api/lookups` | Admin | Add a list value `{ type, label }` — the key is the label at creation and never changes |
 | PATCH | `/api/lookups/:id` | Admin | Rename the label and/or change the order. `key`, `type`, `isSystem`, `active` are rejected |

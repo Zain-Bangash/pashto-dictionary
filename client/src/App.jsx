@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Concepts from './pages/Concepts';
+import Wanted from './pages/Wanted';
 import ConceptDetail from './pages/ConceptDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/concepts" element={<Concepts />} />
         <Route path="/concepts/:id" element={<ConceptDetail />} />
+        <Route path="/wanted" element={<Wanted />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route

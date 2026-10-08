@@ -6,6 +6,8 @@ import LookupSelect from '../components/LookupSelect';
 import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
 import useFieldDefinitions from '../hooks/useFieldDefinitions';
 import { missingRequired } from '../context/fieldsValue';
+import FormsEditor from '../components/forms/FormsEditor';
+import { formKindFor, formsPayload } from '../utils/forms';
 
 const inputClass = 'w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-gold/50 transition-all';
 const labelClass = 'block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider';
@@ -42,6 +44,7 @@ export default function Submit() {
   const [submissionNote, setSubmissionNote] = useState('');
   const [conceptExtra, setConceptExtra]   = useState({});
   const [variantExtra, setVariantExtra]   = useState({});
+  const [forms, setForms]                 = useState([]);
 
   const [crossConceptWarnings, setCrossConceptWarnings] = useState([]);
 
@@ -61,17 +64,24 @@ export default function Submit() {
 
   const debouncedFetch = useDebounce(fetchSuggestions, 300);
 
+  // Forms of the other kind stay in state but are hidden and not sent if the part of speech changes
+  const formKind = formKindFor(creatingNew ? newPos : selectedConcept?.partOfSpeech);
+  const activeForms = forms.filter((f) => f.kind === formKind);
+
   useEffect(() => {
     const conceptId   = searchParams.get('conceptId');
     const pashtoParam = searchParams.get('pashto');
     const phoneticParam = searchParams.get('phonetic');
-    if (conceptId && pashtoParam) {
+    const regionParam = searchParams.get('region');
+    // From a concept page (conceptId + pashto) or from Wanted Words (conceptId + region)
+    if (conceptId && (pashtoParam || regionParam)) {
       api.get(`/api/concepts/${conceptId}`)
         .then((res) => {
           setSelectedConcept(res.data.data);
           setGlossQuery(res.data.data.englishGloss);
-          setPashto(pashtoParam);
+          if (pashtoParam) setPashto(pashtoParam);
           if (phoneticParam) setPhonetic(phoneticParam);
+          if (regionParam) setRegion(regionParam);
           setStep(2);
         })
         .catch(() => {});
@@ -121,6 +131,7 @@ export default function Submit() {
     if (!pashto.trim()) errs.pashto = 'Pashto word is required';
     if (!region) errs.region = 'Region is required';
     if (!definition.trim()) errs.definition = 'Definition is required';
+    if (activeForms.some((f) => !f.pashto.trim())) errs.forms = 'Each form needs its Pashto text';
     if (creatingNew && !newPos) errs.partOfSpeech = 'Part of speech is required';
     const conceptMissing = creatingNew ? missingRequired(forType('concept'), conceptExtra) : {};
     const variantMissing = missingRequired(forType('variant'), variantExtra);
@@ -145,7 +156,10 @@ export default function Submit() {
         conceptId = res.data.data._id;
       }
 
-      await createVariant({ conceptId, pashto, phonetic, region, definition, example, submissionNote, extra: variantExtra });
+      await createVariant({
+        conceptId, pashto, phonetic, region, definition, example, submissionNote, extra: variantExtra,
+        ...(activeForms.length > 0 && { forms: formsPayload(activeForms) }),
+      });
       navigate('/my-submissions');
     } catch (err) {
       const message = err?.response?.data?.error?.message ?? 'Submission failed';
@@ -353,6 +367,18 @@ export default function Submit() {
                   onChange={(e) => setExample(e.target.value)}
                   className={inputClass}
                 />
+              </div>
+
+              <div>
+                <FormsEditor
+                  kind={formKind}
+                  forms={activeForms}
+                  onChange={(next) => setForms([...forms.filter((f) => f.kind !== formKind), ...next])}
+                  idPrefix="submit-form"
+                  inputClassName={inputClass}
+                  labelClassName={labelClass}
+                />
+                {errors.forms && <p className="text-red-400 text-xs font-ui mt-1">{errors.forms}</p>}
               </div>
 
               <ExtraFieldsInputs

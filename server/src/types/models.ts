@@ -27,6 +27,24 @@ export interface IConcept extends Document {
   updatedAt: Date;
 }
 
+export type FormKind = 'noun' | 'verb';
+export type FormGender = 'masculine' | 'feminine';
+export type FormNumber = 'singular' | 'plural';
+export type FormCase = 'direct' | 'oblique';
+export type VerbForm = 'infinitive' | 'past' | 'present' | 'imperative';
+
+export interface IVariantForm {
+  kind: FormKind;
+  gender?: FormGender;
+  number?: FormNumber;
+  case?: FormCase;
+  verbForm?: VerbForm;
+  pashto: string;
+  normalizedPashto?: string;
+  phonetic?: string;
+  example?: string;
+}
+
 export interface IVariant extends Document {
   concept: Types.ObjectId;
   pashto: string;
@@ -38,6 +56,7 @@ export interface IVariant extends Document {
   example?: string;
   submissionNote?: string;
   extra?: Map<string, string>;
+  forms?: IVariantForm[];
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
   reviewedBy?: string;
@@ -85,8 +104,29 @@ export interface IFieldDefinition extends Document {
   updatedAt: Date;
 }
 
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected' | 'published';
+export const OPEN_SUGGESTION_STATUSES: SuggestionStatus[] = ['pending', 'approved'];
+
+export interface IProposal {
+  phonetic?: string;
+  example?: string;
+  forms?: IVariantForm[];
+  extra?: Map<string, string>;
+}
+
+export interface IVariantSuggestion extends Document {
+  variant: Types.ObjectId;
+  proposed: IProposal;
+  status: SuggestionStatus;
+  submittedBy: string;
+  reviewedBy?: string;
+  moderatorNote?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IModerationLog extends Document {
-  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup' | 'FieldDefinition';
+  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup' | 'FieldDefinition' | 'VariantSuggestion';
   targetId?: Types.ObjectId;
   action:
     | 'submitted'
@@ -99,7 +139,8 @@ export interface IModerationLog extends Document {
     | 'edited'
     | 'merged'
     | 'lookup_changed'
-    | 'field_changed';
+    | 'field_changed'
+    | 'suggestion_applied';
   performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;

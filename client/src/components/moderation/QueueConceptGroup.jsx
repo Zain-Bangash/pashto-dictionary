@@ -12,7 +12,7 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
   const [editing, setEditing]   = useState(false);
 
   const { variants = [], ...concept } = group;
-  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, status: concept.status };
+  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, status: concept.status, partOfSpeech: concept.partOfSpeech };
   const count = variants.length;
   const panelId = `variants-${concept._id}`;
 
@@ -46,7 +46,10 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
             </>
           )}
           {concept.status === 'approved' && isAdmin && (
-            <button onClick={() => onAction('concepts', concept._id, 'published')} className={PUBLISH_BTN}>Publish</button>
+            <>
+              <button onClick={() => onAction('concepts', concept._id, 'published')} className={PUBLISH_BTN}>Publish</button>
+              <button onClick={() => onReject('concepts', concept._id)} className={REJECT_BTN}>Reject</button>
+            </>
           )}
           <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>
         </div>

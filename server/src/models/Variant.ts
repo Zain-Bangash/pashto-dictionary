@@ -1,5 +1,7 @@
 import { Schema, model } from 'mongoose';
 import { IVariant } from '../types/models';
+import { variantFormSchema } from './variantFormSchema';
+import { normalizePashto, normalizePhonetic } from '../utils/normalize';
 
 const variantSchema = new Schema<IVariant>(
   {
@@ -13,6 +15,7 @@ const variantSchema = new Schema<IVariant>(
     example: { type: String, trim: true },
     submissionNote: { type: String, trim: true, maxlength: 500 },
     extra: { type: Map, of: String },
+    forms: { type: [variantFormSchema], default: undefined },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],
@@ -29,14 +32,18 @@ const variantSchema = new Schema<IVariant>(
 );
 
 variantSchema.pre('save', function () {
-  this.normalizedPashto = this.pashto.trim().normalize('NFC');
+  this.normalizedPashto = normalizePashto(this.pashto);
   if (this.phonetic) {
-    this.normalizedPhonetic = this.phonetic.toLowerCase().trim();
+    this.normalizedPhonetic = normalizePhonetic(this.phonetic);
+  }
+  for (const form of this.forms ?? []) {
+    form.normalizedPashto = normalizePashto(form.pashto);
   }
 });
 
 variantSchema.index({ status: 1 });
 variantSchema.index({ concept: 1 });
+variantSchema.index({ region: 1, concept: 1 });
 variantSchema.index({ phonetic: 1 });
 variantSchema.index({ pashto: 'text' });
 variantSchema.index(

@@ -18,12 +18,15 @@ const ACTION_STYLES = {
   profile_updated: { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
   lookup_changed:  { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)',  border: 'rgba(45,212,191,0.3)'  },
   field_changed:   { color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(244,114,182,0.3)' },
+  suggestion_applied: { color: '#a3e635', bg: 'rgba(163,230,53,0.08)', border: 'rgba(163,230,53,0.3)' },
 };
 
 const ALL_ACTIONS = [
   'submitted', 'approved', 'rejected', 'published',
-  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed', 'field_changed',
+  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed', 'field_changed', 'suggestion_applied',
 ];
+
+const MODEL_NAMES = { VariantSuggestion: 'Suggestion' };
 
 const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
 const FIELD_OWNER_NAMES = { concept: 'Concept field', variant: 'Variant field' };
@@ -50,7 +53,7 @@ function TargetLabel({ log }) {
     label = (
       <span className="text-warm/80">{t.englishGloss}</span>
     );
-  } else if (model === 'Variant' && t?.pashto) {
+  } else if ((model === 'Variant' || model === 'VariantSuggestion') && t?.pashto) {
     label = (
       <>
         <span dir="rtl" className="font-pashto text-warm/80" style={{ fontSize: 17, lineHeight: 1.5 }}>{t.pashto}</span>
@@ -79,7 +82,7 @@ function TargetLabel({ log }) {
 
   return (
     <p className="text-xs font-ui text-muted flex items-center gap-1.5 flex-wrap">
-      <span className="text-muted/40 uppercase tracking-wider text-[10px]">{model}</span>
+      <span className="text-muted/40 uppercase tracking-wider text-[10px]">{MODEL_NAMES[model] ?? model}</span>
       {label}
     </p>
   );
@@ -151,6 +154,7 @@ export default function DashboardLog() {
             <option value="User"      style={{ background: '#1c1c15', color: '#fffef8' }}>User</option>
             <option value="Lookup"    style={{ background: '#1c1c15', color: '#fffef8' }}>List value</option>
             <option value="FieldDefinition" style={{ background: '#1c1c15', color: '#fffef8' }}>Custom field</option>
+            <option value="VariantSuggestion" style={{ background: '#1c1c15', color: '#fffef8' }}>Suggestion</option>
           </select>
         </div>
       </div>

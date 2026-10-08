@@ -21,7 +21,7 @@ export default function ConceptSearch({ initialGloss, onChange }) {
   const handleSelect = (s) => {
     setQuery(s.englishGloss);
     setSuggestions([]);
-    onChange(s._id);
+    onChange(s._id, s);
   };
 
   return (

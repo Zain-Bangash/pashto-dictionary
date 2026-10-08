@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function SearchBar({ initialValue = '', onSubmit }) {
+export default function SearchBar({ initialValue = '', onSubmit, placeholder = 'Search Pashto words…' }) {
   const [query, setQuery] = useState(initialValue);
 
   function handleSubmit(e) {
@@ -17,7 +17,7 @@ export default function SearchBar({ initialValue = '', onSubmit }) {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search Pashto words…"
+        placeholder={placeholder}
         className="w-full bg-black/40 border border-white/[0.08] rounded-xl pl-10 pr-4 py-3 text-warm font-ui text-sm outline-none focus:border-terracotta/40 transition-colors placeholder:text-muted/60"
       />
       <button type="submit" className="sr-only">Search</button>

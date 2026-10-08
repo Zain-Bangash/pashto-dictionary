@@ -8,10 +8,9 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-
-2. Add more things to a variant such as plural ete and other vital stuff
+1. limit mod 'rights' and increase admin rights
+2. audio
 3. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
-5. Have an an alert tab for admin to see what a variant is missing, admin can either edit those words or make them highlighted in a tab for customers (have a 'attention' tab for customer,) (what should mod's job here be?)
 6. admin should be promote users to mod or demote mods
 7. Change mod functionality
   - mod can approve or reject with a note

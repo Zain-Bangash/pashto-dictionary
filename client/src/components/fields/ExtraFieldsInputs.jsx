@@ -3,27 +3,28 @@ import { optionLabel } from '../../context/fieldsValue';
 
 const MAX = { text: 200, textarea: 2000 };
 
-function FieldInput({ def, id, value, onChange, className, optionClassName }) {
+function FieldInput({ def, id, value, onChange, disabled, className, optionClassName }) {
   if (def.type === 'textarea') {
-    return <textarea id={id} rows={3} maxLength={MAX.textarea} value={value} onChange={(e) => onChange(e.target.value)} className={className} />;
+    return <textarea id={id} disabled={disabled} rows={3} maxLength={MAX.textarea} value={value} onChange={(e) => onChange(e.target.value)} className={className} />;
   }
   if (def.type === 'select') {
     const active = def.options.filter((o) => o.active);
     const retired = value && !active.some((o) => o.key === value);
     return (
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={className}>
+      <select id={id} disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)} className={className}>
         <option value="" className={optionClassName}>—</option>
         {active.map((o) => <option key={o.key} value={o.key} className={optionClassName}>{o.label}</option>)}
         {retired && <option value={value} className={optionClassName}>{optionLabel(def, value)} (retired)</option>}
       </select>
     );
   }
-  return <input id={id} type="text" maxLength={MAX.text} value={value} onChange={(e) => onChange(e.target.value)} className={className} />;
+  return <input id={id} disabled={disabled} type="text" maxLength={MAX.text} value={value} onChange={(e) => onChange(e.target.value)} className={className} />;
 }
 
-export default function ExtraFieldsInputs({ appliesTo, values = {}, onChange, errors = {}, idPrefix = 'extra', inputClassName, labelClassName, optionClassName }) {
+// onlyKeys limits the inputs to those fields; disabledKeys shows them read-only
+export default function ExtraFieldsInputs({ appliesTo, values = {}, onChange, errors = {}, idPrefix = 'extra', inputClassName, labelClassName, optionClassName, onlyKeys, disabledKeys = [] }) {
   const { forType, loading, error, reload } = useFieldDefinitions();
-  const defs = forType(appliesTo);
+  const defs = forType(appliesTo).filter((d) => !onlyKeys || onlyKeys.includes(d.key));
 
   if (loading) return <p className="text-xs font-ui text-muted animate-pulse">Loading extra fields…</p>;
   if (error) {
@@ -48,6 +49,7 @@ export default function ExtraFieldsInputs({ appliesTo, values = {}, onChange, er
           id={id}
           value={values[def.key] ?? ''}
           onChange={(v) => onChange(def.key, v)}
+          disabled={disabledKeys.includes(def.key)}
           className={inputClassName}
           optionClassName={optionClassName}
         />

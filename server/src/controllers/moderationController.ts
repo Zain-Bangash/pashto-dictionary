@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import Concept from '../models/Concept';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
+import VariantSuggestion from '../models/VariantSuggestion';
 import { enrichActors } from '../utils/enrichActors';
 import { getGroupedQueuePage, countQueueItems, QueueStatus } from '../utils/groupedQueue';
 
@@ -98,8 +99,8 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed'];
-  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition'];
+  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied'];
+  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition', 'VariantSuggestion'];
   const filter: Record<string, unknown> = {};
 
   const actionParam = req.query.action as string;
@@ -118,11 +119,21 @@ async function getLog(req: Request, res: Response): Promise<void> {
   // Batch-load the concept and variant names for each log entry
   const conceptIds: string[] = [];
   const variantIds: string[] = [];
+  const suggestionIds: string[] = [];
   for (const log of withPerformers) {
     const id = String(log.targetId ?? '');
     if (!id) continue;
     if (log.targetModel === 'Concept') conceptIds.push(id);
     if (log.targetModel === 'Variant') variantIds.push(id);
+    if (log.targetModel === 'VariantSuggestion') suggestionIds.push(id);
+  }
+
+  // A suggestion is labelled by the word it completes
+  const suggestions = suggestionIds.length ? await VariantSuggestion.find({ _id: { $in: suggestionIds } }, 'variant').lean() : [];
+  const suggestionVariant: Record<string, string> = {};
+  for (const s of suggestions) {
+    suggestionVariant[String(s._id)] = String(s.variant);
+    variantIds.push(String(s.variant));
   }
 
   const [concepts, variants] = await Promise.all([
@@ -140,6 +151,7 @@ async function getLog(req: Request, res: Response): Promise<void> {
     ...log,
     target: log.targetModel === 'Concept' ? (conceptMap[String(log.targetId)] ?? null)
           : log.targetModel === 'Variant' ? (variantMap[String(log.targetId)] ?? null)
+          : log.targetModel === 'VariantSuggestion' ? (variantMap[suggestionVariant[String(log.targetId)]] ?? null)
           : null,
   }));
 
