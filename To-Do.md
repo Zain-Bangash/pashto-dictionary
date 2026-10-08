@@ -37,7 +37,6 @@ _No active phase._
 - [ ] Community page: top contributing users `[S1]`
 - [ ] Region filter on the Concepts browse page _(suggested)_ `[S2]`
 - [ ] Admin trash view — restore soft-deleted concepts/variants _(suggested)_ `[S3]`
-- [ ] Admin-defined custom fields on Concepts and Variants — builds on the S4a Lookup layer `[S4b]`
 - [ ] 
 - [ ] Admin 
 
@@ -70,5 +69,6 @@ _No active phase._
 - GitHub Actions CI badge in README
 - Grouped moderation queue: concept rows with waiting-variant dropdowns (`GET /api/moderation/queue`); variant approve now requires an approved/published concept; `DashboardQueue.jsx` split into `components/moderation/`
 - Admin-editable preset lists `[S4a]`: `Lookup` collection for region and part of speech (immutable key, editable label, deactivate-not-delete); admin page at `/dashboard/lists`; `lookup_changed` audit action; built-in values seeded on server start
+- Admin-defined custom fields `[S4b]`: `FieldDefinition` collection (text / long text / dropdown, server-generated keys, deactivate-not-delete); values in `Concept.extra` / `Variant.extra`; shown on Submit, moderation edit and resubmit forms, ConceptDetail and queue rows; admin page at `/dashboard/fields`; `field_changed` audit action; not searchable by design
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)
