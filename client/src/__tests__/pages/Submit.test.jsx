@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import Submit from '../../pages/Submit';
 import api from '../../services/api';
+import { LookupsWrapper } from '../helpers/lookups';
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { _id: '1', role: 'user' }, token: 'jwt-token', login: vi.fn() })),
@@ -29,13 +30,15 @@ const renderSubmit = (initialEntries = ['/submit']) => {
     return null;
   }
   const utils = render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <Routes>
-        <Route path="/submit" element={<Submit />} />
-        <Route path="/my-submissions" element={<LocationCapture />} />
-        <Route path="/login" element={<div>Login page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <LookupsWrapper>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/submit" element={<Submit />} />
+          <Route path="/my-submissions" element={<LocationCapture />} />
+          <Route path="/login" element={<div>Login page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </LookupsWrapper>
   );
   return { ...utils, locationRef };
 };

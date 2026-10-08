@@ -1,9 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { suggestConcepts, createConcept, createVariant, checkCrossConceptPashto } from '../services/api';
-
-const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
-const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+import useLookups from '../hooks/useLookups';
+import LookupSelect from '../components/LookupSelect';
 
 const inputClass = 'w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-gold/50 transition-all';
 const labelClass = 'block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider';
@@ -17,6 +16,7 @@ function useDebounce(fn, delay) {
 }
 
 export default function Submit() {
+  const { labelFor } = useLookups();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -186,7 +186,7 @@ export default function Submit() {
                         className="w-full text-left px-4 py-2.5 hover:bg-white/[0.05] transition-colors"
                       >
                         <span className="text-warm text-sm font-ui">{c.englishGloss}</span>
-                        <span className="ml-2 text-muted text-xs font-ui">{c.partOfSpeech}</span>
+                        <span className="ml-2 text-muted text-xs font-ui">{labelFor('partOfSpeech', c.partOfSpeech)}</span>
                       </button>
                     </li>
                   ))}
@@ -234,17 +234,15 @@ export default function Submit() {
               {creatingNew && (
                 <div>
                   <label htmlFor="partOfSpeech" className={labelClass}>Part of Speech</label>
-                  <select
+                  <LookupSelect
+                    type="partOfSpeech"
                     id="partOfSpeech"
                     value={newPos}
                     onChange={(e) => setNewPos(e.target.value)}
+                    placeholder="Select…"
                     className={`${inputClass} appearance-none`}
-                  >
-                    <option value="" className="bg-charcoal">Select…</option>
-                    {PARTS_OF_SPEECH.map((pos) => (
-                      <option key={pos} value={pos} className="bg-charcoal">{pos}</option>
-                    ))}
-                  </select>
+                    optionClassName="bg-charcoal"
+                  />
                   {errors.partOfSpeech && <p className="text-red-400 text-xs font-ui mt-1">{errors.partOfSpeech}</p>}
                 </div>
               )}
@@ -299,17 +297,15 @@ export default function Submit() {
 
               <div>
                 <label htmlFor="region" className={labelClass}>Region</label>
-                <select
+                <LookupSelect
+                  type="region"
                   id="region"
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
+                  placeholder="Select…"
                   className={`${inputClass} appearance-none`}
-                >
-                  <option value="" className="bg-charcoal">Select…</option>
-                  {REGIONS.map((r) => (
-                    <option key={r} value={r} className="bg-charcoal">{r}</option>
-                  ))}
-                </select>
+                  optionClassName="bg-charcoal"
+                />
                 {errors.region && <p className="text-red-400 text-xs font-ui mt-1">{errors.region}</p>}
               </div>
 

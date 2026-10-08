@@ -118,4 +118,30 @@ export function checkCrossConceptPashto(pashto, conceptId) {
   return api.get('/api/variants/cross-concept-check', { params: { pashto, conceptId } });
 }
 
+// ── Lookup (preset list) functions ────────────────────────────────────────────
+
+export function getLookups() {
+  return api.get('/api/lookups');
+}
+
+export function createLookup(body) {
+  return api.post('/api/lookups', body);
+}
+
+export function updateLookup(id, body) {
+  return api.patch(`/api/lookups/${id}`, body);
+}
+
+export function reorderLookups(type, ids) {
+  return api.put('/api/lookups/order', { type, ids });
+}
+
+export function deactivateLookup(id) {
+  return api.patch(`/api/lookups/${id}/deactivate`);
+}
+
+export function reactivateLookup(id) {
+  return api.patch(`/api/lookups/${id}/reactivate`);
+}
+
 export default api;

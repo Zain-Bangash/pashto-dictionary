@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import useLookups from '../../hooks/useLookups';
+import LogChanges from '../../components/log/LogChanges';
 
 const ACTION_STYLES = {
   submitted:       { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
@@ -13,12 +15,15 @@ const ACTION_STYLES = {
   edited:          { color: '#38bdf8', bg: 'rgba(56,189,248,0.08)',  border: 'rgba(56,189,248,0.3)'  },
   merged:          { color: '#c084fc', bg: 'rgba(192,132,252,0.08)', border: 'rgba(192,132,252,0.3)' },
   profile_updated: { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
+  lookup_changed:  { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)',  border: 'rgba(45,212,191,0.3)'  },
 };
 
 const ALL_ACTIONS = [
   'submitted', 'approved', 'rejected', 'published',
-  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated',
+  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed',
 ];
+
+const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
 
 function formatDate(ts) {
   if (!ts) return '';
@@ -30,6 +35,7 @@ function formatDate(ts) {
 }
 
 function TargetLabel({ log }) {
+  const { labelFor } = useLookups();
   if (!log.target && !log.targetModel) return null;
 
   const model = log.targetModel;
@@ -44,7 +50,15 @@ function TargetLabel({ log }) {
     label = (
       <>
         <span dir="rtl" className="font-pashto text-warm/80" style={{ fontSize: 17, lineHeight: 1.5 }}>{t.pashto}</span>
-        {t.region && <span className="text-muted/60"> · {t.region}</span>}
+        {t.region && <span className="text-muted/60"> · {labelFor('region', t.region)}</span>}
+      </>
+    );
+  } else if (model === 'Lookup' && log.changes?.type) {
+    const { type, key } = log.changes;
+    label = (
+      <>
+        <span className="text-muted/60">{LOOKUP_TYPE_NAMES[type] ?? type}</span>
+        {key && <span className="text-warm/80"> · {labelFor(type, key)}</span>}
       </>
     );
   }
@@ -57,46 +71,6 @@ function TargetLabel({ log }) {
       {label}
     </p>
   );
-}
-
-function InlineDiff({ log }) {
-  const { action, changes, note } = log;
-
-  if (action === 'edited' && changes && typeof changes === 'object') {
-    const fields = Object.entries(changes).filter(([, v]) => v && typeof v === 'object' && 'from' in v);
-    if (fields.length === 0) return null;
-    return (
-      <div className="mt-1.5 space-y-0.5">
-        {fields.map(([field, diff]) => (
-          <p key={field} className="text-[11px] font-ui text-muted/70">
-            <span className="text-muted/40">{field}: </span>
-            <span className="line-through text-muted/50">{String(diff.from)}</span>
-            <span className="text-muted/40 mx-1">→</span>
-            <span className="text-warm/70">{String(diff.to)}</span>
-          </p>
-        ))}
-        {note && <p className="text-[11px] font-ui text-muted/50 italic">{note}</p>}
-      </div>
-    );
-  }
-
-  if (action === 'merged' && changes && typeof changes === 'object') {
-    const moved   = Array.isArray(changes.variantsMoved)   ? changes.variantsMoved.length   : 0;
-    const skipped = Array.isArray(changes.variantsSkipped) ? changes.variantsSkipped.length : 0;
-    return (
-      <p className="text-[11px] font-ui text-muted/70 mt-1.5">
-        {moved} variant{moved !== 1 ? 's' : ''} moved
-        {skipped > 0 && <>, {skipped} skipped (duplicate)</>}
-        {note && <> · <span className="italic">{note}</span></>}
-      </p>
-    );
-  }
-
-  if (note) {
-    return <p className="text-[11px] font-ui text-muted/60 italic mt-1">{note}</p>;
-  }
-
-  return null;
 }
 
 export default function DashboardLog() {
@@ -163,6 +137,7 @@ export default function DashboardLog() {
             <option value="Concept"   style={{ background: '#1c1c15', color: '#fffef8' }}>Concept</option>
             <option value="Variant"   style={{ background: '#1c1c15', color: '#fffef8' }}>Variant</option>
             <option value="User"      style={{ background: '#1c1c15', color: '#fffef8' }}>User</option>
+            <option value="Lookup"    style={{ background: '#1c1c15', color: '#fffef8' }}>List value</option>
           </select>
         </div>
       </div>
@@ -189,7 +164,7 @@ export default function DashboardLog() {
                         <span className="mx-1.5 text-muted/30">·</span>
                         {formatDate(log.timestamp)}
                       </p>
-                      <InlineDiff log={log} />
+                      <LogChanges log={log} />
                     </div>
                     <span
                       className="shrink-0 text-[10px] font-ui font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"

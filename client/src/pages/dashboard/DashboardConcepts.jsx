@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import PublishedConceptPanel from '../../components/moderation/PublishedConceptPanel';
+import useLookups from '../../hooks/useLookups';
 
 // Use api.get/post directly so vi.fn() mocks on api.* work in tests
 const suggestConcepts = (q) => api.get(`/api/concepts/suggest?q=${encodeURIComponent(q)}`);
@@ -129,6 +130,7 @@ function MergeModal({ sourceConcept, onConfirm, onCancel }) {
 // Main component
 // ---------------------------------------------------------------------------
 export default function DashboardConcepts() {
+  const { labelFor } = useLookups();
   const [concepts, setConcepts] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
@@ -249,7 +251,7 @@ export default function DashboardConcepts() {
                   <div className="flex flex-col gap-0.5 overflow-hidden">
                     <p className="text-warm font-display font-semibold text-lg">{concept.englishGloss}</p>
                     {concept.partOfSpeech && (
-                      <p className="text-sm font-ui text-muted truncate">{concept.partOfSpeech}</p>
+                      <p className="text-sm font-ui text-muted truncate">{labelFor('partOfSpeech', concept.partOfSpeech)}</p>
                     )}
                   </div>
                   <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 shrink-0">

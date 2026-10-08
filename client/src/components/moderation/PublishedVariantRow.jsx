@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import VariantEditForm from './VariantEditForm';
 import { REJECT_BTN, EDIT_BTN } from './queueButtons';
+import useLookups from '../../hooks/useLookups';
 
 export default function PublishedVariantRow({ variant, concept, onReject, onSave }) {
+  const { labelFor } = useLookups();
   const [editing, setEditing] = useState(false);
 
   return (
@@ -13,7 +15,7 @@ export default function PublishedVariantRow({ variant, concept, onReject, onSave
             <div dir="rtl" className="font-pashto text-warm text-2xl leading-[1.7]">{variant.pashto}</div>
             {variant.phonetic && <span className="font-ui text-sm text-muted">/{variant.phonetic}/</span>}
             <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
-              {variant.region}
+              {labelFor('region', variant.region)}
             </span>
           </div>
           <p className="text-sm font-ui text-muted">{variant.definition}</p>

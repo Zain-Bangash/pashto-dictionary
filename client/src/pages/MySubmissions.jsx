@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { updateConcept, updateVariant } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import useLookups from '../hooks/useLookups';
+import LookupSelect from '../components/LookupSelect';
 
 const STATUS_STYLES = {
   pending:   { color: '#e8c547', border: 'rgba(232,197,71,0.3)',  bg: 'rgba(232,197,71,0.08)' },
@@ -9,9 +11,6 @@ const STATUS_STYLES = {
   published: { color: '#00f5b4', border: 'rgba(0,245,180,0.3)',   bg: 'rgba(0,245,180,0.08)' },
   rejected:  { color: '#f87171', border: 'rgba(248,113,113,0.3)', bg: 'rgba(248,113,113,0.08)' },
 };
-
-const PART_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
-const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
 
 const inputCls = 'w-full bg-white/[0.06] border border-white/[0.12] rounded-[10px] px-3 py-2 text-sm font-ui text-warm placeholder-white/30 focus:outline-none focus:border-terracotta/60';
 const labelCls = 'block text-[11px] font-ui text-muted mb-1';
@@ -73,14 +72,14 @@ function ConceptEditForm({ concept, onSave, onCancel }) {
       </div>
       <div>
         <label className={labelCls}>Part of Speech</label>
-        <select
+        <LookupSelect
+          type="partOfSpeech"
+          aria-label="Part of Speech"
           className={inputCls}
           value={partOfSpeech}
           onChange={(e) => setPartOfSpeech(e.target.value)}
-        >
-          <option value="">— select —</option>
-          {PART_OF_SPEECH.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+          placeholder="— select —"
+        />
       </div>
       {error && <p className="text-xs font-ui text-red-400">{error}</p>}
       <div className="flex gap-2">
@@ -150,10 +149,14 @@ function VariantEditForm({ variant, onSave, onCancel }) {
       </div>
       <div>
         <label className={labelCls}>Region</label>
-        <select className={inputCls} value={fields.region} onChange={set('region')}>
-          <option value="">— select —</option>
-          {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        <LookupSelect
+          type="region"
+          aria-label="Region"
+          className={inputCls}
+          value={fields.region}
+          onChange={set('region')}
+          placeholder="— select —"
+        />
       </div>
       <div>
         <label className={labelCls}>Definition</label>
@@ -189,6 +192,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
 }
 
 export default function MySubmissions() {
+  const { labelFor } = useLookups();
   const { user } = useAuth();
   const [concepts, setConcepts]   = useState([]);
   const [variants, setVariants]   = useState([]);
@@ -271,7 +275,7 @@ export default function MySubmissions() {
                     <div className="flex flex-col gap-1 overflow-hidden">
                       <p className="text-warm font-display text-lg font-semibold">{concept.englishGloss}</p>
                       {concept.partOfSpeech && (
-                        <span className="meta-label inline-block">{concept.partOfSpeech}</span>
+                        <span className="meta-label inline-block">{labelFor('partOfSpeech', concept.partOfSpeech)}</span>
                       )}
                       {concept.status === 'rejected' && concept.moderatorNote && (
                         <p className="text-xs font-ui text-red-400 mt-1">Note: {concept.moderatorNote}</p>
@@ -313,7 +317,7 @@ export default function MySubmissions() {
                       </div>
                       <p className="text-sm font-ui text-muted leading-snug">{variant.definition}</p>
                       {variant.region && (
-                        <span className="meta-label inline-block">{variant.region}</span>
+                        <span className="meta-label inline-block">{labelFor('region', variant.region)}</span>
                       )}
                       {variant.status === 'rejected' && variant.moderatorNote && (
                         <p className="text-xs font-ui text-red-400 mt-1">Note: {variant.moderatorNote}</p>

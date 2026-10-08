@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import SearchBar from '../components/SearchBar';
 import api from '../services/api';
+import useLookups from '../hooks/useLookups';
 
 export default function Concepts() {
   const [searchParams] = useSearchParams();
@@ -77,6 +78,7 @@ export default function Concepts() {
 }
 
 function ConceptCard({ concept }) {
+  const { labelFor } = useLookups();
   const variantCount = concept.variantCount ?? 0;
   return (
     <Link
@@ -85,7 +87,7 @@ function ConceptCard({ concept }) {
     >
       <p className="text-warm text-xl font-display font-semibold leading-snug">{concept.englishGloss}</p>
       {concept.partOfSpeech && (
-        <span className="meta-label mt-1 inline-block">{concept.partOfSpeech}</span>
+        <span className="meta-label mt-1 inline-block">{labelFor('partOfSpeech', concept.partOfSpeech)}</span>
       )}
       <p className="text-muted text-xs font-ui mt-2">
         {variantCount} regional variant{variantCount !== 1 ? 's' : ''}

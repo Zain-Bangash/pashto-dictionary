@@ -3,8 +3,10 @@ import ConceptEditForm from './ConceptEditForm';
 import SimilarConceptsPanel from './SimilarConceptsPanel';
 import QueueVariantRow from './QueueVariantRow';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN, EDIT_BTN } from './queueButtons';
+import useLookups from '../../hooks/useLookups';
 
 export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, showSimilar, onAction, onReject, onConceptSave, onVariantSave, onMergeRequest }) {
+  const { labelFor } = useLookups();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing]   = useState(false);
 
@@ -26,11 +28,11 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
               {concept.status}
             </span>
           </div>
-          <p className="text-sm font-ui text-muted">{concept.partOfSpeech}</p>
+          <p className="text-sm font-ui text-muted">{labelFor('partOfSpeech', concept.partOfSpeech)}</p>
           <p className="text-xs font-ui text-muted/60">
             by {concept.submittedBy?.username}
             {(concept.submittedBy?.village || concept.submittedBy?.region) && (
-              <span className="ml-1">({[concept.submittedBy.village, concept.submittedBy.region].filter(Boolean).join(', ')})</span>
+              <span className="ml-1">({[concept.submittedBy.village, labelFor('region', concept.submittedBy.region)].filter(Boolean).join(', ')})</span>
             )}
           </p>
         </div>

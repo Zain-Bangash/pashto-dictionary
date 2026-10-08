@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import Register from '../../pages/Register';
 import { useAuth } from '../../context/AuthContext';
+import { LookupsWrapper, LOOKUP_ROWS } from '../helpers/lookups';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
@@ -131,5 +132,37 @@ describe('Register page', () => {
   it('has a link to the login page', () => {
     renderRegister();
     expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
+  });
+});
+
+describe('Register region list', () => {
+  it('uses the shared admin-maintained region list: active values only, labels shown, key submitted', async () => {
+    const user = userEvent.setup();
+    mockRegister.mockResolvedValue();
+    const rows = [
+      ...LOOKUP_ROWS,
+      { _id: 'r5', type: 'region', key: 'Kurram', label: 'Kurram Valley', order: 5, active: true, isSystem: false },
+      { _id: 'r6', type: 'region', key: 'Bajaur', label: 'Bajaur', order: 6, active: false, isSystem: false },
+    ];
+    render(
+      <LookupsWrapper rows={rows}>
+        <MemoryRouter initialEntries={['/register']}>
+          <Routes>
+            <Route path="/register" element={<Register />} />
+            <Route path="/" element={<div>home</div>} />
+          </Routes>
+        </MemoryRouter>
+      </LookupsWrapper>
+    );
+    const select = screen.getByLabelText(/region/i);
+    const options = Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
+    expect(options).toEqual(['Select your region…', 'Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar', 'Kurram Valley']);
+
+    await user.type(screen.getByLabelText(/username/i), 'zain');
+    await user.type(screen.getByLabelText(/email/i), 'z@test.local');
+    await user.type(screen.getByLabelText(/password/i), 'Password1!');
+    await user.selectOptions(select, 'Kurram Valley');
+    await user.click(screen.getByRole('button', { name: /create account|register|sign up/i }));
+    await waitFor(() => expect(mockRegister).toHaveBeenCalledWith('zain', 'z@test.local', 'Password1!', 'Kurram', undefined));
   });
 });

@@ -158,6 +158,16 @@ describe('DashboardLayout — role-based navigation', () => {
     expect(screen.getByRole('link', { name: /log/i })).toBeInTheDocument();
   });
 
+  it('renders the lists nav link for an admin only', () => {
+    asAdmin();
+    const { unmount } = renderLayout();
+    expect(screen.getByRole('link', { name: /lists/i })).toHaveAttribute('href', '/dashboard/lists');
+    unmount();
+    asModerator();
+    renderLayout();
+    expect(screen.queryByRole('link', { name: /lists/i })).not.toBeInTheDocument();
+  });
+
   it('renders children inside the layout', () => {
     asModerator();
     renderLayout();
@@ -682,6 +692,32 @@ describe('DashboardLog page — audit log (admin only)', () => {
     });
     renderLog('admin');
     expect(await screen.findByText(/لرګی/)).toBeInTheDocument();
+  });
+
+  it('renders a lookup_changed entry with its badge, list type and label diff', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [mockLogEntry({
+          targetModel: 'Lookup',
+          target: null,
+          action: 'lookup_changed',
+          changes: { op: 'updated', type: 'region', key: 'Kohat', label: { from: 'Kohat', to: 'Kohat District' } },
+        })],
+        meta: { page: 1, limit: 20, total: 1 },
+      },
+    });
+    renderLog('admin');
+    expect(await screen.findByText('lookup_changed', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('Region')).toBeInTheDocument();
+    expect(screen.getByText('Kohat District')).toBeInTheDocument();
+  });
+
+  it('offers lookup_changed and List value in the log filters', async () => {
+    api.get.mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } });
+    renderLog('admin');
+    expect(await screen.findByRole('option', { name: 'lookup_changed' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'List value' })).toBeInTheDocument();
   });
 
   it('redirects a moderator away from /dashboard/log', () => {
