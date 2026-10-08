@@ -1,18 +1,10 @@
-import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import Lookup from '../models/Lookup';
 import ModerationLog from '../models/ModerationLog';
 import { ILookup, LookupType } from '../types/models';
 import { MAX_PER_TYPE } from '../utils/lookups';
-
-function sendValidationError(req: Request, res: Response): boolean {
-  const errors = validationResult(req);
-  if (errors.isEmpty()) return false;
-  const first = errors.array()[0];
-  res.status(400).json({ success: false, error: { message: first.msg, field: (first as { path?: string }).path } });
-  return true;
-}
+import { sendValidationError } from '../utils/sendValidationError';
 
 function notFound(res: Response) {
   return res.status(404).json({ success: false, error: { message: 'List value not found' } });

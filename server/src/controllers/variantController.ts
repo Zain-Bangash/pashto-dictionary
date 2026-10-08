@@ -6,6 +6,7 @@ import Variant from '../models/Variant';
 import { IVariant } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
+import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -45,6 +46,12 @@ async function createVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const extra = await validateExtra('variant', req.body.extra, 'create');
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   const conceptExists = await Concept.exists({ _id: conceptId });
   if (!conceptExists) {
     res.status(404).json({ success: false, error: { message: 'Concept not found' } });
@@ -76,6 +83,7 @@ async function createVariant(req: Request, res: Response): Promise<void> {
       definition,
       example,
       submissionNote,
+      extra: initialExtra(extra.values),
       submittedBy: req.user!.id,
       status: 'pending',
     }).save();
@@ -195,6 +203,12 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const extra = await validateExtra('variant', req.body.extra, 'edit', variant.extra);
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
   if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
@@ -221,6 +235,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
   if (definition !== undefined)      variant.definition     = definition;
   if (example !== undefined)         variant.example        = example;
   if (submissionNote !== undefined)  variant.submissionNote = submissionNote;
+  applyExtra(variant, extra.values);
   variant.status = 'pending';
   variant.moderatorNote = undefined;
   variant.isDeleted = false;
@@ -452,6 +467,12 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const extra = await validateExtra('variant', req.body.extra, 'edit', variant.extra);
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   const simpleFields: (keyof IVariant)[] = ['pashto', 'phonetic', 'region', 'definition', 'example'];
   const before: Record<string, unknown> = {};
   for (const field of simpleFields) {
@@ -505,6 +526,7 @@ async function editVariant(req: Request, res: Response): Promise<void> {
       (variant[field] as unknown) = req.body[field as string];
     }
   }
+  Object.assign(changes, applyExtra(variant, extra.values));
 
   await variant.save();
 

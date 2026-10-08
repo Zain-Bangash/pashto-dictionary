@@ -10,21 +10,13 @@ import {
   deactivateLookup,
   reactivateLookup,
 } from '../controllers/lookupController';
-import { LOOKUP_TYPES, LABEL_MAX, SAFE_LABEL } from '../utils/lookups';
+import { LOOKUP_TYPES, labelChain } from '../utils/lookups';
 
 const router = Router();
 
 const typeMessage = `type must be one of: ${LOOKUP_TYPES.join(', ')}`;
 
-const label = (optional: boolean) => {
-  const chain = body('label');
-  return (optional ? chain.optional() : chain)
-    .isString().withMessage('label must be a string')
-    .trim()
-    .notEmpty().withMessage('label is required')
-    .isLength({ max: LABEL_MAX }).withMessage(`label must be ${LABEL_MAX} characters or fewer`)
-    .matches(SAFE_LABEL).withMessage('label contains invalid characters');
-};
+const label = (optional: boolean) => labelChain('label', optional);
 
 const order = body('order').optional().isInt({ min: 0, max: 999 }).withMessage('order must be a whole number from 0 to 999').toInt();
 const idParam = param('id').isMongoId().withMessage('Invalid id');

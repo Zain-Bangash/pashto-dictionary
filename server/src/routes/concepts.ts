@@ -20,9 +20,12 @@ import { activeLookup, lookupFormat } from '../utils/lookups';
 
 const router = Router();
 
+const extraFormat = body('extra').optional().isObject().withMessage('extra must be an object');
+
 const createValidators = [
   body('englishGloss').trim().notEmpty().withMessage('englishGloss is required'),
   activeLookup('partOfSpeech', 'partOfSpeech'),
+  extraFormat,
 ];
 
 const statusValidators = [
@@ -34,11 +37,13 @@ const statusValidators = [
 const updateValidators = [
   body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
   lookupFormat('partOfSpeech', true),
+  extraFormat,
 ];
 
 const editValidators = [
   body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
   lookupFormat('partOfSpeech', true),
+  extraFormat,
 ];
 
 // static paths must come before /:id

@@ -18,20 +18,24 @@ import {
 
 const router = Router();
 
+const extraFormat = body('extra').optional().isObject().withMessage('extra must be an object');
+
 const createValidators = [
   body('conceptId').trim().notEmpty().withMessage('conceptId is required'),
   body('pashto').trim().notEmpty().withMessage('pashto is required'),
   activeLookup('region', 'region'),
   body('definition').trim().notEmpty().withMessage('definition is required'),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
+  extraFormat,
 ];
 
 const updateValidators = [
   lookupFormat('region', true),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
+  extraFormat,
 ];
 
-const editValidators = [lookupFormat('region', true)];
+const editValidators = [lookupFormat('region', true), extraFormat];
 
 const statusValidators = [
   body('status')

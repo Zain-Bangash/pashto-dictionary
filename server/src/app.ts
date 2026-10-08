@@ -10,6 +10,7 @@ import conceptsRouter from './routes/concepts';
 import variantsRouter from './routes/variants';
 import statsRouter from './routes/stats';
 import lookupsRouter from './routes/lookups';
+import fieldsRouter from './routes/fields';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/concepts', conceptsRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/lookups', lookupsRouter);
+app.use('/api/fields', fieldsRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(err.message);

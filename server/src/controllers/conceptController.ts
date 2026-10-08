@@ -7,6 +7,7 @@ import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import { enrichActors } from '../utils/enrichActors';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
+import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 
 type Doc = Record<string, unknown>;
 
@@ -39,6 +40,12 @@ async function createConcept(req: Request, res: Response): Promise<void> {
 
   const { englishGloss, partOfSpeech } = req.body as { englishGloss: string; partOfSpeech: string };
 
+  const extra = await validateExtra('concept', req.body.extra, 'create');
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   const normalizedGloss = englishGloss.toLowerCase().trim();
   const existing = await Concept.findOne({ normalizedGloss, isDeleted: { $ne: true } });
   if (existing) {
@@ -54,6 +61,7 @@ async function createConcept(req: Request, res: Response): Promise<void> {
     concept = await new Concept({
       englishGloss,
       partOfSpeech,
+      extra: initialExtra(extra.values),
       submittedBy: req.user!.id,
       status: 'pending',
     }).save();
@@ -436,6 +444,12 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const extra = await validateExtra('concept', req.body.extra, 'edit', concept.extra);
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   const editableFields: (keyof IConcept)[] = ['englishGloss', 'partOfSpeech'];
   const before: Record<string, unknown> = {};
   for (const field of editableFields) {
@@ -444,10 +458,11 @@ async function editConcept(req: Request, res: Response): Promise<void> {
 
   if (req.body.englishGloss !== undefined) concept.englishGloss = req.body.englishGloss as string;
   if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech as string;
+  const extraChanges = applyExtra(concept, extra.values);
 
   await concept.save();
 
-  const changes: Record<string, unknown> = {};
+  const changes: Record<string, unknown> = { ...extraChanges };
   for (const field of editableFields) {
     if (concept[field] !== before[field as string]) {
       changes[field as string] = { from: before[field as string], to: concept[field] };
@@ -592,8 +607,15 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const extra = await validateExtra('concept', req.body.extra, 'edit', concept.extra);
+  if (extra.error) {
+    res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
   if (englishGloss !== undefined) concept.englishGloss = englishGloss;
   if (partOfSpeech !== undefined) concept.partOfSpeech = partOfSpeech;
+  applyExtra(concept, extra.values);
   concept.status = 'pending';
   concept.moderatorNote = undefined;
   await concept.save();

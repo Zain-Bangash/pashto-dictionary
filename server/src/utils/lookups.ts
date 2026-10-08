@@ -22,9 +22,23 @@ export async function getActiveKeys(type: LookupType): Promise<string[]> {
 }
 
 // An unchanged stored value stays valid even after it is deactivated; a newly chosen one must be active
+export function isUnchanged(value: string, currentValue?: string): boolean {
+  return currentValue !== undefined && value === currentValue;
+}
+
 export async function isAllowedLookup(type: LookupType, value: string, currentValue?: string): Promise<boolean> {
-  if (currentValue !== undefined && value === currentValue) return true;
+  if (isUnchanged(value, currentValue)) return true;
   return (await Lookup.exists({ type, key: value, active: true })) !== null;
+}
+
+export function labelChain(field = 'label', optional = false): ValidationChain {
+  const chain = body(field);
+  return (optional ? chain.optional() : chain)
+    .isString().withMessage(`${field} must be a string`)
+    .trim()
+    .notEmpty().withMessage(`${field} is required`)
+    .isLength({ max: LABEL_MAX }).withMessage(`${field} must be ${LABEL_MAX} characters or fewer`)
+    .matches(SAFE_LABEL).withMessage(`${field} contains invalid characters`);
 }
 
 export function invalidLookupMessage(type: LookupType): string {

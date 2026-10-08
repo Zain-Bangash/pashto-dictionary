@@ -98,8 +98,8 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed'];
-  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup'];
+  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed'];
+  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition'];
   const filter: Record<string, unknown> = {};
 
   const actionParam = req.query.action as string;
