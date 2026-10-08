@@ -88,11 +88,12 @@ submitted → pending    (automatic on POST /api/concepts or /api/variants)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+approved  → rejected   (admin only, note required)
 published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on both `Concept` and `Variant`. Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
+Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on `Concept`, `Variant` and `VariantSuggestion` (fill-only proposals for a user's own published variant; see ARCHITECTURE). Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
 
 ---
 

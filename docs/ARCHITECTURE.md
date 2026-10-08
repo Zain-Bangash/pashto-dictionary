@@ -70,13 +70,14 @@ submitted → pending    (automatic on POST)
 pending   → approved   (moderator or admin)
 pending   → rejected   (moderator or admin, note required)
 approved  → published  (admin only)
+approved  → rejected   (admin only, note required)
 published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
 Every transition on either a Concept or a Variant writes a record to `ModerationLog` with the target model, target ID, action, performer, and optional note. This creates a full audit trail that the admin dashboard exposes.
 
-`published → rejected` lets an admin take down a live entry so its submitter can fix and resubmit it; it then goes through normal review again. A moderator attempting it gets a 403.
+`published → rejected` lets an admin take down a live entry so its submitter can fix and resubmit it; it then goes through normal review again. `approved → rejected` lets an admin turn back an item a moderator approved instead of being forced to publish it. A moderator attempting either gets a 403; moderators never see approved items anyway.
 
 Rejecting a concept (from any status) also rejects its live pending, approved and published variants: each is set to `rejected`, soft-deleted, and given the note `Concept "<gloss>" was rejected: <note>`, so its submitter sees the reason in My Submissions and can resubmit.
 
@@ -219,6 +220,8 @@ To address the race condition, MongoDB unique indexes enforce the identity rules
 - `Variant`: compound unique index on `{ concept, normalizedPashto, region }`
 
 These constraints mean that even if two concurrent requests both pass the application-level pre-check, the database will reject the second insert with an `E11000 duplicate key` error (MongoDB error code 11000). The server catches this error and returns a 409 Conflict rather than letting it surface as a 500. The result is race-condition safety that is guaranteed by the storage layer, not by the timing of application-level queries.
+
+Both unique indexes are **partial on `isDeleted: false`**, and a rejected variant is soft-deleted at rejection. So a rejected variant does not hold its key: someone else can create the same word for the same concept and region, which is intended, because the rejected one may never come back. The clash surfaces when the rejected one is resubmitted, since resubmitting sets `isDeleted` back to `false`. The resubmit path therefore always re-runs the duplicate check (not only when the word or region changed) and also catches E11000, returning a 409 that explains someone may have added the word meanwhile. Staff edits catch E11000 the same way. No mutation path lets the index error surface as a 500.
 
 The identity rule for a variant is deliberately scoped to `concept + pashto + region` rather than globally unique across the entire collection. The same Pashto word can legitimately appear under two different concepts — a form of polysemy that is linguistically valid — and the compound index correctly permits this while still preventing exact duplicates within a single concept and region.
 
@@ -433,6 +436,68 @@ When `forms` is sent it replaces the whole array (`[]` clears it); when it is om
 
 ---
 
+## Filling gaps: Wanted Words, completion and suggestions
+
+Three linked features help contributors fill holes in the dictionary without weakening review.
+
+### Wanted Words
+
+`GET /api/concepts/wanted?region=` lists published concepts with **no variant in that region**. Any variant hides the gap, whatever its status: pending, approved and published ones are live, and rejected ones are matched by status because rejection soft-deletes them. An abandoned rejection therefore keeps hiding its gap until its owner resubmits it or an admin deletes it. Admin-deleted variants (not rejected) do not hide it.
+
+It runs as two queries rather than an aggregation: `Variant.distinct('concept', { region, … })`, then `Concept.find({ status: 'published', _id: { $nin: ids } })` with skip/limit and a count on the same filter. The `{ region: 1, concept: 1 }` index covers the distinct. At the dataset sizes this project expects, a `$nin` list is cheap and both queries are trivially testable; if it grows into tens of thousands of concepts this is the single place to switch to a `$lookup`.
+
+### Blank fields — one definition
+
+`server/src/utils/blankFields.ts` defines "blank" once, as aggregation stages that add three fields to a variant:
+
+- `missingFields` — gaps, published variants only: `phonetic`, `example`, `forms` when the word has **no** forms and its part of speech allows them, and `extra.<key>` for active, **optional** variant fields. `pashto` and `definition` are required and never blank.
+- `fillableFields` — the gaps plus `forms` when some, but not all, form slots are filled.
+- `formsFilled` / `formsTotal` — for the "Forms 2/8" hint.
+
+Only `missingFields` drives the **Needs completion** count, so the chip stays a short to-do list; a noun with two of eight forms is offered "Add details" quietly rather than flagged. The same stages back the My Submissions filters (`?needs=completion&missing=&region=`) and `getCompletion(id)`. The client never computes blankness itself; it renders what the server returns.
+
+### Suggestions — a separate record
+
+A user may propose values for the blank fields of their **own published** variant. The live word stays published and unchanged until an admin publishes the suggestion. Unpublished variants keep the existing Edit & Resubmit workflow.
+
+```
+VariantSuggestion { variant, proposed: { phonetic?, example?, forms?[], extra?: Map }, status,
+                    submittedBy, reviewedBy, moderatorNote, timestamps }
+```
+
+**Why a separate collection.** Editing the variant in place would either unpublish it during review or put unreviewed text on the public page. An embedded "pending changes" block on the variant would mix two lifecycles in one document, complicate every read of a variant, and make "one open suggestion" an application rule instead of an index. A separate record keeps the variant's state machine untouched, gives the suggestion its own audit trail, and makes the live word's content provably unchanged until publish.
+
+**State machine** (mirrors the variant's, with no `published → …`):
+
+```
+pending  → approved   (moderator or admin; not on your own suggestion)
+pending  → rejected   (moderator or admin, note required)
+approved → published  (admin only — merges into the live word)
+approved → rejected   (admin only, note required)
+rejected → pending    (owner edits and resubmits)
+```
+
+**One open suggestion per variant** is a partial unique index on `{ variant: 1 }` where `status ∈ { pending, approved }` (MongoDB 6.0+), with a pre-check for a clean 409.
+
+**Fill-only, checked four times.** `validateProposal()` (in `utils/suggestions.ts`) runs on submit, resubmit, staff edit and approve, and again at publish. Every proposed value must go into a field that is blank on the live word *now*; otherwise the request fails with 400 and the field named (`phonetic`, `forms.masculine.plural.direct`, `extra.register`). Forms are fill-only **per slot**, so a suggestion can add the empty slots of a partly filled word. Forms are re-validated against the concept's current part of speech, and extra values with `validateExtra`. Core fields (`pashto`, `definition`, `region`, …) are rejected by the route validators.
+
+**Preventing conflicts instead of resolving them.** While a suggestion is open, a staff edit to the word cannot change the fields it proposes (409 naming the field); other fields stay editable. The admin's published-word panel shows a "Suggestion pending" badge, disables those inputs and hides the proposed form slots. Staff fix a suggestion *inside* the review instead (`PATCH /api/suggestions/:id/edit`, note required, logged as `edited` with a diff). The remaining ways a publish can fail — a split-second race, the concept's part of speech changing, a custom field being deactivated — refuse the publish with the field named. The suggestion stays approved, and the admin edits or rejects it.
+
+**Publish merge.** There are no transactions in this codebase (and Jest runs a standalone MongoDB), so publish uses conditional writes:
+
+1. Claim: `findOneAndUpdate({ _id, status: 'approved' }, { status: 'published' })`; a double-click or a second admin gets a 400.
+2. Re-check fill-only against the freshly read word.
+3. Write with `Variant.updateOne({ _id, updatedAt: <read value> }, { $set })`, setting `normalizedPhonetic` and each form's `normalizedPashto` itself because `updateOne` skips the pre-save hook. Forms are merged with the existing ones and stored in canonical order.
+4. If the word changed between read and write, retry once; on any failure, put the suggestion back to `approved`.
+
+**Cascade.** When a word leaves the published state — rejected (directly or through its concept) or deleted — its open suggestions are rejected with a note naming the cause, and each gets a log entry.
+
+**Audit log.** Suggestion transitions log under `targetModel: 'VariantSuggestion'` with the usual actions. Publishing also writes `suggestion_applied` on the **Variant**, with an `edited`-style diff and the suggestion id, so the word's own history shows when and how its content changed.
+
+Create and resubmit share a rate limiter (30 requests per 15 minutes) built the same way as the auth limiter.
+
+---
+
 ## API Design
 
 All API responses use a consistent envelope regardless of success or failure:
@@ -590,7 +655,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 - **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
 - **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
 - **Timestamps**: each entry shows an absolute date/time.
-- **Action badge colours**: all 11 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`, `field_changed`) have distinct colours. `lookup_changed` and `field_changed` entries render from their `changes` payload. `extra.<key>` diffs in `edited` entries are shown under the field's label.
+- **Action badge colours**: all 12 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`, `field_changed`, `suggestion_applied`) have distinct colours. Suggestion entries are labelled with the word they complete. `lookup_changed` and `field_changed` entries render from their `changes` payload. `extra.<key>` diffs in `edited` entries are shown under the field's label.
 
 ---
 
