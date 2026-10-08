@@ -12,7 +12,7 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
   const [editing, setEditing]   = useState(false);
 
   const { variants = [], ...concept } = group;
-  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, status: concept.status };
+  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, status: concept.status, partOfSpeech: concept.partOfSpeech };
   const count = variants.length;
   const panelId = `variants-${concept._id}`;
 

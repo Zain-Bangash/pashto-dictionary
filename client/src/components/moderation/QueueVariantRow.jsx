@@ -3,6 +3,7 @@ import VariantEditForm from './VariantEditForm';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN, EDIT_BTN } from './queueButtons';
 import useLookups from '../../hooks/useLookups';
 import ExtraFieldsDisplay from '../fields/ExtraFieldsDisplay';
+import FormsDisplay from '../forms/FormsDisplay';
 
 function approveBlockReason(conceptStatus) {
   if (conceptStatus === 'pending')  return 'Approve the concept first';
@@ -40,6 +41,7 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
           <p className="text-sm font-ui text-muted">{variant.definition}</p>
           {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
           <ExtraFieldsDisplay appliesTo="variant" values={variant.extra} className="text-xs" />
+          <FormsDisplay forms={variant.forms} />
           {variant.submissionNote && (
             <div className="mt-1 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-[10px]">
               <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider mb-1">Submitter note</p>

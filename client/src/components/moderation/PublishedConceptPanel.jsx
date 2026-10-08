@@ -18,7 +18,7 @@ export default function PublishedConceptPanel({ concept, onConceptEdited, onConc
   const [rejectTarget, setRejectTarget] = useState(null);
   const [actionError, setActionError]   = useState(null);
 
-  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss };
+  const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, partOfSpeech: concept.partOfSpeech };
 
   const handleRejectConfirm = async (note) => {
     const target = rejectTarget;

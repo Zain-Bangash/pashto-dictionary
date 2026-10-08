@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
 import LookupSelect from '../components/LookupSelect';
 import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
+import FormsEditor from '../components/forms/FormsEditor';
+import { formKindFor, formsPayload } from '../utils/forms';
 
 const STATUS_STYLES = {
   pending:   { color: '#e8c547', border: 'rgba(232,197,71,0.3)',  bg: 'rgba(232,197,71,0.08)' },
@@ -122,6 +124,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
     submissionNote: variant.submissionNote || '',
   });
   const [extra, setExtra] = useState(variant.extra || {});
+  const [forms, setForms] = useState(variant.forms || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -140,6 +143,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
       if (!body.example) delete body.example;
       if (!body.submissionNote) delete body.submissionNote;
       body.extra = extra;
+      body.forms = formsPayload(forms);
       const res = await updateVariant(variant._id, body);
       onSave(res.data.data);
     } catch (err) {
@@ -187,6 +191,14 @@ function VariantEditForm({ variant, onSave, onCancel }) {
         idPrefix={`resubmit-${variant._id}`}
         values={extra}
         onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
+        inputClassName={inputCls}
+        labelClassName={labelCls}
+      />
+      <FormsEditor
+        kind={formKindFor(variant.concept?.partOfSpeech)}
+        forms={forms}
+        onChange={setForms}
+        idPrefix={`resubmit-form-${variant._id}`}
         inputClassName={inputCls}
         labelClassName={labelCls}
       />

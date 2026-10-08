@@ -1,14 +1,24 @@
 import useFieldDefinitions from '../../hooks/useFieldDefinitions';
+import { slotLabel } from '../../utils/forms';
 
 const OWNER = { Concept: 'concept', Variant: 'variant' };
+
+// Form diffs store { pashto, phonetic?, example? } or null for an added/removed form
+function show(value) {
+  if (value === null) return '—';
+  if (value && typeof value === 'object' && 'pashto' in value) {
+    return [value.pashto, value.phonetic && `/${value.phonetic}/`, value.example].filter(Boolean).join(' · ');
+  }
+  return String(value);
+}
 
 function Diff({ field, diff }) {
   return (
     <p className="text-[11px] font-ui text-muted/70">
       <span className="text-muted/40">{field}: </span>
-      <span className="line-through text-muted/50">{String(diff.from)}</span>
+      <span dir="auto" className="line-through text-muted/50">{show(diff.from)}</span>
       <span className="text-muted/40 mx-1">→</span>
-      <span className="text-warm/70">{String(diff.to)}</span>
+      <span dir="auto" className="text-warm/70">{show(diff.to)}</span>
     </p>
   );
 }
@@ -57,8 +67,11 @@ function FieldChange({ changes }) {
 export default function LogChanges({ log }) {
   const { action, changes, note } = log;
   const { fieldLabel } = useFieldDefinitions();
-  const displayName = (field) =>
-    field.startsWith('extra.') ? fieldLabel(OWNER[log.targetModel], field.slice(6)) : field;
+  const displayName = (field) => {
+    if (field.startsWith('extra.')) return fieldLabel(OWNER[log.targetModel], field.slice(6));
+    if (field.startsWith('forms.')) return `form (${slotLabel(field.slice(6))})`;
+    return field;
+  };
 
   if (action === 'field_changed' && changes && typeof changes === 'object') {
     return <FieldChange changes={changes} />;
