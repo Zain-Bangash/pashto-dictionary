@@ -32,7 +32,8 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate(location.state?.from?.pathname || '/');
+      const from = location.state?.from;
+      navigate(from?.pathname ? `${from.pathname}${from.search ?? ''}` : '/');
     } catch (err) {
       setApiError(err?.message ?? 'Login failed');
     } finally {

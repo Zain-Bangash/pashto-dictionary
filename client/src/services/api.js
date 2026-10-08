@@ -118,6 +118,36 @@ export function checkCrossConceptPashto(pashto, conceptId) {
   return api.get('/api/variants/cross-concept-check', { params: { pashto, conceptId } });
 }
 
+// ── Wanted words, completion and suggestions ─────────────────────────────────
+
+export function getWanted(params = {}) {
+  return api.get('/api/concepts/wanted', { params });
+}
+
+export function getMyVariantSubmissions(params = {}) {
+  return api.get('/api/variants/my-submissions', { params });
+}
+
+export function createSuggestion(variantId, body) {
+  return api.post(`/api/variants/${variantId}/suggestions`, body);
+}
+
+export function resubmitSuggestion(id, body) {
+  return api.patch(`/api/suggestions/${id}`, body);
+}
+
+export function editSuggestion(id, body) {
+  return api.patch(`/api/suggestions/${id}/edit`, body);
+}
+
+export function transitionSuggestion(id, body) {
+  return api.patch(`/api/suggestions/${id}/status`, body);
+}
+
+export function getSuggestionQueue(params = {}) {
+  return api.get('/api/moderation/suggestions', { params });
+}
+
 // ── Lookup (preset list) functions ────────────────────────────────────────────
 
 export function getLookups() {

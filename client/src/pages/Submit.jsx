@@ -72,13 +72,16 @@ export default function Submit() {
     const conceptId   = searchParams.get('conceptId');
     const pashtoParam = searchParams.get('pashto');
     const phoneticParam = searchParams.get('phonetic');
-    if (conceptId && pashtoParam) {
+    const regionParam = searchParams.get('region');
+    // From a concept page (conceptId + pashto) or from Wanted Words (conceptId + region)
+    if (conceptId && (pashtoParam || regionParam)) {
       api.get(`/api/concepts/${conceptId}`)
         .then((res) => {
           setSelectedConcept(res.data.data);
           setGlossQuery(res.data.data.englishGloss);
-          setPashto(pashtoParam);
+          if (pashtoParam) setPashto(pashtoParam);
           if (phoneticParam) setPhonetic(phoneticParam);
+          if (regionParam) setRegion(regionParam);
           setStep(2);
         })
         .catch(() => {});
