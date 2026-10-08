@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ConceptCard from '../../components/ConceptCard';
+import { LookupsWrapper, LOOKUP_ROWS } from '../helpers/lookups';
 
 const renderCard = (concept) =>
   render(
@@ -52,5 +53,17 @@ describe('ConceptCard', () => {
     renderCard(baseConcept);
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/concepts/abc123');
+  });
+
+  test('shows the current admin-edited label for the stored part-of-speech key', () => {
+    const rows = LOOKUP_ROWS.map((r) => (r.key === 'noun' ? { ...r, label: 'Noun (اسم)' } : r));
+    render(
+      <LookupsWrapper rows={rows}>
+        <MemoryRouter>
+          <ConceptCard concept={baseConcept} />
+        </MemoryRouter>
+      </LookupsWrapper>
+    );
+    expect(screen.getByText('Noun (اسم)')).toBeInTheDocument();
   });
 });

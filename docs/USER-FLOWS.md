@@ -14,6 +14,8 @@ As a guest I should be able to browse all published concepts from the Concepts p
 
 As a guest I should be able to click a concept card to go to its detail page, where I see the concept's English gloss and part of speech, and all published variants grouped by Pashto word. Variants that share the same Pashto word are shown as one card with a region tab strip — clicking a region tab shows that region's phonetic, definition, and example.
 
+As a guest, a concept's detail page also shows any extra field values admins have defined: concept fields under the concept heading, and variant fields in each region's panel. Fields an admin has deactivated are not shown.
+
 As a guest I should be able to click Register in the navbar to go to the Register page.
 
 As a guest I should be able to click Login in the navbar to go to the Login page.
@@ -22,7 +24,7 @@ As a guest I should be able to click Login in the navbar to go to the Login page
 
 ## User
 
-As a user I should be able to register with a username, email, and password. I can optionally add my region (Kohat, Hangu, Tirah, Thal, or Parachinar) and village.
+As a user I should be able to register with a username, email, and password. I can optionally add my region and village. The region dropdown shows the current region list maintained by admins — the same list used on the Submit form — and the server rejects a region that is not active.
 
 As a user I should be able to log in with my email and password. My session should survive a page refresh — I should not be logged out when I reload the browser.
 
@@ -31,6 +33,8 @@ As a user, if I enter an incorrect email or password on the Login page, I stay o
 As a user I should be able to view all the same pages a guest can.
 
 As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, phonetic, region, definition, and example.
+
+As a user, the Submit form also shows any extra fields admins have added: concept fields when I create a new concept, and variant fields in Step 2. Fields not marked optional are required, and I cannot submit until they are filled. These fields are not required when I resubmit an existing entry.
 
 As a user I should be able to submit a new concept and its first variant together. After submission both are placed in the pending state awaiting a moderator.
 
@@ -46,7 +50,7 @@ As a user, in Step 2 of the Submit form, I can optionally add a note to the mode
 
 As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
 
-As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published).
+As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published). The resubmit form includes the entry's extra fields, so I can fix those values too.
 
 ---
 
@@ -72,11 +76,13 @@ As a moderator I should be able to reject a pending variant with a note.
 
 As a moderator I should be able to view the Concepts list page in the dashboard.
 
-As a moderator I should not be able to access the Users or Log pages — those are admin-only.
+As a moderator I should not be able to access the Users, Log, Lists, or Fields pages — those are admin-only. The server returns 403 if a moderator or user calls the list-editing endpoints.
 
 As a moderator I should be able to reject a pending item by clicking Reject, which opens a modal requiring me to type a reason before confirming. The reason is stored and shown to the submitter in their My Submissions page.
 
-As a moderator I should be able to edit any submission that was not submitted by me and is not yet published, using the Edit button on the queue card. The inline form opens pre-populated with the current values. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change.
+As a moderator I should be able to edit any submission that was not submitted by me and is not yet published, using the Edit button on the queue card. The inline form opens pre-populated with the current values, including any extra fields. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change. Changes to extra fields appear in the edit's Moderation Log diff under the field's name. If the server rejects the edit, its message is shown in the form.
+
+As a moderator, each concept row and variant row in the queue shows the entry's extra field values, so I can review them without opening the Edit form.
 
 As a moderator I should see a "Similar concepts" panel on each concept card in the queue, populated by the suggest endpoint using that concept's English gloss. If a match is found I can click "Merge into this" to open a confirmation modal, enter a note, and merge the pending concept into the existing one. All variants are moved to the target; the source concept is soft-deleted.
 
@@ -119,3 +125,11 @@ As an admin I can edit a published concept or variant from that panel using the 
 As an admin I can reject a published concept from that panel. The Reject modal requires a reason and warns how many variants will also be rejected. On confirm, the concept leaves the public site, every one of its variants is rejected with the note "Concept "X" was rejected: <reason>", and the Concepts list refreshes.
 
 As an admin I can reject a single published variant from that panel with a required reason. It disappears from the panel and the public concept page, and its submitter sees the reason in My Submissions.
+
+As an admin I can open Lists in the dashboard to manage the region and part-of-speech lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log.
+
+As an admin I can deactivate a value I added. It disappears from the Submit, Register, and edit dropdowns, but existing entries that use it still show it, and they can still be edited as long as that value is not changed. I can reactivate it later. Built-in values (the original five regions and six parts of speech) cannot be deactivated, and no value can ever be deleted.
+
+As an admin I can open Fields in the dashboard to add a text, long-text, or dropdown field to concepts or variants. I can rename a field, mark it required or optional, and reorder it. Making a field required only affects new submissions. Each change writes a `field_changed` record to the Moderation Log.
+
+As an admin I can deactivate a field. It disappears from the forms, entry pages and queue, but the values already entered are kept and come back if I reactivate it. For dropdown fields I can add, rename, deactivate and reactivate options, but I cannot deactivate the last active option. Entries that already use a deactivated option keep it. No field or option can ever be deleted.

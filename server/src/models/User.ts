@@ -7,7 +7,7 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, lowercase: true },
     cognitoSub: { type: String, unique: true, sparse: true },
     role: { type: String, enum: ['user', 'moderator', 'admin'], default: 'user' },
-    region: { type: String, enum: ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'] },
+    region: { type: String, trim: true, maxlength: 50 },
     village: { type: String, trim: true },
   },
   { timestamps: true }

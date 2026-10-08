@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import useLookups from '../hooks/useLookups';
+import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
 
 export default function ConceptDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { labelFor } = useLookups();
   const navigate = useNavigate();
   const [concept, setConcept] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,16 +54,17 @@ export default function ConceptDetail() {
               <div className="flex gap-2 flex-wrap">
                 {concept.partOfSpeech && (
                   <span className="meta-label bg-white/[0.05] border border-white/[0.08] rounded-full px-3 py-1">
-                    {concept.partOfSpeech}
+                    {labelFor('partOfSpeech', concept.partOfSpeech)}
                   </span>
                 )}
               </div>
+              <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
               {concept.submittedBy?.username && (
                 <p className="text-[11px] font-ui text-muted/50">
                   Submitted by {concept.submittedBy.username}
                   {(concept.submittedBy.village || concept.submittedBy.region) && (
                     <span className="ml-1">
-                      ({[concept.submittedBy.village, concept.submittedBy.region].filter(Boolean).join(', ')})
+                      ({[concept.submittedBy.village, labelFor('region', concept.submittedBy.region)].filter(Boolean).join(', ')})
                     </span>
                   )}
                 </p>
@@ -105,7 +109,7 @@ export default function ConceptDetail() {
                                 color: activeIdx === idx ? '#00f5b4' : '#888',
                               }}
                             >
-                              {v.region}
+                              {labelFor('region', v.region)}
                             </button>
                           ))}
                         </div>
@@ -118,13 +122,14 @@ export default function ConceptDetail() {
                         {selected.example && (
                           <p className="font-ui text-muted text-sm italic">{selected.example}</p>
                         )}
+                        <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
 
                         {selected.submittedBy?.username && (
                           <p className="text-[11px] font-ui text-muted/40">
                             Added by {selected.submittedBy.username}
                             {(selected.submittedBy.village || selected.submittedBy.region) && (
                               <span className="ml-1">
-                                ({[selected.submittedBy.village, selected.submittedBy.region].filter(Boolean).join(', ')})
+                                ({[selected.submittedBy.village, labelFor('region', selected.submittedBy.region)].filter(Boolean).join(', ')})
                               </span>
                             )}
                           </p>

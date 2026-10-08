@@ -7,6 +7,8 @@ const NAV_ITEMS = [
   { to: '/dashboard/concepts', label: 'Concepts', roles: ['moderator', 'admin'] },
   { to: '/dashboard/users',   label: 'Users',    roles: ['admin'] },
   { to: '/dashboard/log',     label: 'Log',      roles: ['admin'] },
+  { to: '/dashboard/lists',   label: 'Lists',    roles: ['admin'] },
+  { to: '/dashboard/fields',  label: 'Fields',   roles: ['admin'] },
 ];
 
 export default function DashboardLayout({ children }) {

@@ -11,6 +11,8 @@ vi.mock('../services/api', () => ({
   clearToken: vi.fn(),
   getToken: vi.fn(() => null),
   setLogoutHandler: vi.fn(),
+  getLookups: vi.fn(() => Promise.resolve({ data: { data: [], meta: { page: 1, limit: 200, total: 0 } } })),
+  getFields: vi.fn(() => Promise.resolve({ data: { data: [], meta: { page: 1, limit: 40, total: 0 } } })),
 }));
 
 describe('App router', () => {

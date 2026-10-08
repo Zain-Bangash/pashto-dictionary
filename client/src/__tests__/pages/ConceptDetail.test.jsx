@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi, beforeEach } from 'vitest';
 import ConceptDetail from '../../pages/ConceptDetail';
 import api from '../../services/api';
+import { FieldsWrapper } from '../helpers/fields';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn() },
@@ -132,5 +133,32 @@ describe('ConceptDetail page', () => {
     api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
     renderDetail('abc123');
     expect(api.get).toHaveBeenCalledWith('/api/concepts/abc123');
+  });
+});
+
+describe('ConceptDetail — extra field values', () => {
+  it('shows concept and variant extra values for active fields only', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          ...fullConcept,
+          extra: { etymology: 'Old Iranian' },
+          variants: [{ ...fullConcept.variants[0], extra: { plural: 'کورونه', ghost: 'hidden' } }],
+        },
+      },
+    });
+    render(
+      <FieldsWrapper>
+        <MemoryRouter initialEntries={['/concepts/abc123']}>
+          <Routes>
+            <Route path="/concepts/:id" element={<ConceptDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </FieldsWrapper>
+    );
+    expect(await screen.findByText('Old Iranian')).toBeInTheDocument();
+    expect(screen.getByText('کورونه')).toBeInTheDocument();
+    expect(screen.queryByText('hidden')).not.toBeInTheDocument();
   });
 });

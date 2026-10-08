@@ -4,7 +4,8 @@ import ConceptSearch from './ConceptSearch';
 
 const editVariant = (id, data) => api.patch(`/api/variants/${id}/edit`, data);
 
-const REGION_OPTIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+import LookupSelect from '../LookupSelect';
+import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 
 export default function VariantEditForm({ item, onSave, onCancel }) {
   const [pashto, setPashto] = useState(item.pashto || '');
@@ -13,16 +14,21 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
   const [definition, setDefinition] = useState(item.definition || '');
   const [example, setExample] = useState(item.example || '');
   const [concept, setConcept] = useState(item.concept?._id || item.concept || '');
+  const [extra, setExtra] = useState(item.extra || {});
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!note.trim()) return;
     setSaving(true);
+    setError('');
     try {
-      const res = await editVariant(item._id, { pashto, phonetic, region, definition, example, concept, note });
+      const res = await editVariant(item._id, { pashto, phonetic, region, definition, example, concept, extra, note });
       onSave(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.error?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -51,14 +57,13 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
       </div>
       <div>
         <label className="block text-xs font-ui text-muted uppercase tracking-wider mb-1">Region</label>
-        <select
+        <LookupSelect
+          type="region"
           aria-label="Region"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
           className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
-        >
-          {REGION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        />
       </div>
       <div>
         <label className="block text-xs font-ui text-muted uppercase tracking-wider mb-1">Definition</label>
@@ -78,6 +83,14 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
           className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
         />
       </div>
+      <ExtraFieldsInputs
+        appliesTo="variant"
+        idPrefix={`edit-${item._id}`}
+        values={extra}
+        onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
+        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+        labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"
+      />
       <ConceptSearch
         initialGloss={item.concept?.englishGloss || ''}
         onChange={(id) => setConcept(id)}
@@ -93,6 +106,7 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
           className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
         />
       </div>
+      {error && <p role="alert" className="text-xs font-ui text-red-400">{error}</p>}
       <div className="flex gap-2 justify-end">
         <button
           type="button"

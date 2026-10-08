@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import useLookups from '../hooks/useLookups';
 
 const POS_SHORT = { noun: 'N.', verb: 'V.', adjective: 'Adj.', adverb: 'Adv.', phrase: 'Ph.', other: '—' };
 
@@ -64,6 +65,7 @@ function AmbientBackground() {
 
 // ─── Concept card (recent concepts grid) ──────────────────────
 function ConceptCard({ entry }) {
+  const { labelFor } = useLookups();
   const [playing, setPlaying] = useState(false);
   const cardRef = useRef(null);
   // entry is a Concept; firstVariant is pre-populated by the list API
@@ -109,7 +111,7 @@ function ConceptCard({ entry }) {
             <div className="font-display text-warm font-bold text-lg min-w-0">{entry.englishGloss}</div>
           )}
           <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-2.5 uppercase tracking-wider">
-            {POS_SHORT[entry.partOfSpeech] || '—'}
+            {POS_SHORT[entry.partOfSpeech] || labelFor('partOfSpeech', entry.partOfSpeech) || '—'}
           </span>
         </div>
 
@@ -143,6 +145,7 @@ function ConceptCard({ entry }) {
 
 // ─── Home ──────────────────────────────────────────────────────
 export default function Home() {
+  const { labelFor } = useLookups();
   const { user }  = useAuth();
   const navigate  = useNavigate();
 
@@ -315,7 +318,7 @@ export default function Home() {
                   <div className="flex flex-col gap-3 sm:w-48 shrink-0" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.22s' }}>
                     {wotd.partOfSpeech && (
                       <span className="font-ui text-warm/70 border border-white/[0.1] rounded text-[10px] px-2 py-0.5 tracking-wide uppercase self-start">
-                        {wotd.partOfSpeech}
+                        {labelFor('partOfSpeech', wotd.partOfSpeech)}
                       </span>
                     )}
                     <button

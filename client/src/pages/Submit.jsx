@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { suggestConcepts, createConcept, createVariant, checkCrossConceptPashto } from '../services/api';
-
-const PARTS_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
-const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+import useLookups from '../hooks/useLookups';
+import LookupSelect from '../components/LookupSelect';
+import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
+import useFieldDefinitions from '../hooks/useFieldDefinitions';
+import { missingRequired } from '../context/fieldsValue';
 
 const inputClass = 'w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-gold/50 transition-all';
 const labelClass = 'block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider';
@@ -17,6 +19,8 @@ function useDebounce(fn, delay) {
 }
 
 export default function Submit() {
+  const { labelFor } = useLookups();
+  const { forType } = useFieldDefinitions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -36,6 +40,8 @@ export default function Submit() {
   const [definition, setDefinition]       = useState('');
   const [example, setExample]             = useState('');
   const [submissionNote, setSubmissionNote] = useState('');
+  const [conceptExtra, setConceptExtra]   = useState({});
+  const [variantExtra, setVariantExtra]   = useState({});
 
   const [crossConceptWarnings, setCrossConceptWarnings] = useState([]);
 
@@ -116,6 +122,10 @@ export default function Submit() {
     if (!region) errs.region = 'Region is required';
     if (!definition.trim()) errs.definition = 'Definition is required';
     if (creatingNew && !newPos) errs.partOfSpeech = 'Part of speech is required';
+    const conceptMissing = creatingNew ? missingRequired(forType('concept'), conceptExtra) : {};
+    const variantMissing = missingRequired(forType('variant'), variantExtra);
+    if (Object.keys(conceptMissing).length) errs.conceptExtra = conceptMissing;
+    if (Object.keys(variantMissing).length) errs.variantExtra = variantMissing;
     return errs;
   }
 
@@ -131,11 +141,11 @@ export default function Submit() {
       let conceptId = selectedConcept?._id;
 
       if (creatingNew) {
-        const res = await createConcept({ englishGloss: newGloss, partOfSpeech: newPos });
+        const res = await createConcept({ englishGloss: newGloss, partOfSpeech: newPos, extra: conceptExtra });
         conceptId = res.data.data._id;
       }
 
-      await createVariant({ conceptId, pashto, phonetic, region, definition, example, submissionNote });
+      await createVariant({ conceptId, pashto, phonetic, region, definition, example, submissionNote, extra: variantExtra });
       navigate('/my-submissions');
     } catch (err) {
       const message = err?.response?.data?.error?.message ?? 'Submission failed';
@@ -186,7 +196,7 @@ export default function Submit() {
                         className="w-full text-left px-4 py-2.5 hover:bg-white/[0.05] transition-colors"
                       >
                         <span className="text-warm text-sm font-ui">{c.englishGloss}</span>
-                        <span className="ml-2 text-muted text-xs font-ui">{c.partOfSpeech}</span>
+                        <span className="ml-2 text-muted text-xs font-ui">{labelFor('partOfSpeech', c.partOfSpeech)}</span>
                       </button>
                     </li>
                   ))}
@@ -234,19 +244,29 @@ export default function Submit() {
               {creatingNew && (
                 <div>
                   <label htmlFor="partOfSpeech" className={labelClass}>Part of Speech</label>
-                  <select
+                  <LookupSelect
+                    type="partOfSpeech"
                     id="partOfSpeech"
                     value={newPos}
                     onChange={(e) => setNewPos(e.target.value)}
+                    placeholder="Select…"
                     className={`${inputClass} appearance-none`}
-                  >
-                    <option value="" className="bg-charcoal">Select…</option>
-                    {PARTS_OF_SPEECH.map((pos) => (
-                      <option key={pos} value={pos} className="bg-charcoal">{pos}</option>
-                    ))}
-                  </select>
+                    optionClassName="bg-charcoal"
+                  />
                   {errors.partOfSpeech && <p className="text-red-400 text-xs font-ui mt-1">{errors.partOfSpeech}</p>}
                 </div>
+              )}
+
+              {creatingNew && (
+                <ExtraFieldsInputs
+                  appliesTo="concept"
+                  values={conceptExtra}
+                  onChange={(key, value) => setConceptExtra((v) => ({ ...v, [key]: value }))}
+                  errors={errors.conceptExtra}
+                  inputClassName={inputClass}
+                  labelClassName={labelClass}
+                  optionClassName="bg-charcoal"
+                />
               )}
 
               <div>
@@ -299,17 +319,15 @@ export default function Submit() {
 
               <div>
                 <label htmlFor="region" className={labelClass}>Region</label>
-                <select
+                <LookupSelect
+                  type="region"
                   id="region"
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
+                  placeholder="Select…"
                   className={`${inputClass} appearance-none`}
-                >
-                  <option value="" className="bg-charcoal">Select…</option>
-                  {REGIONS.map((r) => (
-                    <option key={r} value={r} className="bg-charcoal">{r}</option>
-                  ))}
-                </select>
+                  optionClassName="bg-charcoal"
+                />
                 {errors.region && <p className="text-red-400 text-xs font-ui mt-1">{errors.region}</p>}
               </div>
 
@@ -336,6 +354,16 @@ export default function Submit() {
                   className={inputClass}
                 />
               </div>
+
+              <ExtraFieldsInputs
+                appliesTo="variant"
+                values={variantExtra}
+                onChange={(key, value) => setVariantExtra((v) => ({ ...v, [key]: value }))}
+                errors={errors.variantExtra}
+                inputClassName={inputClass}
+                labelClassName={labelClass}
+                optionClassName="bg-charcoal"
+              />
 
               <div>
                 <label htmlFor="submissionNote" className={labelClass}>Note to moderators (optional)</label>

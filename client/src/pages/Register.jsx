@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
+import LookupSelect from '../components/LookupSelect';
 
 export default function Register() {
   const { register } = useAuth();
@@ -104,17 +103,15 @@ export default function Register() {
             <label htmlFor="region" className="block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider">
               Region <span className="normal-case text-muted/50">(optional)</span>
             </label>
-            <select
+            <LookupSelect
+              type="region"
               id="region"
               value={region}
               onChange={(e) => setRegion(e.target.value)}
+              placeholder="Select your region…"
               className="w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-mint/50 transition-all appearance-none"
-            >
-              <option value="" className="bg-charcoal">Select your region…</option>
-              {REGIONS.map((r) => (
-                <option key={r} value={r} className="bg-charcoal">{r}</option>
-              ))}
-            </select>
+              optionClassName="bg-charcoal"
+            />
           </div>
 
           <div>

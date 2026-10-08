@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import VariantEditForm from './VariantEditForm';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN, EDIT_BTN } from './queueButtons';
+import useLookups from '../../hooks/useLookups';
+import ExtraFieldsDisplay from '../fields/ExtraFieldsDisplay';
 
 function approveBlockReason(conceptStatus) {
   if (conceptStatus === 'pending')  return 'Approve the concept first';
@@ -9,6 +11,7 @@ function approveBlockReason(conceptStatus) {
 }
 
 export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, onAction, onReject, onSave }) {
+  const { labelFor } = useLookups();
   const [editing, setEditing] = useState(false);
   const approveBlocked = approveBlockReason(concept.status);
   const publishBlocked = concept.status !== 'published' ? 'Publish the concept first' : null;
@@ -22,7 +25,7 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
             <div dir="rtl" className="font-pashto text-warm text-2xl leading-[1.7]">{variant.pashto}</div>
             {variant.phonetic && <span className="font-ui text-sm text-muted">/{variant.phonetic}/</span>}
             <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
-              {variant.region}
+              {labelFor('region', variant.region)}
             </span>
           </div>
           {conflicts?.length > 0 && (
@@ -36,6 +39,7 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
           )}
           <p className="text-sm font-ui text-muted">{variant.definition}</p>
           {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
+          <ExtraFieldsDisplay appliesTo="variant" values={variant.extra} className="text-xs" />
           {variant.submissionNote && (
             <div className="mt-1 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-[10px]">
               <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider mb-1">Submitter note</p>
@@ -45,7 +49,7 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
           <p className="text-xs font-ui text-muted/60">
             by {variant.submittedBy?.username}
             {(variant.submittedBy?.village || variant.submittedBy?.region) && (
-              <span className="ml-1">({[variant.submittedBy.village, variant.submittedBy.region].filter(Boolean).join(', ')})</span>
+              <span className="ml-1">({[variant.submittedBy.village, labelFor('region', variant.submittedBy.region)].filter(Boolean).join(', ')})</span>
             )}
           </p>
         </div>

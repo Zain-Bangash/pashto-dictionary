@@ -47,6 +47,10 @@ Concept: "Sun"  (noun)
     └── Variant: ...  | phonetic: ...    | region: Hangu
 ```
 
+`Concept.partOfSpeech`, `Variant.region` and `User.region` store a **key** from the `Lookup` collection, not a free string and not a schema enum. See [Admin-editable lists](#admin-editable-lists).
+
+Both Concept and Variant also carry an optional `extra` map of admin-defined field values (`{ plural: 'لمرونه', register: 'Formal' }`). See [Admin-defined custom fields](#admin-defined-custom-fields).
+
 ### Why two separate moderation lifecycles?
 
 A key design requirement was that variants must be moderated independently. A single bad variant (e.g. a misspelled phonetic) should not block the other valid regional forms. At the same time, the concept itself needs moderation — a malicious or incorrect English gloss could corrupt the anchor for all its variants.
@@ -126,6 +130,18 @@ changes: { pashto: { from: 'old', to: 'new' }, region: { from: 'Kohat', to: 'Tir
 
 // merged
 changes: { mergedInto: '<targetId>', variantsMoved: ['<id1>'], variantsSkipped: ['<id2>'] }
+```
+
+```js
+// lookup_changed (targetModel: 'Lookup')
+changes: { op: 'updated', type: 'region', key: 'Kohat', label: { from: 'Kohat', to: 'Kohat District' } }
+changes: { op: 'reordered', type: 'region', from: ['Kohat', 'Hangu'], to: ['Hangu', 'Kohat'] }   // no targetId
+
+// field_changed (targetModel: 'FieldDefinition')
+changes: { op: 'option_added', appliesTo: 'variant', key: 'register', option: { key: 'Poetic', label: 'Poetic' } }
+
+// edited — custom field values appear alongside core fields
+changes: { definition: { from: 'a', to: 'b' }, 'extra.plural': { from: 'لمرونه', to: '' } }
 ```
 
 Only fields that actually changed appear in the diff — unchanged fields are omitted. This keeps the log readable and ensures the admin dashboard can show meaningful diffs without storing noise.
@@ -281,6 +297,94 @@ const wotd  = await Concept.findOne({ status: 'published' }).skip(index).lean();
 ```
 
 Any given date maps to a stable index into the published concepts list. Adding new concepts shifts future dates but never changes what a past date showed. No state is stored anywhere — the date itself is the state.
+
+---
+
+## Admin-editable lists
+
+Regions and parts of speech used to be hardcoded in about a dozen places: Mongoose enums, route validators, and client dropdowns. Adding a region meant a code change and a redeploy. They now live in one `Lookup` collection that admins edit from **Dashboard → Lists**.
+
+```
+Lookup { type: 'region' | 'partOfSpeech', key, label, order, active, isSystem }
+```
+
+### Why key and label are separate
+
+`key` is what Concept, Variant and User store, and it is **immutable**: the schema marks it `immutable` and `PATCH /api/lookups/:id` rejects a `key` in the body with a 400. `label` is what people see, and admins can edit it freely. Because entries only hold the key, renaming "Kohat" to "Kohat District" updates every existing entry with no data rewrite and no migration. A new row's key is its label as typed at creation (trimmed, NFC). This matches the original keys and works for Pashto script, where a slug would come out empty.
+
+The five original regions and six parts of speech are `isSystem: true` rows whose keys equal the strings already stored. Existing data therefore needed no migration.
+
+### Why deactivate, not delete
+
+Deleting a value would orphan every entry that uses it, and a dictionary of dialect history should never silently lose that. So there is no delete endpoint. An admin-added value can be **deactivated**: it disappears from every form, but entries that already use it keep their key and still display its label. System values cannot be deactivated at all. Each list is capped at 100 values, which keeps the public read bounded.
+
+### Where validation lives
+
+The schema enum is gone. `utils/lookups.ts` holds the single rule, `isAllowedLookup(type, value, currentValue)`:
+
+- **Create** routes (`POST /concepts`, `POST /variants`, `POST /auth/register`) use the `activeLookup()` validator, so only active keys are accepted.
+- **Edit** paths (resubmit, staff edit, profile update) load the document first. Keeping the stored value passes even if it is now inactive, so an old entry is still editable. Newly choosing an inactive or unknown key returns a 400 with `field`.
+
+The check is deliberately not a schema validator. That would need a database read on every save, and it would block approve, publish, merge and cascade-reject on any entry whose value had since been deactivated.
+
+### Seeding
+
+`ensureSystemLookups()` inserts any missing system rows using `$setOnInsert`, so it never overwrites an edited label or order. It runs on server start (`index.ts`) and on Lambda cold start (`lambda.ts`); without the rows, every submission would fail validation. `npm run seed:lookups -- --dry-run` reports what it would insert. In Jest, a `setupFilesAfterEnv` hook re-runs it before every test, because test files wipe collections between tests.
+
+### Client
+
+`LookupsProvider` fetches `GET /api/lookups` once at the app root. That endpoint is public and returns inactive rows too, flagged `active: false`, so old entries can still show their label. `useLookups()` exposes `active(type)` for forms and `labelFor(type, key)` for display; `labelFor` falls back to the raw key. Every dropdown uses `LookupSelect`. It lists active values plus the entry's current value marked "(retired)" if that value is inactive. The Home card abbreviations (N., V., and so on) still use a fixed map for the six built-in parts of speech and show the full label for admin-added ones.
+
+---
+
+## Admin-defined custom fields
+
+Admins can add extra fields to Concepts and Variants (for example a plural form, a register dropdown, or usage notes) from **Dashboard → Fields**, with no code change or redeploy.
+
+```
+FieldDefinition { appliesTo: 'concept' | 'variant', key, label, type: 'text' | 'textarea' | 'select',
+                  options[{ key, label, active }], required, order, active }
+Concept.extra / Variant.extra : Map<key, string>
+```
+
+Core fields (`englishGloss`, `partOfSpeech`, `pashto`, `phonetic`, `region`, `definition`, `example`) stay real schema fields. Custom fields can never replace or remove them, because search, duplicate detection and the moderation rules all depend on them.
+
+### Why an `extra` map
+
+Values live in one `extra` map per entry instead of new top-level schema paths. The schema stays fixed however many fields admins define, and a field's values can never collide with a core field name.
+
+It is a Mongoose `Map` of `String`, not `Mixed`, for three reasons:
+
+- All three field types store strings, so Mongoose checks and converts the type itself.
+- Changes are tracked automatically; `Mixed` needs `markModified` on every write.
+- Map keys may not contain `.` or start with `$`, which blocks database-operator injection at the schema layer.
+
+That last rule is also why field keys are **generated by the server**: an ASCII slug of the label (`Plural form` → `plural_form`), with a `field` fallback for Pashto-only labels and `_2`, `_3` added for duplicates. The admin never types a key. Keys, `appliesTo` and `type` are immutable, because changing a type would invalidate stored values. Select **option** keys follow the S4a rule (key = label at creation), because they are stored as values, not as map keys.
+
+### Validation
+
+`utils/extraFields.ts` has one entry point, `validateExtra(appliesTo, input, mode, current)`, used by create, user resubmit, moderator edit and admin edit:
+
+- Keys with no definition are rejected.
+- Values must be strings: `text` up to 200 characters, `textarea` up to 2,000 (line breaks kept), other control characters stripped.
+- A select value must be an active option key.
+- A value equal to the stored one always passes, even if its field or option has since been deactivated (the same rule as S4a lookups). A new value for a deactivated field or option is rejected.
+- `required` is enforced in `create` mode only. Existing entries, resubmits and staff edits never fail because a field became required later.
+- Each entry type allows at most 20 definitions, and each select at most 50 options.
+
+Edits **merge**: only keys that are sent and actually change are written, and an empty string clears a value. The changes go into the `edited` log entry as `extra.<key>` diffs.
+
+### Why deactivate, not delete
+
+Deleting a definition would destroy every value entered for it. A deactivated field disappears from the forms, the entry pages and the moderation queue, but its values stay in `extra` and come back if the field is reactivated. Options work the same way. A select must keep at least one active option, otherwise nobody could fill it in.
+
+### Why custom values are not searchable
+
+Values show on the concept detail page and in the moderation queue, but they are not part of search or duplicate detection. Making them searchable would mean a second search path and new indexes, and would mix admin-defined data into the ranked search, all for fields nobody has needed to search yet. An opt-in `searchable` flag can be added later without migrating any data.
+
+### Client
+
+`FieldsProvider` loads the active definitions once (`GET /api/fields`, which includes every option with its `active` flag). `ExtraFieldsInputs` renders the inputs on Submit, the moderation edit forms and the My Submissions resubmit forms; a stored retired option shows as "(retired)". `ExtraFieldsDisplay` renders values as plain text on ConceptDetail and in the queue rows. The admin page loads every definition, including inactive ones, from `GET /api/fields/all`.
 
 ---
 
@@ -441,7 +545,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 - **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
 - **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
 - **Timestamps**: each entry shows an absolute date/time.
-- **Action badge colours**: all 9 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`) have distinct colours.
+- **Action badge colours**: all 11 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`, `field_changed`) have distinct colours. `lookup_changed` and `field_changed` entries render from their `changes` payload. `extra.<key>` diffs in `edited` entries are shown under the field's label.
 
 ---
 

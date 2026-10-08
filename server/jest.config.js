@@ -10,6 +10,7 @@ module.exports = {
       testTimeout: 30000,
       testMatch: ['<rootDir>/src/__tests__/ratelimit.test.ts'],
       setupFiles: ['<rootDir>/src/__tests__/setup/rateLimitEnabled.ts'],
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/seedLookups.ts'],
       globals: {
         'ts-jest': { diagnostics: false },
       },
@@ -26,6 +27,7 @@ module.exports = {
         '/src/__tests__/ratelimit\\.test\\.ts$',
       ],
       setupFiles: ['<rootDir>/src/__tests__/setup/rateLimitDisabled.ts'],
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/seedLookups.ts'],
       globals: {
         'ts-jest': { diagnostics: false },
       },

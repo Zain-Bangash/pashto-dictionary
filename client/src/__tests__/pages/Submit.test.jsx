@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import Submit from '../../pages/Submit';
 import api from '../../services/api';
+import { LookupsWrapper } from '../helpers/lookups';
+import { FieldsWrapper } from '../helpers/fields';
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { _id: '1', role: 'user' }, token: 'jwt-token', login: vi.fn() })),
@@ -29,13 +31,15 @@ const renderSubmit = (initialEntries = ['/submit']) => {
     return null;
   }
   const utils = render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <Routes>
-        <Route path="/submit" element={<Submit />} />
-        <Route path="/my-submissions" element={<LocationCapture />} />
-        <Route path="/login" element={<div>Login page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <LookupsWrapper>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/submit" element={<Submit />} />
+          <Route path="/my-submissions" element={<LocationCapture />} />
+          <Route path="/login" element={<div>Login page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </LookupsWrapper>
   );
   return { ...utils, locationRef };
 };
@@ -283,6 +287,58 @@ describe('Submit page (two-step concept + variant flow)', () => {
     await user.click(screen.getByRole('button', { name: /submit/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
+    });
+  });
+});
+
+describe('Submit page — admin-defined extra fields', () => {
+  const renderWithFields = () =>
+    render(
+      <LookupsWrapper>
+        <FieldsWrapper>
+          <MemoryRouter initialEntries={['/submit']}>
+            <Routes>
+              <Route path="/submit" element={<Submit />} />
+              <Route path="/my-submissions" element={<div>mine</div>} />
+            </Routes>
+          </MemoryRouter>
+        </FieldsWrapper>
+      </LookupsWrapper>
+    );
+
+  async function fillNewConcept(user) {
+    await user.type(screen.getByLabelText(/english meaning/i), 'moon');
+    await user.click(await screen.findByText(/create new concept/i));
+    await user.type(await screen.findByLabelText(/pashto word/i), 'سپوږمۍ');
+    await user.selectOptions(screen.getByLabelText(/^region/i), 'Kohat');
+    await user.type(screen.getByLabelText(/definition/i), 'the moon');
+    await user.selectOptions(screen.getByLabelText(/part of speech/i), 'noun');
+  }
+
+  it('blocks submission until required extra fields are filled', async () => {
+    const user = userEvent.setup();
+    suggestConcepts.mockResolvedValue({ data: { data: [] } });
+    renderWithFields();
+    await fillNewConcept(user);
+    await user.click(screen.getByRole('button', { name: /submit/i }));
+    expect(await screen.findByText('Plural form is required')).toBeInTheDocument();
+    expect(createConcept).not.toHaveBeenCalled();
+  });
+
+  it('sends concept and variant extra values with the submission', async () => {
+    const user = userEvent.setup();
+    suggestConcepts.mockResolvedValue({ data: { data: [] } });
+    createConcept.mockResolvedValueOnce({ data: { data: { _id: 'c1' } } });
+    createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+    renderWithFields();
+    await fillNewConcept(user);
+    await user.type(screen.getByLabelText(/etymology/i), 'Old Iranian');
+    await user.type(screen.getByLabelText('Plural form'), 'سپوږمۍ ګانې');
+    await user.selectOptions(screen.getByLabelText(/^register/i), 'Formal');
+    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await waitFor(() => {
+      expect(createConcept).toHaveBeenCalledWith(expect.objectContaining({ extra: { etymology: 'Old Iranian' } }));
+      expect(createVariant).toHaveBeenCalledWith(expect.objectContaining({ extra: { plural: 'سپوږمۍ ګانې', register: 'Formal' } }));
     });
   });
 });

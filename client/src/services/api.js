@@ -118,4 +118,76 @@ export function checkCrossConceptPashto(pashto, conceptId) {
   return api.get('/api/variants/cross-concept-check', { params: { pashto, conceptId } });
 }
 
+// ── Lookup (preset list) functions ────────────────────────────────────────────
+
+export function getLookups() {
+  return api.get('/api/lookups');
+}
+
+export function createLookup(body) {
+  return api.post('/api/lookups', body);
+}
+
+export function updateLookup(id, body) {
+  return api.patch(`/api/lookups/${id}`, body);
+}
+
+export function reorderLookups(type, ids) {
+  return api.put('/api/lookups/order', { type, ids });
+}
+
+export function deactivateLookup(id) {
+  return api.patch(`/api/lookups/${id}/deactivate`);
+}
+
+export function reactivateLookup(id) {
+  return api.patch(`/api/lookups/${id}/reactivate`);
+}
+
+// ── Custom field definitions ──────────────────────────────────────────────────
+
+export function getFields() {
+  return api.get('/api/fields');
+}
+
+export function getAllFields() {
+  return api.get('/api/fields/all');
+}
+
+export function createField(body) {
+  return api.post('/api/fields', body);
+}
+
+export function updateField(id, body) {
+  return api.patch(`/api/fields/${id}`, body);
+}
+
+export function reorderFields(appliesTo, ids) {
+  return api.put('/api/fields/order', { appliesTo, ids });
+}
+
+export function deactivateField(id) {
+  return api.patch(`/api/fields/${id}/deactivate`);
+}
+
+export function reactivateField(id) {
+  return api.patch(`/api/fields/${id}/reactivate`);
+}
+
+export function addFieldOption(id, label) {
+  return api.post(`/api/fields/${id}/options`, { label });
+}
+
+export function renameFieldOption(id, optionId, label) {
+  return api.patch(`/api/fields/${id}/options/${optionId}`, { label });
+}
+
+export function deactivateFieldOption(id, optionId) {
+  return api.patch(`/api/fields/${id}/options/${optionId}/deactivate`);
+}
+
+export function reactivateFieldOption(id, optionId) {
+  return api.patch(`/api/fields/${id}/options/${optionId}/reactivate`);
+}
+
 export default api;

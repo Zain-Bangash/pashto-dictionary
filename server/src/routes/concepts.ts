@@ -16,14 +16,16 @@ import {
   mergeConcepts,
   updateConcept,
 } from '../controllers/conceptController';
+import { activeLookup, lookupFormat } from '../utils/lookups';
 
 const router = Router();
 
-const PART_OF_SPEECH = ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'];
+const extraFormat = body('extra').optional().isObject().withMessage('extra must be an object');
 
 const createValidators = [
   body('englishGloss').trim().notEmpty().withMessage('englishGloss is required'),
-  body('partOfSpeech').isIn(PART_OF_SPEECH).withMessage(`partOfSpeech must be one of: ${PART_OF_SPEECH.join(', ')}`),
+  activeLookup('partOfSpeech', 'partOfSpeech'),
+  extraFormat,
 ];
 
 const statusValidators = [
@@ -34,7 +36,14 @@ const statusValidators = [
 
 const updateValidators = [
   body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
-  body('partOfSpeech').optional().isIn(PART_OF_SPEECH).withMessage(`partOfSpeech must be one of: ${PART_OF_SPEECH.join(', ')}`),
+  lookupFormat('partOfSpeech', true),
+  extraFormat,
+];
+
+const editValidators = [
+  body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
+  lookupFormat('partOfSpeech', true),
+  extraFormat,
 ];
 
 // static paths must come before /:id
@@ -47,7 +56,7 @@ router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id', verifyToken, updateValidators, updateConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
-router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editConcept);
+router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editValidators, editConcept);
 router.post('/:sourceId/merge', verifyToken, requireModeratorOrAdmin, mergeConcepts);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteConcept);
 

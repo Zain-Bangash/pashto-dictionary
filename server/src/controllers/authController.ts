@@ -11,6 +11,7 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import { IUser } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
+import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 
 const cognitoClient = new CognitoIdentityProviderClient({
   region: process.env.AWS_REGION || 'ap-southeast-1',
@@ -148,7 +149,7 @@ async function register(req: Request, res: Response): Promise<void> {
       email: normalizedEmail,
       cognitoSub,
       role: 'user',
-      region,
+      region: region || undefined,
       village,
     }).save();
   } catch (err) {
@@ -246,7 +247,11 @@ async function updateProfile(req: Request, res: Response): Promise<void> {
   }
 
   const { region, village } = req.body as { region?: string; village?: string };
-  if (region !== undefined) user.region = (region || undefined) as IUser['region'];
+  if (region && !(await isAllowedLookup('region', region, user.region))) {
+    res.status(400).json({ success: false, error: { message: invalidLookupMessage('region'), field: 'region' } });
+    return;
+  }
+  if (region !== undefined) user.region = region || undefined;
   if (village !== undefined) user.village = village?.trim() || undefined;
   await user.save();
 

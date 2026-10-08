@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LookupsProvider } from './context/LookupsContext';
+import { FieldsProvider } from './context/FieldsContext';
 import { useAuth } from './context/AuthContext';
 import { setLogoutHandler } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,6 +20,8 @@ import DashboardQueue from './pages/dashboard/DashboardQueue';
 import DashboardConcepts from './pages/dashboard/DashboardConcepts';
 import DashboardUsers from './pages/dashboard/DashboardUsers';
 import DashboardLog from './pages/dashboard/DashboardLog';
+import DashboardLists from './pages/dashboard/DashboardLists';
+import DashboardFields from './pages/dashboard/DashboardFields';
 import NotFound from './pages/NotFound';
 
 function AppRoutes() {
@@ -92,6 +96,22 @@ function AppRoutes() {
             </DashboardLayout>
           }
         />
+        <Route
+          path="/dashboard/lists"
+          element={
+            <DashboardLayout>
+              <DashboardLists />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/fields"
+          element={
+            <DashboardLayout>
+              <DashboardFields />
+            </DashboardLayout>
+          }
+        />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -102,7 +122,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <LookupsProvider>
+          <FieldsProvider>
+            <AppRoutes />
+          </FieldsProvider>
+        </LookupsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
