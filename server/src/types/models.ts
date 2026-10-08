@@ -15,6 +15,7 @@ export interface IConcept extends Document {
   englishGloss: string;
   normalizedGloss?: string;
   partOfSpeech: string;
+  extra?: Map<string, string>;
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
   reviewedBy?: string;
@@ -36,6 +37,7 @@ export interface IVariant extends Document {
   definition: string;
   example?: string;
   submissionNote?: string;
+  extra?: Map<string, string>;
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
   reviewedBy?: string;
@@ -60,8 +62,31 @@ export interface ILookup extends Document {
   updatedAt: Date;
 }
 
+export type FieldAppliesTo = 'concept' | 'variant';
+export type FieldType = 'text' | 'textarea' | 'select';
+
+export interface IFieldOption {
+  _id: Types.ObjectId;
+  key: string;
+  label: string;
+  active: boolean;
+}
+
+export interface IFieldDefinition extends Document {
+  appliesTo: FieldAppliesTo;
+  key: string;
+  label: string;
+  type: FieldType;
+  options: Types.DocumentArray<IFieldOption & Types.Subdocument>;
+  required: boolean;
+  order: number;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IModerationLog extends Document {
-  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup';
+  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup' | 'FieldDefinition';
   targetId?: Types.ObjectId;
   action:
     | 'submitted'
@@ -73,7 +98,8 @@ export interface IModerationLog extends Document {
     | 'deleted'
     | 'edited'
     | 'merged'
-    | 'lookup_changed';
+    | 'lookup_changed'
+    | 'field_changed';
   performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;

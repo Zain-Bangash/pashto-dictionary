@@ -12,6 +12,7 @@ const variantSchema = new Schema<IVariant>(
     definition: { type: String, required: true, trim: true },
     example: { type: String, trim: true },
     submissionNote: { type: String, trim: true, maxlength: 500 },
+    extra: { type: Map, of: String },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],

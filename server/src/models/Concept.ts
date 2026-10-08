@@ -6,6 +6,7 @@ const conceptSchema = new Schema<IConcept>(
     englishGloss: { type: String, required: true, trim: true },
     normalizedGloss: { type: String },
     partOfSpeech: { type: String, required: true, trim: true, maxlength: 50 },
+    extra: { type: Map, of: String },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],
