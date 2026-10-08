@@ -13,7 +13,7 @@ export type ExtraResult = { values: Record<string, string>; error?: undefined } 
 const fail = (message: string, field: string): ExtraResult => ({ error: { message, field } });
 
 // Textareas keep line breaks; every other control character is dropped
-function clean(raw: string, type: FieldType): string {
+export function clean(raw: string, type: FieldType): string {
   const text = raw.replace(/\r\n?/g, '\n');
   const stripped = type === 'textarea'
     ? text.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '')

@@ -1,5 +1,21 @@
 import { Schema, model } from 'mongoose';
-import { IVariant } from '../types/models';
+import { IVariant, IVariantForm } from '../types/models';
+import { FORM_KINDS, GENDERS, NUMBERS, CASES, VERB_FORMS, FORM_MAX } from '../utils/variantForms';
+
+const variantFormSchema = new Schema<IVariantForm>(
+  {
+    kind: { type: String, enum: FORM_KINDS, required: true },
+    gender: { type: String, enum: GENDERS },
+    number: { type: String, enum: NUMBERS },
+    case: { type: String, enum: CASES },
+    verbForm: { type: String, enum: VERB_FORMS },
+    pashto: { type: String, required: true, trim: true, maxlength: FORM_MAX.pashto },
+    normalizedPashto: { type: String },
+    phonetic: { type: String, trim: true, maxlength: FORM_MAX.phonetic },
+    example: { type: String, trim: true, maxlength: FORM_MAX.example },
+  },
+  { _id: false }
+);
 
 const variantSchema = new Schema<IVariant>(
   {
@@ -13,6 +29,7 @@ const variantSchema = new Schema<IVariant>(
     example: { type: String, trim: true },
     submissionNote: { type: String, trim: true, maxlength: 500 },
     extra: { type: Map, of: String },
+    forms: { type: [variantFormSchema], default: undefined },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],
@@ -32,6 +49,9 @@ variantSchema.pre('save', function () {
   this.normalizedPashto = this.pashto.trim().normalize('NFC');
   if (this.phonetic) {
     this.normalizedPhonetic = this.phonetic.toLowerCase().trim();
+  }
+  for (const form of this.forms ?? []) {
+    form.normalizedPashto = form.pashto.trim().normalize('NFC');
   }
 });
 

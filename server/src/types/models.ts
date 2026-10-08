@@ -27,6 +27,24 @@ export interface IConcept extends Document {
   updatedAt: Date;
 }
 
+export type FormKind = 'noun' | 'verb';
+export type FormGender = 'masculine' | 'feminine';
+export type FormNumber = 'singular' | 'plural';
+export type FormCase = 'direct' | 'oblique';
+export type VerbForm = 'infinitive' | 'past' | 'present' | 'imperative';
+
+export interface IVariantForm {
+  kind: FormKind;
+  gender?: FormGender;
+  number?: FormNumber;
+  case?: FormCase;
+  verbForm?: VerbForm;
+  pashto: string;
+  normalizedPashto?: string;
+  phonetic?: string;
+  example?: string;
+}
+
 export interface IVariant extends Document {
   concept: Types.ObjectId;
   pashto: string;
@@ -38,6 +56,7 @@ export interface IVariant extends Document {
   example?: string;
   submissionNote?: string;
   extra?: Map<string, string>;
+  forms?: IVariantForm[];
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
   reviewedBy?: string;
