@@ -70,6 +70,8 @@ Backend infrastructure is declared in `template.yaml` (AWS SAM) and owned by the
 ```
 Concept  — the meaning anchor (English gloss, part of speech, moderation status)
     └── Variant(s) — the regional word (Pashto script, phonetic, region, definition)
+
+Lookup   — admin-editable lists (region, part of speech): immutable key, editable label
 ```
 
 Each Concept and each Variant has its own independent moderation lifecycle. A single bad variant does not block other valid regional forms of the same concept.
@@ -113,7 +115,13 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting a published variant is admin-only |
 | PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
 | PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required). Published variants are admin-only |
-| GET | `/api/moderation/log` | Admin | Audit log |
+| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`) |
+| GET | `/api/lookups?type=` | — | Region and part-of-speech list values, including inactive ones (`active: false`) |
+| POST | `/api/lookups` | Admin | Add a list value `{ type, label }` — the key is the label at creation and never changes |
+| PATCH | `/api/lookups/:id` | Admin | Rename the label and/or change the order. `key`, `type`, `isSystem`, `active` are rejected |
+| PUT | `/api/lookups/order` | Admin | Reorder a whole list `{ type, ids }` |
+| PATCH | `/api/lookups/:id/deactivate` | Admin | Hide an admin-added value from forms (built-in values cannot be deactivated) |
+| PATCH | `/api/lookups/:id/reactivate` | Admin | Make a deactivated value selectable again |
 
 ---
 
@@ -127,7 +135,8 @@ cd pashto-dictionary
 # Server
 cd server && npm install
 cp .env.example .env   # fill in MONGODB_URI and the COGNITO_* values
-npm run dev            # ts-node src/index.ts on :5000
+npm run dev            # ts-node src/index.ts on :5000 (inserts any missing built-in list values on start)
+npm run seed:lookups -- --dry-run   # optional: report which built-in list values are missing
 
 # Client (separate terminal)
 cd client && npm install

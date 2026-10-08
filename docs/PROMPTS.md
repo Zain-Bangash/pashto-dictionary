@@ -238,6 +238,39 @@ Tests: server (role boundaries, log written, collision, orphan rule), client (li
 Docs: docs/USER-FLOWS.md Admin section, docs/ARCHITECTURE.md › Soft Deletes (the recovery path is now real).
 ```
 
+**S4b — Admin-defined custom fields on Concepts and Variants** — requires S4a to be merged first
+```
+Full-stack feature: admins can define extra fields on Concepts and Variants without a code change. Builds on the Lookup layer from S4a; reuse its key/label/deactivate rules and shared validation helper rather than inventing new ones.
+
+Step 1 — plan only. Read CLAUDE.md, docs/ARCHITECTURE.md (data model, moderation, search, duplicates, plus the S4a "Admin-editable lists" section), docs/USER-FLOWS.md, server/src/models/Concept.ts, Variant.ts, server/src/types/models.ts, the Lookup code from S4a, and the client files that render or edit entries: pages/Submit.jsx, pages/MySubmissions.jsx, pages/ConceptDetail.jsx, components/moderation/VariantEditForm.jsx, components/moderation/ConceptEditForm.jsx, and the admin lists page from S4a.
+Then give me the plan in the Step 1 format below and stop for approval.
+
+Decisions already made (don't re-ask):
+- New `FieldDefinition` collection { appliesTo: 'concept' | 'variant', key, label, type: 'text' | 'textarea' | 'select', options[{key,label,active}], required, order, active }.
+- Values live in an `extra` map on Concept and Variant, keyed by field key. Core fields (englishGloss, partOfSpeech, pashto, phonetic, region, definition, example) stay real schema fields and cannot be removed.
+- Removing a custom field = deactivate. Data is kept, hidden from forms and entry display. Never hard-delete.
+- `required` applies to new submissions only. Existing entries just show the field empty.
+- Select options follow the S4a rule: rename the label freely, never change the key, deactivate rather than delete. Admins can add options.
+- Types limited to text, textarea, select. URL/audio is a later phase.
+- Display only: custom values show on the entry detail page. They are NOT searchable and NOT part of duplicate detection. Ask me at plan time whether to add an opt-in per-field `searchable` flag; default is no.
+- Only admins create/edit definitions. Everyone else reads active ones.
+
+Step 1 format:
+- Endpoints (method, path, auth, request/response shape): public read of active definitions per appliesTo, admin-only create/update/reorder/deactivate/reactivate and option add/rename/deactivate.
+- `extra` validation (shared helper): unknown keys rejected, type check per field, required check on create only, max field count (propose a number), max length per value, select value must be an active option key. Mongoose Map vs Mixed: recommend one and say why.
+- Whether editing an entry (rejected→pending resubmit, moderator edit, admin edit of a published entry) re-validates `extra`, and how a deactivated field's stored value is handled on edit.
+- ModerationLog: new action(s) for definition changes, and whether edits to `extra` on an entry are captured in the existing 'edited' `changes` payload.
+- Client: a dynamic fields renderer used by Submit and the two moderation edit forms; a read-only renderer for ConceptDetail; extend the admin /dashboard/lists page (or add a sibling page) for managing definitions. Services/api.js only; loading/error states. Flag any file that would pass ~150 lines.
+- Security: render values as plain text (no dangerouslySetInnerHTML), allow-list of field types, express-validator on everything, rate limit on admin routes if the existing pattern does.
+- The user-flow sentences for docs/USER-FLOWS.md (User submit, Moderator edit, Guest view, Admin).
+- Test list (server Jest, client RTL, optional E2E) including: unknown extra key rejected, required-on-create-only, select must be an active option, deactivated field hidden but data kept, non-admin 403, ModerationLog written, existing entries without `extra` still load and publish.
+- Risks and anything you want me to decide.
+
+Step 2 — build backend first (tests green, `npx tsc --noEmit` clean), then frontend (tests green). Run only the affected test files while working, then both full suites once at the end.
+Step 3 — update docs/ARCHITECTURE.md (data model; why `extra` map, why deactivate-not-delete, why not searchable), docs/USER-FLOWS.md, the README API table, and To-Do.md.
+Finish with: summary, test results, and suggested commits split by layer. Don't commit.
+```
+
 ### Tests & docs
 
 **T1 — E2E coverage gaps**

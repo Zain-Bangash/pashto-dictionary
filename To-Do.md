@@ -8,17 +8,15 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-1. ~~clicking the concept row should expand it rather than pressing 'N varient waiting'~~ — done (see Completed)
-2. ~~I should be able edit or reject (in which can its user can resubmit it) an already published concept or variant~~ — done (see Completed)
 
 2. Add more things to a variant such as plural ete and other vital stuff
 3. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
-4. see if database is 3nf (admin can edit part of speech and region) (can admin edit the whole variant section to add or remove things from it)
 5. Have an an alert tab for admin to see what a variant is missing, admin can either edit those words or make them highlighted in a tab for customers (have a 'attention' tab for customer,) (what should mod's job here be?)
 6. admin should be promote users to mod or demote mods
 7. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
+8. why can't i open two tabs on differents pages without having to sign in in the other tab again. 
 
 ## Backlog
 
@@ -39,6 +37,7 @@ _No active phase._
 - [ ] Community page: top contributing users `[S1]`
 - [ ] Region filter on the Concepts browse page _(suggested)_ `[S2]`
 - [ ] Admin trash view — restore soft-deleted concepts/variants _(suggested)_ `[S3]`
+- [ ] Admin-defined custom fields on Concepts and Variants — builds on the S4a Lookup layer `[S4b]`
 - [ ] 
 - [ ] Admin 
 
@@ -70,6 +69,6 @@ _No active phase._
 - Post-14 polish: usernames via `enrichActors` (shown on concept/variant detail, queue, audit log, My Submissions); audit log filters, diffs, timestamps
 - GitHub Actions CI badge in README
 - Grouped moderation queue: concept rows with waiting-variant dropdowns (`GET /api/moderation/queue`); variant approve now requires an approved/published concept; `DashboardQueue.jsx` split into `components/moderation/`
-- Queue concept rows expand on click; admin edit/reject of published concepts and variants from the dashboard Concepts page (`published → rejected`, admin only); concept rejection now marks cascaded variants `rejected` with a note naming the concept; moderators can no longer edit published entries
+- Admin-editable preset lists `[S4a]`: `Lookup` collection for region and part of speech (immutable key, editable label, deactivate-not-delete); admin page at `/dashboard/lists`; `lookup_changed` audit action; built-in values seeded on server start
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

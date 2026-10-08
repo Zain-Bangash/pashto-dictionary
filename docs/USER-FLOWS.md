@@ -22,7 +22,7 @@ As a guest I should be able to click Login in the navbar to go to the Login page
 
 ## User
 
-As a user I should be able to register with a username, email, and password. I can optionally add my region (Kohat, Hangu, Tirah, Thal, or Parachinar) and village.
+As a user I should be able to register with a username, email, and password. I can optionally add my region and village. The region dropdown shows the current region list maintained by admins — the same list used on the Submit form — and the server rejects a region that is not active.
 
 As a user I should be able to log in with my email and password. My session should survive a page refresh — I should not be logged out when I reload the browser.
 
@@ -72,7 +72,7 @@ As a moderator I should be able to reject a pending variant with a note.
 
 As a moderator I should be able to view the Concepts list page in the dashboard.
 
-As a moderator I should not be able to access the Users or Log pages — those are admin-only.
+As a moderator I should not be able to access the Users, Log, or Lists pages — those are admin-only. The server returns 403 if a moderator or user calls the list-editing endpoints.
 
 As a moderator I should be able to reject a pending item by clicking Reject, which opens a modal requiring me to type a reason before confirming. The reason is stored and shown to the submitter in their My Submissions page.
 
@@ -119,3 +119,7 @@ As an admin I can edit a published concept or variant from that panel using the 
 As an admin I can reject a published concept from that panel. The Reject modal requires a reason and warns how many variants will also be rejected. On confirm, the concept leaves the public site, every one of its variants is rejected with the note "Concept "X" was rejected: <reason>", and the Concepts list refreshes.
 
 As an admin I can reject a single published variant from that panel with a required reason. It disappears from the panel and the public concept page, and its submitter sees the reason in My Submissions.
+
+As an admin I can open Lists in the dashboard to manage the region and part-of-speech lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log.
+
+As an admin I can deactivate a value I added. It disappears from the Submit, Register, and edit dropdowns, but existing entries that use it still show it, and they can still be edited as long as that value is not changed. I can reactivate it later. Built-in values (the original five regions and six parts of speech) cannot be deactivated, and no value can ever be deleted.

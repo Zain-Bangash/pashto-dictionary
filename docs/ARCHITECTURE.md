@@ -47,6 +47,8 @@ Concept: "Sun"  (noun)
     └── Variant: ...  | phonetic: ...    | region: Hangu
 ```
 
+`Concept.partOfSpeech`, `Variant.region` and `User.region` store a **key** from the `Lookup` collection, not a free string and not a schema enum. See [Admin-editable lists](#admin-editable-lists).
+
 ### Why two separate moderation lifecycles?
 
 A key design requirement was that variants must be moderated independently. A single bad variant (e.g. a misspelled phonetic) should not block the other valid regional forms. At the same time, the concept itself needs moderation — a malicious or incorrect English gloss could corrupt the anchor for all its variants.
@@ -126,6 +128,12 @@ changes: { pashto: { from: 'old', to: 'new' }, region: { from: 'Kohat', to: 'Tir
 
 // merged
 changes: { mergedInto: '<targetId>', variantsMoved: ['<id1>'], variantsSkipped: ['<id2>'] }
+```
+
+```js
+// lookup_changed (targetModel: 'Lookup')
+changes: { op: 'updated', type: 'region', key: 'Kohat', label: { from: 'Kohat', to: 'Kohat District' } }
+changes: { op: 'reordered', type: 'region', from: ['Kohat', 'Hangu'], to: ['Hangu', 'Kohat'] }   // no targetId
 ```
 
 Only fields that actually changed appear in the diff — unchanged fields are omitted. This keeps the log readable and ensures the admin dashboard can show meaningful diffs without storing noise.
@@ -281,6 +289,43 @@ const wotd  = await Concept.findOne({ status: 'published' }).skip(index).lean();
 ```
 
 Any given date maps to a stable index into the published concepts list. Adding new concepts shifts future dates but never changes what a past date showed. No state is stored anywhere — the date itself is the state.
+
+---
+
+## Admin-editable lists
+
+Regions and parts of speech used to be hardcoded in about a dozen places: Mongoose enums, route validators, and client dropdowns. Adding a region meant a code change and a redeploy. They now live in one `Lookup` collection that admins edit from **Dashboard → Lists**.
+
+```
+Lookup { type: 'region' | 'partOfSpeech', key, label, order, active, isSystem }
+```
+
+### Why key and label are separate
+
+`key` is what Concept, Variant and User store, and it is **immutable**: the schema marks it `immutable` and `PATCH /api/lookups/:id` rejects a `key` in the body with a 400. `label` is what people see, and admins can edit it freely. Because entries only hold the key, renaming "Kohat" to "Kohat District" updates every existing entry with no data rewrite and no migration. A new row's key is its label as typed at creation (trimmed, NFC). This matches the original keys and works for Pashto script, where a slug would come out empty.
+
+The five original regions and six parts of speech are `isSystem: true` rows whose keys equal the strings already stored. Existing data therefore needed no migration.
+
+### Why deactivate, not delete
+
+Deleting a value would orphan every entry that uses it, and a dictionary of dialect history should never silently lose that. So there is no delete endpoint. An admin-added value can be **deactivated**: it disappears from every form, but entries that already use it keep their key and still display its label. System values cannot be deactivated at all. Each list is capped at 100 values, which keeps the public read bounded.
+
+### Where validation lives
+
+The schema enum is gone. `utils/lookups.ts` holds the single rule, `isAllowedLookup(type, value, currentValue)`:
+
+- **Create** routes (`POST /concepts`, `POST /variants`, `POST /auth/register`) use the `activeLookup()` validator, so only active keys are accepted.
+- **Edit** paths (resubmit, staff edit, profile update) load the document first. Keeping the stored value passes even if it is now inactive, so an old entry is still editable. Newly choosing an inactive or unknown key returns a 400 with `field`.
+
+The check is deliberately not a schema validator. That would need a database read on every save, and it would block approve, publish, merge and cascade-reject on any entry whose value had since been deactivated.
+
+### Seeding
+
+`ensureSystemLookups()` inserts any missing system rows using `$setOnInsert`, so it never overwrites an edited label or order. It runs on server start (`index.ts`) and on Lambda cold start (`lambda.ts`); without the rows, every submission would fail validation. `npm run seed:lookups -- --dry-run` reports what it would insert. In Jest, a `setupFilesAfterEnv` hook re-runs it before every test, because test files wipe collections between tests.
+
+### Client
+
+`LookupsProvider` fetches `GET /api/lookups` once at the app root. That endpoint is public and returns inactive rows too, flagged `active: false`, so old entries can still show their label. `useLookups()` exposes `active(type)` for forms and `labelFor(type, key)` for display; `labelFor` falls back to the raw key. Every dropdown uses `LookupSelect`. It lists active values plus the entry's current value marked "(retired)" if that value is inactive. The Home card abbreviations (N., V., and so on) still use a fixed map for the six built-in parts of speech and show the full label for admin-added ones.
 
 ---
 
@@ -441,7 +486,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 - **Filtering**: `?action=approved` and `?targetModel=Concept` query params narrow the result set; `meta.total` reflects the filtered count for correct pagination.
 - **`changes` field surfaced**: `edited` actions display a field-by-field before/after diff; `merged` actions display how many variants moved and how many were skipped as duplicates.
 - **Timestamps**: each entry shows an absolute date/time.
-- **Action badge colours**: all 9 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`) have distinct colours.
+- **Action badge colours**: all 10 action types (`submitted`, `approved`, `rejected`, `published`, `resubmitted`, `deleted`, `edited`, `merged`, `profile_updated`, `lookup_changed`) have distinct colours. `lookup_changed` entries render from their `changes` payload (list type and value, then the label/order diff, the new order, or deactivated/reactivated).
 
 ---
 
