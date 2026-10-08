@@ -8,12 +8,14 @@ import ModerationLog from '../models/ModerationLog';
 import { enrichActors } from '../utils/enrichActors';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
+import { isDuplicateKey } from '../utils/duplicateKey';
+import { rejectOpenSuggestions } from '../utils/suggestions';
 
 type Doc = Record<string, unknown>;
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
-  approved:  ['published'],
+  approved:  ['published', 'rejected'],
   rejected:  ['pending'],
   published: ['rejected'],
 };
@@ -66,7 +68,7 @@ async function createConcept(req: Request, res: Response): Promise<void> {
       status: 'pending',
     }).save();
   } catch (err: unknown) {
-    if ((err as { code?: number }).code === 11000) {
+    if (isDuplicateKey(err)) {
       res.status(409).json({
         success: false,
         error: { message: 'A concept with this English gloss already exists' },
@@ -293,8 +295,8 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
     return;
   }
 
-  if (concept.status === 'published' && status === 'rejected' && req.user!.role !== 'admin') {
-    res.status(403).json({ success: false, error: { message: 'Only admins can reject published entries' } });
+  if (['published', 'approved'].includes(concept.status) && status === 'rejected' && req.user!.role !== 'admin') {
+    res.status(403).json({ success: false, error: { message: `Only admins can reject ${concept.status} entries` } });
     return;
   }
 
@@ -359,6 +361,7 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
         }).save();
       })
     );
+    await rejectOpenSuggestions(variantsToDelete.map((v) => v._id as mongoose.Types.ObjectId), req.user!.id, cascadeNote);
   }
 
   res.status(200).json({ success: true, data: concept });
@@ -379,6 +382,27 @@ async function getWotd(req: Request, res: Response): Promise<void> {
     'pashto phonetic region definition example'
   ).lean();
   res.status(200).json({ success: true, data: { ...concept, firstVariant: firstVariant || null } });
+}
+
+// Published concepts with no variant in the region. A variant in any status hides the gap; rejected
+// variants are soft-deleted at rejection, so they are matched by status rather than isDeleted.
+async function getWanted(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+  const skip  = (page - 1) * limit;
+  const region = req.query.region as string;
+  const q = ((req.query.q as string) || '').trim();
+
+  const taken = await Variant.distinct('concept', { region, $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }] });
+  const filter: Record<string, unknown> = { status: 'published', isDeleted: { $ne: true }, _id: { $nin: taken } };
+  if (q) filter.englishGloss = new RegExp(escapeRegex(q), 'i');
+
+  const [data, total] = await Promise.all([
+    Concept.find(filter, 'englishGloss partOfSpeech').sort({ normalizedGloss: 1 }).skip(skip).limit(limit).lean(),
+    Concept.countDocuments(filter),
+  ]);
+
+  res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
 async function getMyConceptSubmissions(req: Request, res: Response): Promise<void> {
@@ -420,6 +444,9 @@ async function deleteConcept(req: Request, res: Response): Promise<void> {
     action: 'deleted',
     performedBy: req.user!.id,
   }).save();
+
+  const variantIds = await Variant.distinct('_id', { concept: concept._id });
+  await rejectOpenSuggestions(variantIds, req.user!.id, `Concept "${concept.englishGloss}" was removed`);
 
   res.status(200).json({ success: true, data: concept });
 }
@@ -650,4 +677,4 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
   res.status(200).json({ success: true, data: concept });
 }
 
-export { createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts, updateConcept };
+export { getWanted, createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts, updateConcept };

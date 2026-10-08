@@ -8,13 +8,20 @@ import ModerationLog from '../models/ModerationLog';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 import { validateForms, applyForms } from '../utils/variantForms';
+import VariantSuggestion from '../models/VariantSuggestion';
+import { isDuplicateKey } from '../utils/duplicateKey';
+import { completionStages, missingMatch, optionalExtraKeys } from '../utils/blankFields';
+import { lockedFields, lockClash, rejectOpenSuggestions } from '../utils/suggestions';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
-  approved:  ['published'],
+  approved:  ['published', 'rejected'],
   rejected:  ['pending'],
   published: ['rejected'],
 };
+
+const RESUBMIT_DUPLICATE = 'This word already exists for that concept in this region. Someone may have added it while yours was rejected; change the word or region.';
+const EDIT_DUPLICATE = 'A variant with the same Pashto and region already exists for this concept';
 
 function invalidId(res: Response) {
   return res.status(400).json({ success: false, error: { message: 'Invalid variant id' } });
@@ -96,7 +103,7 @@ async function createVariant(req: Request, res: Response): Promise<void> {
       status: 'pending',
     }).save();
   } catch (err: unknown) {
-    if ((err as { code?: number }).code === 11000) {
+    if (isDuplicateKey(err)) {
       res.status(409).json({
         success: false,
         error: { message: 'This Pashto word already exists for this concept and region' },
@@ -224,24 +231,19 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // Always checked: resubmitting restores a soft-deleted record, and someone may have added the same word meanwhile
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
-  if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
-    const normalizedPashto = effectivePashto.trim().normalize('NFC');
-    const duplicate = await Variant.findOne({
-      normalizedPashto,
-      concept: variant.concept,
-      region: effectiveRegion,
-      isDeleted: { $ne: true },
-      _id: { $ne: variant._id },
-    });
-    if (duplicate) {
-      res.status(409).json({
-        success: false,
-        error: { message: 'This word already exists for that concept in this region.' },
-      });
-      return;
-    }
+  const duplicate = await Variant.findOne({
+    normalizedPashto: effectivePashto.trim().normalize('NFC'),
+    concept: variant.concept,
+    region: effectiveRegion,
+    isDeleted: { $ne: true },
+    _id: { $ne: variant._id },
+  });
+  if (duplicate) {
+    res.status(409).json({ success: false, error: { message: RESUBMIT_DUPLICATE } });
+    return;
   }
 
   if (pashto !== undefined)          variant.pashto         = pashto;
@@ -256,7 +258,15 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
   variant.moderatorNote = undefined;
   variant.isDeleted = false;
   variant.deletedAt = undefined;
-  await variant.save();
+  try {
+    await variant.save();
+  } catch (err) {
+    if (isDuplicateKey(err)) {
+      res.status(409).json({ success: false, error: { message: RESUBMIT_DUPLICATE } });
+      return;
+    }
+    throw err;
+  }
 
   await new ModerationLog({
     targetModel: 'Variant',
@@ -303,8 +313,8 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
     return;
   }
 
-  if (variant.status === 'published' && status === 'rejected' && req.user!.role !== 'admin') {
-    res.status(403).json({ success: false, error: { message: 'Only admins can reject published entries' } });
+  if (['published', 'approved'].includes(variant.status) && status === 'rejected' && req.user!.role !== 'admin') {
+    res.status(403).json({ success: false, error: { message: `Only admins can reject ${variant.status} entries` } });
     return;
   }
 
@@ -370,6 +380,10 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
     note: moderatorNote,
   }).save();
 
+  if (status === 'rejected') {
+    await rejectOpenSuggestions([variant._id as Types.ObjectId], req.user!.id, `The word was rejected: ${moderatorNote}`);
+  }
+
   res.status(200).json({ success: true, data: variant });
 }
 
@@ -396,23 +410,47 @@ async function searchVariants(req: Request, res: Response): Promise<void> {
   res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
 
+type Doc = Record<string, unknown>;
+
+async function attachLatestSuggestions(variants: Doc[]): Promise<Doc[]> {
+  const ids = variants.filter((v) => v.status === 'published').map((v) => v._id as Types.ObjectId);
+  if (!ids.length) return variants.map((v) => ({ ...v, latestSuggestion: null }));
+  const suggestions = await VariantSuggestion.find({ variant: { $in: ids } }, 'variant status moderatorNote proposed updatedAt')
+    .sort({ updatedAt: -1 }).lean();
+  const latest = new Map<string, unknown>();
+  for (const s of suggestions) if (!latest.has(String(s.variant))) latest.set(String(s.variant), s);
+  return variants.map((v) => ({ ...v, latestSuggestion: latest.get(String(v._id)) ?? null }));
+}
+
+// ?needs=completion lists published words with blank optional fields; ?missing narrows it; ?region filters either list
 async function getMyVariantSubmissions(req: Request, res: Response): Promise<void> {
   const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  // Include soft-deleted rejected variants so submitters can still read the rejection note.
-  const filter = {
-    submittedBy: req.user!.id,
-    $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }],
-  };
+  const own: Record<string, unknown> = { submittedBy: req.user!.id };
+  if (req.query.region) own.region = req.query.region as string;
+  const live = { ...own, status: 'published', isDeleted: { $ne: true } };
+  const completion = req.query.needs === 'completion';
 
-  const [data, total] = await Promise.all([
-    Variant.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('concept', 'englishGloss partOfSpeech').lean(),
-    Variant.countDocuments(filter),
+  // Include soft-deleted rejected variants so submitters can still read the rejection note.
+  const listMatch = completion ? live : { ...own, $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }] };
+  const stages = completionStages(await optionalExtraKeys());
+
+  const [[list], [count]] = await Promise.all([
+    Variant.aggregate([
+      { $match: listMatch },
+      ...stages,
+      ...(completion ? [{ $match: missingMatch((req.query.missing as string) || 'any') }] : []),
+      { $sort: { createdAt: -1, _id: -1 } },
+      { $facet: { data: [{ $skip: skip }, { $limit: limit }], total: [{ $count: 'n' }] } },
+    ]),
+    Variant.aggregate([{ $match: live }, ...stages, { $match: missingMatch('any') }, { $count: 'n' }]),
   ]);
 
-  res.status(200).json({ success: true, data, meta: { page, limit, total } });
+  const data = await attachLatestSuggestions(list.data as Doc[]);
+  const total = (list.total[0]?.n as number) ?? 0;
+  res.status(200).json({ success: true, data, meta: { page, limit, total, needsCompletionCount: count?.n ?? 0 } });
 }
 
 async function deleteVariant(req: Request, res: Response): Promise<void> {
@@ -439,6 +477,8 @@ async function deleteVariant(req: Request, res: Response): Promise<void> {
     action: 'deleted',
     performedBy: req.user!.id,
   }).save();
+
+  await rejectOpenSuggestions([variant._id as Types.ObjectId], req.user!.id, 'The word was removed');
 
   res.status(200).json({ success: true, data: variant });
 }
@@ -543,6 +583,12 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const clash = lockClash(await lockedFields(variant._id as Types.ObjectId), req.body, variant, extra.values, forms.forms);
+  if (clash) {
+    res.status(409).json({ success: false, error: clash });
+    return;
+  }
+
   // Apply simple field updates
   for (const field of simpleFields) {
     if (req.body[field as string] !== undefined) {
@@ -551,7 +597,15 @@ async function editVariant(req: Request, res: Response): Promise<void> {
   }
   Object.assign(changes, applyExtra(variant, extra.values), applyForms(variant, forms.forms));
 
-  await variant.save();
+  try {
+    await variant.save();
+  } catch (err) {
+    if (isDuplicateKey(err)) {
+      res.status(409).json({ success: false, error: { message: EDIT_DUPLICATE } });
+      return;
+    }
+    throw err;
+  }
 
   // Compute diff for simple fields
   for (const field of simpleFields) {

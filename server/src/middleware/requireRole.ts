@@ -21,4 +21,15 @@ function requireModeratorOrAdmin(req: Request, res: Response, next: NextFunction
   next();
 }
 
-export { requireRole, requireModeratorOrAdmin };
+// For status endpoints: the listed target statuses are admin-only
+function adminOnlyStatus(...statuses: string[]) {
+  return function (req: Request, res: Response, next: NextFunction): void {
+    if (statuses.includes(req.body?.status) && req.user?.role !== 'admin') {
+      res.status(403).json({ success: false, error: { message: 'Only admins can publish' } });
+      return;
+    }
+    next();
+  };
+}
+
+export { requireRole, requireModeratorOrAdmin, adminOnlyStatus };

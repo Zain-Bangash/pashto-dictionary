@@ -16,6 +16,12 @@ import {
   editVariant,
   crossConceptCheck,
 } from '../controllers/variantController';
+import { createSuggestion } from '../controllers/suggestionController';
+import { loadOwnedVariant } from '../middleware/ownership';
+import { suggestionLimiter } from '../middleware/rateLimit';
+import { rejectInvalid } from '../utils/sendValidationError';
+import { idParam, proposalValidators } from '../utils/suggestionValidators';
+import { MISSING_PATTERN } from '../utils/blankFields';
 
 const router = Router();
 
@@ -46,6 +52,14 @@ const statusValidators = [
     .withMessage('status must be approved, rejected, or published'),
 ];
 
+const mySubmissionsValidators = [
+  query('needs').optional().isIn(['completion']).withMessage('needs must be completion'),
+  query('missing').optional().matches(MISSING_PATTERN).withMessage('Invalid missing filter'),
+  query('region').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid region'),
+  query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive number'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+];
+
 const crossConceptCheckValidators = [
   query('pashto').notEmpty().withMessage('pashto is required'),
   query('conceptId').isMongoId().withMessage('conceptId must be a valid MongoDB ObjectId'),
@@ -53,11 +67,12 @@ const crossConceptCheckValidators = [
 
 // static paths must come before /:id
 router.get('/search', searchVariants);
-router.get('/my-submissions', verifyToken, getMyVariantSubmissions);
+router.get('/my-submissions', verifyToken, mySubmissionsValidators, rejectInvalid, getMyVariantSubmissions);
 router.get('/cross-concept-check', verifyToken, crossConceptCheckValidators, crossConceptCheck);
 router.get('/', verifyToken, requireModeratorOrAdmin, listVariants);
 router.get('/:id', optionalVerifyToken, getVariant);
 router.post('/', verifyToken, createValidators, createVariant);
+router.post('/:id/suggestions', verifyToken, suggestionLimiter, idParam, ...proposalValidators, rejectInvalid, loadOwnedVariant, createSuggestion);
 router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editValidators, editVariant);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionVariantStatus);
 router.patch('/:id', verifyToken, updateValidators, updateVariant);
