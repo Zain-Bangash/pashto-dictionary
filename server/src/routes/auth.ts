@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { register, login, me, updateProfile } from '../controllers/authController';
 import { verifyToken } from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimit';
+import { activeLookup, lookupFormat } from '../utils/lookups';
 
 const router = Router();
 
@@ -14,6 +15,8 @@ const registerValidators = [
     .matches(/[A-Z]/).withMessage('password must contain at least one uppercase letter')
     .matches(/[0-9]/).withMessage('password must contain at least one number')
     .matches(/[^A-Za-z0-9]/).withMessage('password must contain at least one special character'),
+  activeLookup('region', 'region', 'falsy'),
+  body('village').optional().isString().trim().isLength({ max: 100 }).withMessage('Village name too long'),
 ];
 
 const loginValidators = [
@@ -22,7 +25,7 @@ const loginValidators = [
 ];
 
 const profileValidators = [
-  body('region').optional().isIn(['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar']).withMessage('Invalid region'),
+  body('region').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid region'),
   body('village').optional().isString().trim().isLength({ max: 100 }).withMessage('Village name too long'),
 ];
 

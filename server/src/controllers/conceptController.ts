@@ -6,6 +6,7 @@ import { IConcept } from '../types/models';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import { enrichActors } from '../utils/enrichActors';
+import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 
 type Doc = Record<string, unknown>;
 
@@ -396,6 +397,13 @@ async function deleteConcept(req: Request, res: Response): Promise<void> {
 }
 
 async function editConcept(req: Request, res: Response): Promise<void> {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const first = errors.array()[0];
+    res.status(400).json({ success: false, error: { message: first.msg, field: (first as { path?: string }).path } });
+    return;
+  }
+
   const id = req.params.id as string;
   if (!mongoose.Types.ObjectId.isValid(id)) {
     invalidId(res);
@@ -423,6 +431,11 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  if (req.body.partOfSpeech !== undefined && !(await isAllowedLookup('partOfSpeech', req.body.partOfSpeech, concept.partOfSpeech))) {
+    res.status(400).json({ success: false, error: { message: invalidLookupMessage('partOfSpeech'), field: 'partOfSpeech' } });
+    return;
+  }
+
   const editableFields: (keyof IConcept)[] = ['englishGloss', 'partOfSpeech'];
   const before: Record<string, unknown> = {};
   for (const field of editableFields) {
@@ -430,7 +443,7 @@ async function editConcept(req: Request, res: Response): Promise<void> {
   }
 
   if (req.body.englishGloss !== undefined) concept.englishGloss = req.body.englishGloss as string;
-  if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech as IConcept['partOfSpeech'];
+  if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech as string;
 
   await concept.save();
 
@@ -572,7 +585,12 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { englishGloss, partOfSpeech } = req.body as { englishGloss?: string; partOfSpeech?: IConcept['partOfSpeech'] };
+  const { englishGloss, partOfSpeech } = req.body as { englishGloss?: string; partOfSpeech?: string };
+
+  if (partOfSpeech !== undefined && !(await isAllowedLookup('partOfSpeech', partOfSpeech, concept.partOfSpeech))) {
+    res.status(400).json({ success: false, error: { message: invalidLookupMessage('partOfSpeech'), field: 'partOfSpeech' } });
+    return;
+  }
 
   if (englishGloss !== undefined) concept.englishGloss = englishGloss;
   if (partOfSpeech !== undefined) concept.partOfSpeech = partOfSpeech;

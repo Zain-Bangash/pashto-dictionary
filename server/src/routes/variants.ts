@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body, query } from 'express-validator';
 import { verifyToken, optionalVerifyToken } from '../middleware/auth';
 import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
+import { activeLookup, lookupFormat } from '../utils/lookups';
 import {
   createVariant,
   listVariants,
@@ -17,20 +18,20 @@ import {
 
 const router = Router();
 
-const REGIONS = ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'];
-
 const createValidators = [
   body('conceptId').trim().notEmpty().withMessage('conceptId is required'),
   body('pashto').trim().notEmpty().withMessage('pashto is required'),
-  body('region').isIn(REGIONS).withMessage(`region must be one of: ${REGIONS.join(', ')}`),
+  activeLookup('region', 'region'),
   body('definition').trim().notEmpty().withMessage('definition is required'),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
 ];
 
 const updateValidators = [
-  body('region').optional().isIn(REGIONS).withMessage(`region must be one of: ${REGIONS.join(', ')}`),
+  lookupFormat('region', true),
   body('submissionNote').optional().isString().trim().isLength({ max: 500 }).withMessage('Note must be 500 characters or fewer'),
 ];
+
+const editValidators = [lookupFormat('region', true)];
 
 const statusValidators = [
   body('status')
@@ -50,7 +51,7 @@ router.get('/cross-concept-check', verifyToken, crossConceptCheckValidators, cro
 router.get('/', verifyToken, requireModeratorOrAdmin, listVariants);
 router.get('/:id', optionalVerifyToken, getVariant);
 router.post('/', verifyToken, createValidators, createVariant);
-router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editVariant);
+router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editValidators, editVariant);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionVariantStatus);
 router.patch('/:id', verifyToken, updateValidators, updateVariant);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteVariant);

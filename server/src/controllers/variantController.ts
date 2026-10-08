@@ -5,6 +5,7 @@ import Concept from '../models/Concept';
 import Variant from '../models/Variant';
 import { IVariant } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
+import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -189,6 +190,11 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     submissionNote?: string;
   };
 
+  if (region !== undefined && !(await isAllowedLookup('region', region, variant.region))) {
+    res.status(400).json({ success: false, error: { message: invalidLookupMessage('region'), field: 'region' } });
+    return;
+  }
+
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
   if (effectivePashto !== variant.pashto || effectiveRegion !== variant.region) {
@@ -211,7 +217,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
 
   if (pashto !== undefined)          variant.pashto         = pashto;
   if (phonetic !== undefined)        variant.phonetic       = phonetic;
-  if (region !== undefined)          variant.region         = region as IVariant['region'];
+  if (region !== undefined)          variant.region         = region;
   if (definition !== undefined)      variant.definition     = definition;
   if (example !== undefined)         variant.example        = example;
   if (submissionNote !== undefined)  variant.submissionNote = submissionNote;
@@ -407,6 +413,13 @@ async function deleteVariant(req: Request, res: Response): Promise<void> {
 }
 
 async function editVariant(req: Request, res: Response): Promise<void> {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const first = errors.array()[0];
+    res.status(400).json({ success: false, error: { message: first.msg, field: (first as { path?: string }).path } });
+    return;
+  }
+
   const id = req.params.id as string;
   if (!mongoose.Types.ObjectId.isValid(id)) {
     invalidId(res);
@@ -431,6 +444,11 @@ async function editVariant(req: Request, res: Response): Promise<void> {
 
   if (!req.body.note) {
     res.status(400).json({ success: false, error: { message: 'note is required', field: 'note' } });
+    return;
+  }
+
+  if (req.body.region !== undefined && !(await isAllowedLookup('region', req.body.region, variant.region))) {
+    res.status(400).json({ success: false, error: { message: invalidLookupMessage('region'), field: 'region' } });
     return;
   }
 
