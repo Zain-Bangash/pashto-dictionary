@@ -1,7 +1,7 @@
 import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 import { slotLabel } from '../../utils/forms';
 
-const OWNER = { Concept: 'concept', Variant: 'variant' };
+const OWNER = { Concept: 'concept', Variant: 'variant', VariantSuggestion: 'variant' };
 
 // Form diffs store { pashto, phonetic?, example? } or null for an added/removed form
 function show(value) {
@@ -81,7 +81,7 @@ export default function LogChanges({ log }) {
     return <LookupChange changes={changes} />;
   }
 
-  if (action === 'edited' && changes && typeof changes === 'object') {
+  if ((action === 'edited' || action === 'suggestion_applied') && changes && typeof changes === 'object') {
     const fields = Object.entries(changes).filter(([, v]) => v && typeof v === 'object' && 'from' in v);
     if (fields.length === 0) return null;
     return (

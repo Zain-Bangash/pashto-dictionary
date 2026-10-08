@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { transitionConceptStatus, transitionVariantStatus } from '../../services/api';
 import usePublishedConcept from '../../hooks/usePublishedConcept';
+import useOpenSuggestions from '../../hooks/useOpenSuggestions';
 import ConceptEditForm from './ConceptEditForm';
 import RejectModal from './RejectModal';
 import PublishedVariantRow from './PublishedVariantRow';
@@ -14,6 +15,7 @@ function cascadeWarning(count) {
 
 export default function PublishedConceptPanel({ concept, onConceptEdited, onConceptRejected }) {
   const { variants, setVariants, loading, error } = usePublishedConcept(concept._id);
+  const openSuggestions = useOpenSuggestions(concept._id);
   const [editing, setEditing]           = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [actionError, setActionError]   = useState(null);
@@ -79,6 +81,7 @@ export default function PublishedConceptPanel({ concept, onConceptEdited, onConc
               key={v._id}
               variant={v}
               concept={conceptRef}
+              openSuggestion={openSuggestions[v._id]}
               onReject={(variant) => setRejectTarget({ type: 'variant', variant })}
               onSave={handleVariantSave}
             />

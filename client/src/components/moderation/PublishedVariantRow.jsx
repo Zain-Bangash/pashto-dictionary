@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import VariantEditForm from './VariantEditForm';
 import { REJECT_BTN, EDIT_BTN } from './queueButtons';
 import useLookups from '../../hooks/useLookups';
+import { proposedFields } from '../../utils/suggestions';
 
-export default function PublishedVariantRow({ variant, concept, onReject, onSave }) {
+export default function PublishedVariantRow({ variant, concept, openSuggestion, onReject, onSave }) {
   const { labelFor } = useLookups();
   const [editing, setEditing] = useState(false);
 
@@ -20,6 +22,12 @@ export default function PublishedVariantRow({ variant, concept, onReject, onSave
           </div>
           <p className="text-sm font-ui text-muted">{variant.definition}</p>
           {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
+          {openSuggestion && (
+            <p className="text-[11px] font-ui text-amber-300/90">
+              Suggestion {openSuggestion.status} from the submitter — its fields are locked here.{' '}
+              <Link to="/dashboard/queue?view=suggestions" className="underline hover:text-amber-200">Review it in Suggestions</Link>
+            </p>
+          )}
           {variant.submittedBy?.username && (
             <p className="text-xs font-ui text-muted/60">by {variant.submittedBy.username}</p>
           )}
@@ -32,6 +40,7 @@ export default function PublishedVariantRow({ variant, concept, onReject, onSave
       {editing && (
         <VariantEditForm
           item={{ ...variant, concept }}
+          lockedFields={proposedFields(openSuggestion)}
           onSave={(updated) => { setEditing(false); onSave(updated); }}
           onCancel={() => setEditing(false)}
         />

@@ -9,7 +9,10 @@ import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import FormsEditor from '../forms/FormsEditor';
 import { formKindFor, formsPayload } from '../../utils/forms';
 
-export default function VariantEditForm({ item, onSave, onCancel }) {
+// lockedFields: fields an open suggestion proposes; they stay read-only until it is resolved
+export default function VariantEditForm({ item, onSave, onCancel, lockedFields = [] }) {
+  const locked = (field) => lockedFields.includes(field);
+  const lockedSlots = lockedFields.filter((f) => f.startsWith('forms.')).map((f) => f.slice(6));
   const [pashto, setPashto] = useState(item.pashto || '');
   const [phonetic, setPhonetic] = useState(item.phonetic || '');
   const [region, setRegion] = useState(item.region || '');
@@ -54,6 +57,8 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
         <label className="block text-xs font-ui text-muted uppercase tracking-wider mb-1">Phonetic</label>
         <input
           aria-label="Phonetic"
+          disabled={locked('phonetic')}
+          title={locked('phonetic') ? 'Proposed in an open suggestion' : undefined}
           value={phonetic}
           onChange={(e) => setPhonetic(e.target.value)}
           className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
@@ -82,6 +87,8 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
         <label className="block text-xs font-ui text-muted uppercase tracking-wider mb-1">Example</label>
         <input
           aria-label="Example"
+          disabled={locked('example')}
+          title={locked('example') ? 'Proposed in an open suggestion' : undefined}
           value={example}
           onChange={(e) => setExample(e.target.value)}
           className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
@@ -90,6 +97,7 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
       <ExtraFieldsInputs
         appliesTo="variant"
         idPrefix={`edit-${item._id}`}
+        disabledKeys={lockedFields.filter((f) => f.startsWith('extra.')).map((f) => f.slice(6))}
         values={extra}
         onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
         inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
@@ -99,6 +107,7 @@ export default function VariantEditForm({ item, onSave, onCancel }) {
         kind={formKindFor(partOfSpeech)}
         forms={forms}
         onChange={setForms}
+        takenSlots={lockedSlots}
         idPrefix={`edit-form-${item._id}`}
         inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
         labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"

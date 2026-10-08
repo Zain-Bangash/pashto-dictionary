@@ -369,6 +369,32 @@ describe('Grouped queue — admin filter and publishing', () => {
     expect(within(region).getByText(/publish the concept first/i)).toBeInTheDocument();
   });
 
+  it('lets an admin reject an approved variant with a note', async () => {
+    const user = userEvent.setup();
+    asAdmin();
+    mockQueue([mockGroup({ status: 'published' }, [mockVariant({ _id: 'vApp', status: 'approved' })])]);
+    api.patch.mockResolvedValueOnce({ data: { success: true, data: {} } });
+    mockQueue([]);
+
+    renderQueue();
+    const region = await expandVariants(user);
+    await user.click(within(region).getByRole('button', { name: /^reject$/i }));
+    await user.type(screen.getByLabelText(/reason for rejection/i), 'Not this region');
+    await user.click(screen.getByRole('button', { name: /confirm/i }));
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith('/api/variants/vApp/status', { status: 'rejected', moderatorNote: 'Not this region' });
+    });
+  });
+
+  it('lets an admin reject an approved concept', async () => {
+    asAdmin();
+    mockQueue([mockGroup({ _id: 'cApp', status: 'approved' })]);
+    renderQueue();
+    await screen.findByText('house');
+    expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
+  });
+
   it('enables variant Publish under a published concept', async () => {
     const user = userEvent.setup();
     asAdmin();

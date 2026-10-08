@@ -18,6 +18,7 @@ import DashboardConcepts from '../../pages/dashboard/DashboardConcepts';
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   getConcept: vi.fn(),
+  getSuggestionQueue: vi.fn(() => Promise.resolve({ data: { data: [] } })),
   transitionConceptStatus: vi.fn(),
   transitionVariantStatus: vi.fn(),
 }));

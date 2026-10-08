@@ -66,9 +66,12 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
               </>
             )}
             {variant.status === 'approved' && isAdmin && (
-              <button onClick={() => onAction('variants', variant._id, 'published')} disabled={!!publishBlocked} className={PUBLISH_BTN}>
-                Publish
-              </button>
+              <>
+                <button onClick={() => onAction('variants', variant._id, 'published')} disabled={!!publishBlocked} className={PUBLISH_BTN}>
+                  Publish
+                </button>
+                <button onClick={() => onReject('variants', variant._id)} className={REJECT_BTN}>Reject</button>
+              </>
             )}
             <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>
           </div>
