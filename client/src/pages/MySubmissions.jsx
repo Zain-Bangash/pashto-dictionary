@@ -4,6 +4,7 @@ import api, { updateConcept, updateVariant } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
 import LookupSelect from '../components/LookupSelect';
+import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
 
 const STATUS_STYLES = {
   pending:   { color: '#e8c547', border: 'rgba(232,197,71,0.3)',  bg: 'rgba(232,197,71,0.08)' },
@@ -42,6 +43,7 @@ function Section({ title, items, renderItem }) {
 function ConceptEditForm({ concept, onSave, onCancel }) {
   const [englishGloss, setEnglishGloss] = useState(concept.englishGloss);
   const [partOfSpeech, setPartOfSpeech] = useState(concept.partOfSpeech || '');
+  const [extra, setExtra] = useState(concept.extra || {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,7 +52,7 @@ function ConceptEditForm({ concept, onSave, onCancel }) {
     setSaving(true);
     setError('');
     try {
-      const res = await updateConcept(concept._id, { englishGloss, partOfSpeech });
+      const res = await updateConcept(concept._id, { englishGloss, partOfSpeech, extra });
       onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
@@ -81,6 +83,14 @@ function ConceptEditForm({ concept, onSave, onCancel }) {
           placeholder="— select —"
         />
       </div>
+      <ExtraFieldsInputs
+        appliesTo="concept"
+        idPrefix={`resubmit-${concept._id}`}
+        values={extra}
+        onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
+        inputClassName={inputCls}
+        labelClassName={labelCls}
+      />
       {error && <p className="text-xs font-ui text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button
@@ -111,6 +121,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
     example: variant.example || '',
     submissionNote: variant.submissionNote || '',
   });
+  const [extra, setExtra] = useState(variant.extra || {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -128,6 +139,7 @@ function VariantEditForm({ variant, onSave, onCancel }) {
       if (!body.region) delete body.region;
       if (!body.example) delete body.example;
       if (!body.submissionNote) delete body.submissionNote;
+      body.extra = extra;
       const res = await updateVariant(variant._id, body);
       onSave(res.data.data);
     } catch (err) {
@@ -170,6 +182,14 @@ function VariantEditForm({ variant, onSave, onCancel }) {
         <label className={labelCls}>Submission Note</label>
         <input className={inputCls} value={fields.submissionNote} onChange={set('submissionNote')} placeholder="optional" maxLength={500} />
       </div>
+      <ExtraFieldsInputs
+        appliesTo="variant"
+        idPrefix={`resubmit-${variant._id}`}
+        values={extra}
+        onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
+        inputClassName={inputCls}
+        labelClassName={labelCls}
+      />
       {error && <p className="text-xs font-ui text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button

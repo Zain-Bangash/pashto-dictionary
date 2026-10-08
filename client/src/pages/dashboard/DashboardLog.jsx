@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import useLookups from '../../hooks/useLookups';
+import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 import LogChanges from '../../components/log/LogChanges';
 
 const ACTION_STYLES = {
@@ -16,14 +17,16 @@ const ACTION_STYLES = {
   merged:          { color: '#c084fc', bg: 'rgba(192,132,252,0.08)', border: 'rgba(192,132,252,0.3)' },
   profile_updated: { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
   lookup_changed:  { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)',  border: 'rgba(45,212,191,0.3)'  },
+  field_changed:   { color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(244,114,182,0.3)' },
 };
 
 const ALL_ACTIONS = [
   'submitted', 'approved', 'rejected', 'published',
-  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed',
+  'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed', 'field_changed',
 ];
 
 const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
+const FIELD_OWNER_NAMES = { concept: 'Concept field', variant: 'Variant field' };
 
 function formatDate(ts) {
   if (!ts) return '';
@@ -36,6 +39,7 @@ function formatDate(ts) {
 
 function TargetLabel({ log }) {
   const { labelFor } = useLookups();
+  const { fieldLabel } = useFieldDefinitions();
   if (!log.target && !log.targetModel) return null;
 
   const model = log.targetModel;
@@ -59,6 +63,14 @@ function TargetLabel({ log }) {
       <>
         <span className="text-muted/60">{LOOKUP_TYPE_NAMES[type] ?? type}</span>
         {key && <span className="text-warm/80"> · {labelFor(type, key)}</span>}
+      </>
+    );
+  } else if (model === 'FieldDefinition' && log.changes?.appliesTo) {
+    const { appliesTo, key } = log.changes;
+    label = (
+      <>
+        <span className="text-muted/60">{FIELD_OWNER_NAMES[appliesTo] ?? appliesTo}</span>
+        {key && <span className="text-warm/80"> · {fieldLabel(appliesTo, key)}</span>}
       </>
     );
   }
@@ -138,6 +150,7 @@ export default function DashboardLog() {
             <option value="Variant"   style={{ background: '#1c1c15', color: '#fffef8' }}>Variant</option>
             <option value="User"      style={{ background: '#1c1c15', color: '#fffef8' }}>User</option>
             <option value="Lookup"    style={{ background: '#1c1c15', color: '#fffef8' }}>List value</option>
+            <option value="FieldDefinition" style={{ background: '#1c1c15', color: '#fffef8' }}>Custom field</option>
           </select>
         </div>
       </div>

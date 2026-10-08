@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
+import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
 
 export default function ConceptDetail() {
   const { id } = useParams();
@@ -57,6 +58,7 @@ export default function ConceptDetail() {
                   </span>
                 )}
               </div>
+              <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
               {concept.submittedBy?.username && (
                 <p className="text-[11px] font-ui text-muted/50">
                   Submitted by {concept.submittedBy.username}
@@ -120,6 +122,7 @@ export default function ConceptDetail() {
                         {selected.example && (
                           <p className="font-ui text-muted text-sm italic">{selected.example}</p>
                         )}
+                        <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
 
                         {selected.submittedBy?.username && (
                           <p className="text-[11px] font-ui text-muted/40">

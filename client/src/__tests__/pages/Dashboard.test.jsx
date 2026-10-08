@@ -168,6 +168,16 @@ describe('DashboardLayout — role-based navigation', () => {
     expect(screen.queryByRole('link', { name: /lists/i })).not.toBeInTheDocument();
   });
 
+  it('renders the fields nav link for an admin only', () => {
+    asAdmin();
+    const { unmount } = renderLayout();
+    expect(screen.getByRole('link', { name: /fields/i })).toHaveAttribute('href', '/dashboard/fields');
+    unmount();
+    asModerator();
+    renderLayout();
+    expect(screen.queryByRole('link', { name: /fields/i })).not.toBeInTheDocument();
+  });
+
   it('renders children inside the layout', () => {
     asModerator();
     renderLayout();
@@ -713,11 +723,45 @@ describe('DashboardLog page — audit log (admin only)', () => {
     expect(screen.getByText('Kohat District')).toBeInTheDocument();
   });
 
+  it('renders a field_changed entry with its badge, field owner and option change', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [mockLogEntry({
+          targetModel: 'FieldDefinition',
+          target: null,
+          action: 'field_changed',
+          changes: { op: 'option_added', appliesTo: 'variant', key: 'register', option: { key: 'Poetic', label: 'Poetic' } },
+        })],
+        meta: { page: 1, limit: 20, total: 1 },
+      },
+    });
+    renderLog('admin');
+    expect(await screen.findByText('field_changed', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('Variant field')).toBeInTheDocument();
+    expect(screen.getByText(/Added option “Poetic”/)).toBeInTheDocument();
+  });
+
+  it('shows extra.* diffs under the field name, not the raw path', async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [mockLogEntry({ targetModel: 'Variant', action: 'edited', target: { pashto: 'کور' }, changes: { 'extra.plural': { from: 'a', to: 'b' } } })],
+        meta: { page: 1, limit: 20, total: 1 },
+      },
+    });
+    renderLog('admin');
+    expect(await screen.findByText('plural:')).toBeInTheDocument();
+    expect(screen.queryByText(/extra\./)).not.toBeInTheDocument();
+  });
+
   it('offers lookup_changed and List value in the log filters', async () => {
     api.get.mockResolvedValueOnce({ data: { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } } });
     renderLog('admin');
     expect(await screen.findByRole('option', { name: 'lookup_changed' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'List value' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'field_changed' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Custom field' })).toBeInTheDocument();
   });
 
   it('redirects a moderator away from /dashboard/log', () => {

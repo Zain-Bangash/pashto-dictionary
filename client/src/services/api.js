@@ -144,4 +144,50 @@ export function reactivateLookup(id) {
   return api.patch(`/api/lookups/${id}/reactivate`);
 }
 
+// ── Custom field definitions ──────────────────────────────────────────────────
+
+export function getFields() {
+  return api.get('/api/fields');
+}
+
+export function getAllFields() {
+  return api.get('/api/fields/all');
+}
+
+export function createField(body) {
+  return api.post('/api/fields', body);
+}
+
+export function updateField(id, body) {
+  return api.patch(`/api/fields/${id}`, body);
+}
+
+export function reorderFields(appliesTo, ids) {
+  return api.put('/api/fields/order', { appliesTo, ids });
+}
+
+export function deactivateField(id) {
+  return api.patch(`/api/fields/${id}/deactivate`);
+}
+
+export function reactivateField(id) {
+  return api.patch(`/api/fields/${id}/reactivate`);
+}
+
+export function addFieldOption(id, label) {
+  return api.post(`/api/fields/${id}/options`, { label });
+}
+
+export function renameFieldOption(id, optionId, label) {
+  return api.patch(`/api/fields/${id}/options/${optionId}`, { label });
+}
+
+export function deactivateFieldOption(id, optionId) {
+  return api.patch(`/api/fields/${id}/options/${optionId}/deactivate`);
+}
+
+export function reactivateFieldOption(id, optionId) {
+  return api.patch(`/api/fields/${id}/options/${optionId}/reactivate`);
+}
+
 export default api;
