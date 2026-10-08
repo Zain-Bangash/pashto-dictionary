@@ -6,10 +6,11 @@ const HINT = {
   verb: 'Verb forms: infinitive, past, present and imperative.',
 };
 
-export default function FormsEditor({ kind, forms = [], onChange, idPrefix = 'forms', inputClassName, labelClassName }) {
+// takenSlots: slots already filled elsewhere (e.g. on the live word) that cannot be picked here
+export default function FormsEditor({ kind, forms = [], onChange, idPrefix = 'forms', inputClassName, labelClassName, takenSlots = [] }) {
   if (!kind && forms.length === 0) return null;
 
-  const usedSlots = new Set(forms.map(formSlot));
+  const usedSlots = new Set([...takenSlots, ...forms.map(formSlot)]);
   const nextSlot = kind ? SLOTS[kind].find((s) => !usedSlots.has(formSlot(s))) : null;
   const canAdd = nextSlot && forms.length < MAX_FORMS;
 

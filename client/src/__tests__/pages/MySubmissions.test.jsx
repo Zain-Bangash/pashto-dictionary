@@ -143,7 +143,7 @@ describe('MySubmissions page', () => {
     renderMySubmissions();
     await screen.findByText(/no submissions/i);
     expect(api.get).toHaveBeenCalledWith('/api/concepts/my-submissions');
-    expect(api.get).toHaveBeenCalledWith('/api/variants/my-submissions');
+    expect(api.get).toHaveBeenCalledWith('/api/variants/my-submissions', { params: {} });
   });
 
   it('has a link or button to submit a new entry', async () => {
