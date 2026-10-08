@@ -55,9 +55,11 @@ describe('Concept model', () => {
     await expect(concept.save()).rejects.toThrow(/status/i);
   });
 
-  test('rejects an invalid partOfSpeech enum value', async () => {
-    const concept = new Concept({ englishGloss: 'house', partOfSpeech: 'emoji' });
-    await expect(concept.save()).rejects.toThrow(/partOfSpeech/i);
+  // partOfSpeech is validated against the Lookup collection at the route layer, not by a schema enum
+  test('stores any partOfSpeech key up to 50 characters', async () => {
+    const concept = await new Concept({ englishGloss: 'house', partOfSpeech: 'particle' }).save();
+    expect(concept.partOfSpeech).toBe('particle');
+    await expect(new Concept({ englishGloss: 'roof', partOfSpeech: 'x'.repeat(51) }).save()).rejects.toThrow(/partOfSpeech/i);
   });
 
   test('accepts all valid partOfSpeech values', async () => {
@@ -129,9 +131,11 @@ describe('Variant model', () => {
     await expect(new Variant(data).save()).rejects.toThrow(/concept/i);
   });
 
-  test('rejects an invalid region enum value', async () => {
-    const variant = new Variant({ ...validVariant(), region: 'Kandahar' });
-    await expect(variant.save()).rejects.toThrow(/region/i);
+  // region is validated against the Lookup collection at the route layer, not by a schema enum
+  test('stores any region key up to 50 characters', async () => {
+    const variant = await new Variant({ ...validVariant(), region: 'Kurram' }).save();
+    expect(variant.region).toBe('Kurram');
+    await expect(new Variant({ ...validVariant(), pashto: 'نور', region: 'x'.repeat(51) }).save()).rejects.toThrow(/region/i);
   });
 
   test('accepts all valid region values', async () => {

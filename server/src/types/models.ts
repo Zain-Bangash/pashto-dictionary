@@ -5,7 +5,7 @@ export interface IUser extends Document {
   email: string;
   cognitoSub: string;
   role: 'user' | 'moderator' | 'admin';
-  region?: 'Kohat' | 'Hangu' | 'Tirah' | 'Thal' | 'Parachinar';
+  region?: string;
   village?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -14,7 +14,7 @@ export interface IUser extends Document {
 export interface IConcept extends Document {
   englishGloss: string;
   normalizedGloss?: string;
-  partOfSpeech: 'noun' | 'verb' | 'adjective' | 'adverb' | 'phrase' | 'other';
+  partOfSpeech: string;
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
   reviewedBy?: string;
@@ -32,7 +32,7 @@ export interface IVariant extends Document {
   normalizedPashto?: string;
   phonetic?: string;
   normalizedPhonetic?: string;
-  region: 'Kohat' | 'Hangu' | 'Tirah' | 'Thal' | 'Parachinar';
+  region: string;
   definition: string;
   example?: string;
   submissionNote?: string;
@@ -47,8 +47,21 @@ export interface IVariant extends Document {
   updatedAt: Date;
 }
 
+export type LookupType = 'region' | 'partOfSpeech';
+
+export interface ILookup extends Document {
+  type: LookupType;
+  key: string;
+  label: string;
+  order: number;
+  active: boolean;
+  isSystem: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IModerationLog extends Document {
-  targetModel?: 'Concept' | 'Variant' | 'User';
+  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup';
   targetId?: Types.ObjectId;
   action:
     | 'submitted'
@@ -59,7 +72,8 @@ export interface IModerationLog extends Document {
     | 'profile_updated'
     | 'deleted'
     | 'edited'
-    | 'merged';
+    | 'merged'
+    | 'lookup_changed';
   performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;

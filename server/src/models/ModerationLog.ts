@@ -2,11 +2,11 @@ import { Schema, model } from 'mongoose';
 import { IModerationLog } from '../types/models';
 
 const moderationLogSchema = new Schema<IModerationLog>({
-  targetModel: { type: String, enum: ['Concept', 'Variant', 'User'] },
+  targetModel: { type: String, enum: ['Concept', 'Variant', 'User', 'Lookup'] },
   targetId: { type: Schema.Types.ObjectId },
   action: {
     type: String,
-    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged'],
+    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed'],
     required: true,
   },
   performedBy: { type: String, required: true },

@@ -8,11 +8,7 @@ const variantSchema = new Schema<IVariant>(
     normalizedPashto: { type: String },
     phonetic: { type: String, trim: true },
     normalizedPhonetic: { type: String },
-    region: {
-      type: String,
-      enum: ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'],
-      required: true,
-    },
+    region: { type: String, required: true, trim: true, maxlength: 50 },
     definition: { type: String, required: true, trim: true },
     example: { type: String, trim: true },
     submissionNote: { type: String, trim: true, maxlength: 500 },
