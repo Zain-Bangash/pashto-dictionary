@@ -4,20 +4,35 @@ import { MemoryRouter } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 
 vi.mock('../../services/api', () => ({
-  default: { get: vi.fn(), post: vi.fn() },
+  loginRequest: vi.fn(),
+  registerRequest: vi.fn(),
+  logoutRequest: vi.fn(),
+  refreshSession: vi.fn(),
   setToken: vi.fn(),
   clearToken: vi.fn(),
-  getToken: vi.fn(),
   setLogoutHandler: vi.fn(),
 }));
 
-import api, { setToken, clearToken, getToken, setLogoutHandler } from '../../services/api';
+let broadcastListener = null;
+vi.mock('../../services/sessionSync', () => ({
+  broadcastLogout: vi.fn(),
+  onLogoutBroadcast: vi.fn((fn) => {
+    broadcastListener = fn;
+    return () => { broadcastListener = null; };
+  }),
+}));
+
+import {
+  loginRequest, logoutRequest, refreshSession, setToken, clearToken,
+} from '../../services/api';
+import { broadcastLogout } from '../../services/sessionSync';
 import { AuthProvider, useAuth } from '../../context/AuthContext';
 
 function AuthConsumer() {
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, initializing } = useAuth();
   return (
     <div>
+      <span data-testid="init">{initializing ? 'loading' : 'ready'}</span>
       <span data-testid="user">{user ? user._id : 'null'}</span>
       <button onClick={() => login('test@test.com', 'password123')}>Login</button>
       <button onClick={logout}>Logout</button>
@@ -34,9 +49,12 @@ const renderProvider = () =>
     </MemoryRouter>
   );
 
+const noSession = () => Promise.reject(Object.assign(new Error('401'), { response: { status: 401 } }));
+
 beforeEach(() => {
-  vi.resetAllMocks();
-  getToken.mockReturnValue(null);
+  vi.clearAllMocks();
+  refreshSession.mockImplementation(noSession);
+  logoutRequest.mockResolvedValue({});
 });
 
 describe('AuthContext', () => {
@@ -46,7 +64,7 @@ describe('AuthContext', () => {
   });
 
   it('login() sets user in context', async () => {
-    api.post.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
+    loginRequest.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
     renderProvider();
     await act(async () => {
       screen.getByRole('button', { name: /login/i }).click();
@@ -56,7 +74,7 @@ describe('AuthContext', () => {
   });
 
   it('logout() clears user from context', async () => {
-    api.post.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
+    loginRequest.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
     renderProvider();
     await act(async () => { screen.getByRole('button', { name: /login/i }).click(); });
     await act(async () => { screen.getByRole('button', { name: /logout/i }).click(); });
@@ -77,7 +95,7 @@ describe('AuthContext', () => {
     }
 
     const loginWith = async (response) => {
-      api.post.mockRejectedValue({ message: 'Request failed', response });
+      loginRequest.mockRejectedValue({ message: 'Request failed', response });
       render(
         <MemoryRouter>
           <AuthProvider>
@@ -105,16 +123,55 @@ describe('AuthContext', () => {
     });
   });
 
-  it('restores user from existing session on mount', async () => {
-    getToken.mockReturnValue('existing-token');
-    api.get.mockResolvedValue({ data: { data: { user: { _id: 'u1', role: 'user' } } } });
+  it('logout() calls the logout endpoint and tells other tabs', async () => {
+    loginRequest.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
+    renderProvider();
+    await act(async () => { screen.getByRole('button', { name: /login/i }).click(); });
+    await act(async () => { screen.getByRole('button', { name: /logout/i }).click(); });
+    expect(logoutRequest).toHaveBeenCalledTimes(1);
+    expect(broadcastLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('logout() still clears the user when the logout request fails', async () => {
+    loginRequest.mockResolvedValue({ data: { data: { token: 'tok1', user: { _id: 'u1', role: 'user' } } } });
+    logoutRequest.mockRejectedValue(new Error('network'));
+    renderProvider();
+    await act(async () => { screen.getByRole('button', { name: /login/i }).click(); });
+    await act(async () => { screen.getByRole('button', { name: /logout/i }).click(); });
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+  });
+
+  it('restores user from the refresh cookie on mount', async () => {
+    refreshSession.mockResolvedValue({ token: 'tok', user: { _id: 'u1', role: 'user' } });
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('u1'));
+    expect(refreshSession).toHaveBeenCalled();
+  });
+
+  it('stays initializing until the session check settles, so protected routes do not redirect early', async () => {
+    let resolve;
+    refreshSession.mockReturnValue(new Promise((r) => { resolve = r; }));
+    renderProvider();
+    expect(screen.getByTestId('init')).toHaveTextContent('loading');
+    await act(async () => { resolve({ token: 'tok', user: { _id: 'u1' } }); });
+    expect(screen.getByTestId('init')).toHaveTextContent('ready');
+    expect(screen.getByTestId('user')).toHaveTextContent('u1');
   });
 
   it('stays unauthenticated when no session exists on mount', async () => {
-    getToken.mockReturnValue(null);
     renderProvider();
-    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    await waitFor(() => expect(screen.getByTestId('init')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(clearToken).toHaveBeenCalled();
+  });
+
+  it('logs out when another tab broadcasts a logout', async () => {
+    refreshSession.mockResolvedValue({ token: 'tok', user: { _id: 'u1', role: 'user' } });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('u1'));
+    await act(async () => { broadcastListener(); });
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(clearToken).toHaveBeenCalled();
+    expect(logoutRequest).not.toHaveBeenCalled();
   });
 });

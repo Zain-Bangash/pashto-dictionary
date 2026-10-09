@@ -404,3 +404,34 @@ CloudFormation stack `pashto-dictionary` → `UPDATE_COMPLETE`; GitHub Actions D
 - Audit log: target names, inline diffs for `edited`/`merged`, absolute timestamps, action-type and model-type filters, pagination.
 
 Details in ARCHITECTURE.md › *Post-Phase-14 Polish*.
+
+---
+
+## Persistent Sessions (refresh cookie)
+
+Users stay logged in across tabs and for 30 days instead of per tab until the access token expires.
+
+- Server: `POST /api/auth/refresh` and `POST /api/auth/logout` (`sessionController.ts`); login/register set the httpOnly `pd_rt`/`pd_ru` cookies; `sessionGuard.ts` CSRF check; `sessionLimiter`; `cookie-parser` added.
+- Client: access token in memory (`services/authSession.js`), single-flight refresh + retry on 401, session restore on load, `BroadcastChannel` logout sync (`services/sessionSync.js`).
+- Infra: `FrontendOrigin` and `CookieSameSite` template parameters (defaults, no new secrets), HTTP API `CorsConfiguration` with credentials, `cognito-idp:RevokeToken` on the Lambda role.
+
+Why and trade-offs: ARCHITECTURE.md › *Persistent sessions (refresh cookie)*.
+
+### Manual step — Cognito app client
+
+The User Pool is not in `template.yaml`, so set these in the Cognito console (User pool → App integration → app client → Edit):
+
+- Access token expiration: **1 hour**
+- Refresh token expiration: **30 days**
+- **Enable token revocation**: on (required for `RevokeToken` on logout)
+- Authentication flows: `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH` enabled
+- Leave refresh-token rotation **off**. With rotation on, `REFRESH_TOKEN_AUTH` via `InitiateAuth` is rejected.
+
+### Manual step (optional, recommended) — same-origin API for Safari
+
+Safari blocks the cross-site refresh cookie, so Safari users are logged out on reload. To fix:
+
+1. Amplify console → Hosting → Rewrites and redirects: add source `/api/<*>`, target `https://<api-id>.execute-api.ap-southeast-1.amazonaws.com/api/<*>`, type **200 (Rewrite)**.
+2. Set the Amplify env var `VITE_API_URL` to the Amplify origin and redeploy the frontend.
+3. Change the `CookieSameSite` default in `template.yaml` to `strict` and deploy.
+4. Check in a branch preview that `Set-Cookie` passes through the rewrite before relying on it.

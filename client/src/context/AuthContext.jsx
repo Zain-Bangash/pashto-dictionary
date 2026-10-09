@@ -1,5 +1,14 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import api, { setToken, clearToken, getToken, setLogoutHandler } from '../services/api';
+import {
+  loginRequest,
+  registerRequest,
+  logoutRequest,
+  refreshSession,
+  setToken,
+  clearToken,
+  setLogoutHandler,
+} from '../services/api';
+import { broadcastLogout, onLogoutBroadcast } from '../services/sessionSync';
 
 const AuthContext = createContext(null);
 
@@ -9,20 +18,22 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     setLogoutHandler(() => setUser(null));
+    const unsubscribe = onLogoutBroadcast(() => {
+      clearToken();
+      setUser(null);
+    });
 
-    if (!getToken()) {
-      setInitializing(false);
-      return;
-    }
-    api.get('/api/auth/me')
-      .then((res) => setUser(res.data.data.user))
+    refreshSession()
+      .then(({ user: restored }) => setUser(restored))
       .catch(() => clearToken())
       .finally(() => setInitializing(false));
+
+    return unsubscribe;
   }, []);
 
   async function login(email, password) {
     try {
-      const res = await api.post('/api/auth/login', { email, password });
+      const res = await loginRequest({ email, password });
       setToken(res.data.data.token);
       setUser(res.data.data.user);
     } catch (err) {
@@ -33,7 +44,7 @@ export function AuthProvider({ children }) {
 
   async function register(username, email, password, region, village) {
     try {
-      const res = await api.post('/api/auth/register', { username, email, password, region, village });
+      const res = await registerRequest({ username, email, password, region, village });
       setToken(res.data.data.token);
       setUser(res.data.data.user);
     } catch (err) {
@@ -49,6 +60,8 @@ export function AuthProvider({ children }) {
   async function logout() {
     clearToken();
     setUser(null);
+    broadcastLogout();
+    await logoutRequest().catch(() => {});
   }
 
   return (

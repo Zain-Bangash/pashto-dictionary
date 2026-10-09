@@ -105,7 +105,9 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 |---|---|---|---|
 | GET | `/api/health` | — | Health check |
 | POST | `/api/auth/register` | — | Register user |
-| POST | `/api/auth/login` | — | Login, returns Cognito access token. `401` on wrong email/password, `429` when rate-limited |
+| POST | `/api/auth/login` | — | Login, returns Cognito access token and sets the httpOnly refresh cookie. `401` on wrong email/password, `429` when rate-limited |
+| POST | `/api/auth/refresh` | Cookie | New access token + user from the refresh cookie. `401` when the session is missing, expired or revoked; `403` without `X-Requested-With` or from an unknown origin |
+| POST | `/api/auth/logout` | Cookie | Revokes the refresh token and clears the cookie. Always `200` |
 | GET | `/api/auth/me` | Token | Current user |
 | GET | `/api/concepts` | — | List published concepts (paginated) |
 | GET | `/api/concepts/search?q=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms) |
@@ -179,6 +181,8 @@ COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
 COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
 AWS_REGION=ap-southeast-1
 NODE_ENV=development
+FRONTEND_ORIGIN=http://localhost:5173   # comma-separated; CORS + refresh/logout origin check
+COOKIE_SAMESITE=strict                  # production only: strict | lax | none
 
 # client/.env
 VITE_API_URL=http://localhost:5000

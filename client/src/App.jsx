@@ -1,10 +1,7 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LookupsProvider } from './context/LookupsContext';
 import { FieldsProvider } from './context/FieldsContext';
-import { useAuth } from './context/AuthContext';
-import { setLogoutHandler } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -26,12 +23,6 @@ import DashboardFields from './pages/dashboard/DashboardFields';
 import NotFound from './pages/NotFound';
 
 function AppRoutes() {
-  const { logout } = useAuth();
-
-  useEffect(() => {
-    setLogoutHandler(logout);
-  }, [logout]);
-
   return (
     <>
       <Navbar />

@@ -1,62 +1,18 @@
 import {
-  CognitoIdentityProviderClient,
   SignUpCommand,
   AdminConfirmSignUpCommand,
   AdminDeleteUserCommand,
   InitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { createHmac } from 'crypto';
 import { validationResult } from 'express-validator';
 import { Request, Response } from 'express';
 import User from '../models/User';
 import { IUser } from '../types/models';
 import ModerationLog from '../models/ModerationLog';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
-
-const cognitoClient = new CognitoIdentityProviderClient({
-  region: process.env.AWS_REGION || 'ap-southeast-1',
-});
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID!;
-const CLIENT_ID = process.env.COGNITO_CLIENT_ID!;
-const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET;
-
-function secretHash(username: string): string | undefined {
-  if (!CLIENT_SECRET) return undefined;
-  return createHmac('sha256', CLIENT_SECRET).update(username + CLIENT_ID).digest('base64');
-}
-
-type SafeUserInput = IUser | (Omit<IUser, keyof Document> & {
-  _id: unknown;
-  username: string;
-  email: string;
-  role: string;
-  region?: string;
-  village?: string;
-  createdAt: Date;
-});
-
-function safeUser(user: SafeUserInput) {
-  return {
-    id: (user as IUser)._id,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    region: user.region,
-    village: user.village,
-    createdAt: user.createdAt,
-  };
-}
-
-function decodeAccessTokenSub(accessToken: string): string | null {
-  const parts = accessToken.split('.');
-  if (parts.length < 3) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-    return (payload.sub as string) ?? null;
-  } catch {
-    return null;
-  }
-}
+import { safeUser } from '../utils/safeUser';
+import { cognitoClient, USER_POOL_ID, CLIENT_ID, secretHash, decodeAccessTokenClaims } from '../utils/cognito';
+import { setSessionCookies } from '../utils/sessionCookies';
 
 async function register(req: Request, res: Response): Promise<void> {
   const errors = validationResult(req);
@@ -125,6 +81,7 @@ async function register(req: Request, res: Response): Promise<void> {
   // Everything after SignUp must be atomic — if it fails, remove the Cognito user
   // so the email is not permanently locked and the user can retry.
   let accessToken: string;
+  let refreshToken: string | undefined;
   let user: IUser;
   try {
     await cognitoClient.send(new AdminConfirmSignUpCommand({
@@ -143,6 +100,7 @@ async function register(req: Request, res: Response): Promise<void> {
     }));
 
     accessToken = authResult.AuthenticationResult!.AccessToken!;
+    refreshToken = authResult.AuthenticationResult!.RefreshToken;
 
     user = await new User({
       username,
@@ -160,6 +118,9 @@ async function register(req: Request, res: Response): Promise<void> {
     throw err;
   }
 
+  if (refreshToken) {
+    setSessionCookies(res, refreshToken, decodeAccessTokenClaims(accessToken)?.username ?? cognitoSub);
+  }
   res.status(201).json({
     success: true,
     data: { token: accessToken, user: safeUser(user) },
@@ -181,7 +142,9 @@ async function login(req: Request, res: Response): Promise<void> {
   const normalizedEmail = email.toLowerCase();
 
   let accessToken: string;
+  let refreshToken: string | undefined;
   let cognitoSub: string;
+  let cognitoUsername: string;
   try {
     const authResult = await cognitoClient.send(new InitiateAuthCommand({
       AuthFlow: 'USER_PASSWORD_AUTH',
@@ -194,8 +157,11 @@ async function login(req: Request, res: Response): Promise<void> {
     }));
     const ar = authResult.AuthenticationResult!;
     accessToken = ar.AccessToken!;
+    refreshToken = ar.RefreshToken;
+    const claims = decodeAccessTokenClaims(accessToken);
     // Prefer sub from JWT payload; fall back to sub field on AuthenticationResult (test mocks)
-    cognitoSub = decodeAccessTokenSub(accessToken) ?? (ar as Record<string, unknown>)['sub'] as string;
+    cognitoSub = claims?.sub ?? (ar as Record<string, unknown>)['sub'] as string;
+    cognitoUsername = claims?.username ?? cognitoSub;
   } catch (err) {
     const errName = (err as { name?: string }).name;
     if (errName === 'NotAuthorizedException' || errName === 'UserNotFoundException') {
@@ -214,6 +180,7 @@ async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  if (refreshToken) setSessionCookies(res, refreshToken, cognitoUsername);
   res.status(200).json({
     success: true,
     data: { token: accessToken, user: safeUser(user) },

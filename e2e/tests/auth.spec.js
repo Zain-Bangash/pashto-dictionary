@@ -115,7 +115,7 @@ test.describe('Auth — Register: validation — duplicate email', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth — Login: success', () => {
-  test('valid credentials log the user in, store a token, and show the logged-in navbar', async ({ page }) => {
+  test('valid credentials log the user in, set an httpOnly refresh cookie, and show the logged-in navbar', async ({ page, context }) => {
     await page.goto('/login');
 
     await page.getByLabel('Email').fill('e2e-user@test.local');
@@ -126,9 +126,16 @@ test.describe('Auth — Login: success', () => {
     // Redirects to / after login.
     await expect(page).toHaveURL('/', { timeout: 10000 });
 
-    // JWT must be stored in localStorage.
-    const token = await page.evaluate(() => localStorage.getItem('token'));
-    expect(token).toBeTruthy();
+    // The refresh token is an httpOnly cookie that page scripts cannot read.
+    const cookie = (await context.cookies()).find((c) => c.name === 'pd_rt');
+    expect(cookie).toBeTruthy();
+    expect(cookie.httpOnly).toBe(true);
+    expect(cookie.path).toBe('/api/auth');
+    expect(await page.evaluate(() => document.cookie)).not.toContain('pd_rt');
+
+    // The access token is held in memory only — never in web storage.
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    expect(stored).not.toMatch(/eyJ/);
 
     // Logged-in nav element (username button) is visible.
     await expect(page.getByText('e2e-user')).toBeVisible();
@@ -140,34 +147,29 @@ test.describe('Auth — Login: success', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth — Login: failure — wrong password', () => {
-  test('wrong password does not grant access — no token stored, stays on /login', async ({ page }) => {
+  test('wrong password does not grant access — no session cookie, stays on /login', async ({ page, context }) => {
     await page.goto('/login');
     await page.waitForLoadState('networkidle');
 
     await page.getByLabel('Email').fill('e2e-user@test.local');
     await page.getByLabel('Password').fill('WrongPassword999!');
 
-    // The global Axios 401 interceptor in api.js calls window.location.replace('/login')
-    // on any 401 response — including failed login attempts. This means the component's
-    // apiError state is never rendered; instead the page reloads to /login.
-    // We verify the end-state: user is NOT logged in, still on /login, no token.
+    // A 401 from /api/auth/login is not treated as an expired session: the interceptor
+    // neither refreshes nor redirects, so the page stays on /login.
     const [response] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/auth/login') && r.status() === 401),
       page.getByRole('button', { name: 'Log In' }).click(),
     ]);
 
     expect(response.status()).toBe(401);
-
-    // After the 401 the interceptor calls window.location.replace('/login'),
-    // which navigates back to /login (guest state — no token in localStorage).
     await expect(page).toHaveURL('/login', { timeout: 10000 });
 
     // The login form heading must be present — we are on the login page, not the app.
     await expect(page.getByRole('heading', { name: 'Log In' })).toBeVisible();
 
-    // Crucially, no token was stored — the login failed.
-    const token = await page.evaluate(() => localStorage.getItem('token'));
-    expect(token).toBeNull();
+    // Crucially, no session cookie was set — the login failed.
+    const cookie = (await context.cookies()).find((c) => c.name === 'pd_rt');
+    expect(cookie).toBeUndefined();
 
     // Guest navbar links are present — the user is not logged in.
     await expect(page.getByRole('link', { name: 'Login' })).toBeVisible();
@@ -182,10 +184,10 @@ test.describe('Auth — Session persistence on reload', () => {
   test('logged-in user remains authenticated after a full page reload', async ({ page }) => {
     await loginAs(page, 'user');
 
-    // loginAs already calls page.reload(); confirm the navbar still shows the username.
+    // loginAs loads the app, which restores the session from the refresh cookie.
     await expect(page.getByText('e2e-user')).toBeVisible({ timeout: 10000 });
 
-    // Reload once more to verify the AuthContext rehydrates from /api/auth/me.
+    // Reload: the in-memory access token is gone, so AuthContext must refresh again.
     await page.reload();
 
     await expect(page.getByText('e2e-user')).toBeVisible({ timeout: 10000 });
@@ -200,22 +202,55 @@ test.describe('Auth — Session persistence on reload', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth — Logout', () => {
-  test('clicking Logout clears the token and restores guest navigation', async ({ page }) => {
+  test('clicking Logout clears the session cookie and restores guest navigation', async ({ page, context }) => {
     await loginAs(page, 'user');
 
     // Open the user dropdown.
     await page.getByText('e2e-user').click();
 
     // Click the Logout button inside the dropdown.
-    await page.getByRole('button', { name: 'Logout' }).click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/auth/logout')),
+      page.getByRole('button', { name: 'Logout' }).click(),
+    ]);
 
-    // Token must be gone from localStorage.
-    const token = await page.evaluate(() => localStorage.getItem('token'));
-    expect(token).toBeNull();
+    // The refresh cookie must be gone.
+    const cookie = (await context.cookies()).find((c) => c.name === 'pd_rt');
+    expect(cookie).toBeUndefined();
 
     // Guest navigation links are restored.
     await expect(page.getByRole('link', { name: 'Login' })).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole('link', { name: 'Register' })).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flow 7b — Session shared across tabs
+// ---------------------------------------------------------------------------
+
+test.describe('Auth — Session across tabs', () => {
+  test('a new tab opens already logged in', async ({ page, context }) => {
+    await loginAs(page, 'user');
+
+    const secondTab = await context.newPage();
+    await secondTab.goto('/');
+
+    await expect(secondTab.getByText('e2e-user')).toBeVisible({ timeout: 10000 });
+    await expect(secondTab.getByRole('link', { name: 'Login' })).not.toBeVisible();
+  });
+
+  test('logging out in one tab logs out the other tab', async ({ page, context }) => {
+    await loginAs(page, 'user');
+    const secondTab = await context.newPage();
+    await secondTab.goto('/my-submissions');
+    await expect(secondTab.getByText('e2e-user')).toBeVisible({ timeout: 10000 });
+
+    await page.getByText('e2e-user').click();
+    await page.getByRole('button', { name: 'Logout' }).click();
+
+    // The protected page in the other tab sends the user to Login.
+    await expect(secondTab).toHaveURL('/login', { timeout: 10000 });
+    await expect(secondTab.getByRole('link', { name: 'Register' })).toBeVisible();
   });
 });
 
@@ -225,11 +260,7 @@ test.describe('Auth — Logout', () => {
 
 test.describe('Auth — Protected route redirect', () => {
   test('navigating to /submit without being logged in redirects to /login', async ({ page }) => {
-    // Ensure no token exists in this fresh browser context.
-    await page.goto('/');
-    await page.evaluate(() => localStorage.removeItem('token'));
-
-    // Attempt to visit a protected route directly.
+    // A fresh browser context has no refresh cookie, so there is no session.
     await page.goto('/submit');
 
     // ProtectedRoute sends the user to /login.
