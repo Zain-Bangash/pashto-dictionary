@@ -577,7 +577,7 @@ The `User` model dropped `passwordHash` and added `cognitoSub: { type: String, u
 
 ### Frontend
 
-`AuthContext.jsx` calls the backend endpoints directly via axios — `POST /api/auth/register` and `POST /api/auth/login`. The backend performs all Cognito SDK calls and returns a Cognito access token in the response. The token is stored in `sessionStorage` and attached as a `Bearer` header by the axios interceptor in `services/api.js` on every subsequent request. No `@aws-amplify/auth` is used on the client; the Cognito surface is entirely server-side.
+`AuthContext.jsx` calls the backend endpoints directly via axios — `POST /api/auth/register` and `POST /api/auth/login`. The backend performs all Cognito SDK calls and returns a Cognito access token in the response. The access token is held in memory only and attached as a `Bearer` header by the axios interceptor on every subsequent request; sessions survive reloads and new tabs through an httpOnly refresh cookie (see *Persistent sessions* below). No `@aws-amplify/auth` is used on the client; the Cognito surface is entirely server-side.
 
 ### Role model
 
@@ -586,6 +586,44 @@ Roles (`user`, `moderator`, `admin`) are stored in MongoDB `User.role`. The midd
 ### Test strategy
 
 Server tests mock both `aws-jwt-verify` (the JWKS verifier) and `@aws-sdk/client-cognito-identity-provider` (the SDK client). The mock for `aws-jwt-verify` returns a controlled `{ sub }` payload. Because role is resolved from MongoDB (not the token), each test's `makeToken` helper is async — it seeds a `User` document with the given `cognitoSub` and `role` before signing the JWT, ensuring the middleware's MongoDB lookup finds the correct role.
+
+### Persistent sessions (refresh cookie)
+
+The access token used to live in `sessionStorage`, which is per tab: a new tab started logged out, and the session ended when the token expired. Sessions now last up to 30 days and are shared by every tab.
+
+**How it works**
+
+- Login and register store Cognito's refresh token in an httpOnly cookie `pd_rt`. A second httpOnly cookie, `pd_ru`, holds the access token's `username` claim (see SECRET_HASH below). The refresh token never appears in a response body.
+- `POST /api/auth/refresh` reads the cookies, calls `InitiateAuth` with `REFRESH_TOKEN_AUTH`, and returns `{ token, user }`, the same shape as login. If the cookie is missing, invalid, expired or revoked, or the user has no MongoDB profile, it returns 401 and clears both cookies.
+- `POST /api/auth/logout` calls Cognito `RevokeToken` and clears the cookies. It always returns 200. A failed revoke is logged by error name only; tokens are never logged.
+- The client keeps the access token in a module variable in `services/authSession.js`. On page load `AuthContext` calls refresh, and `initializing` stays true until it settles, so protected routes never flash a redirect.
+- On a 401 from any non-auth route, the interceptor refreshes once and retries. Concurrent 401s share one in-flight refresh. The session ends (redirect to `/login`) only if refresh itself returns 401/403. A network error or 5xx keeps the user logged in.
+- Logout is synced across tabs with `BroadcastChannel('pd-auth')` (`services/sessionSync.js`).
+
+**Why an httpOnly cookie for the refresh token, and memory for the access token.** A 30-day credential must not be readable by JavaScript: an XSS bug could otherwise steal it and use it from anywhere for a month. The access token is short-lived (1 hour), so keeping it in memory limits what XSS can take to a token that soon expires. It also removes token persistence from web storage entirely. XSS running on the page can still call refresh while the user is on the site; that is a limit of every browser-session design, not something this one adds.
+
+**SECRET_HASH.** The app client has a secret, so `REFRESH_TOKEN_AUTH` needs a SECRET_HASH computed from the Cognito *username*. The refresh response does not return it, and on a fresh tab there is no old access token to decode it from, so it is kept in `pd_ru`. The value is the access token's `username` claim (equal to the `sub` in this pool, which signs in by email). Tampering with it only produces a hash mismatch, which Cognito rejects.
+
+**Cookie attributes** (`utils/sessionCookies.ts`): `HttpOnly`, `Path=/api/auth` (only sent to the auth endpoints), `Max-Age` 30 days, host-only. In production it is `Secure`, and `SameSite` comes from `COOKIE_SAMESITE`: `strict` by default, or `none` + `Partitioned`. In development it is always `Lax` and not Secure, because `localhost:5173` → `localhost:5000` is cross-origin but same-site (ports don't count) and runs over plain http.
+
+**Cross-site trade-off.** Amplify (`*.amplifyapp.com`) and API Gateway (`*.execute-api.*.amazonaws.com`) are different sites, so a cookie set by the API is a third-party cookie.
+
+- The template currently deploys `CookieSameSite=none` with `Partitioned` (CHIPS). This works in Chrome, Edge and Firefox, including when third-party cookies are blocked, because the cookie is partitioned under the Amplify top-level site.
+- Safari's ITP blocks third-party cookies, so Safari users lose the session on reload or in a new tab. They do not lose it within a tab.
+- The fix is to make the API same-origin: add an Amplify rewrite proxying `/api/<*>` to the API Gateway URL, point `VITE_API_URL` at the Amplify origin, and set `CookieSameSite=strict`. A custom domain (`app.` + `api.` under one registrable domain) achieves the same at the cost of a domain. No code change is needed for either.
+
+**CSRF.** Refresh and logout authenticate by cookie, so `middleware/sessionGuard.ts` requires `X-Requested-With: XMLHttpRequest` and rejects any `Origin` not in `FRONTEND_ORIGIN` with a 403.
+
+- HTML forms cannot set custom headers. A cross-origin request that sets one must pass a CORS preflight, which only allows the listed origins.
+- A forged refresh could not read the response anyway. The guard mainly stops forced logouts. With `SameSite=Strict` it is defence in depth.
+
+**CORS.** `app.ts` and the HTTP API `CorsConfiguration` both allow exactly the `FRONTEND_ORIGIN` list, with credentials. Once API Gateway has a CORS config it answers preflights itself and ignores the integration's CORS headers, so the template is authoritative in production and `app.ts` covers local dev. Axios sends `withCredentials` only on the four `/api/auth/*` session calls.
+
+**Known limits**
+
+- Cognito refresh tokens expire 30 days after login, not after last use. Sliding expiry would need Cognito refresh-token rotation, which uses `GetTokensFromRefreshToken` instead of `InitiateAuth`. Refresh already re-sets the cookie if Cognito ever returns a new refresh token.
+- `RevokeToken` stops further refreshes, but access tokens already issued stay valid until they expire (at most 1 hour), because `aws-jwt-verify` checks them locally.
+- Refresh and logout use their own limiter, `sessionLimiter` (100 per 15 minutes), because refresh runs on every page load in every tab.
 
 ---
 
@@ -666,7 +704,7 @@ The `GET /api/moderation/log` endpoint was extended with:
 | Frontend | React 19 + Vite + Tailwind CSS v4 | No component library |
 | Backend | Node.js 22 + Express + TypeScript (strict) | `express-async-errors` for clean async error handling |
 | Database | MongoDB via Mongoose | Two-collection Concept/Variant model; unique indexes enforce data integrity |
-| Auth | AWS Cognito + `aws-jwt-verify` (server-side only) | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role`; no Amplify SDK on client |
+| Auth | AWS Cognito + `aws-jwt-verify` (server-side only) | Managed passwords, auto-rotating JWKS, role resolved from MongoDB `User.role`; 30-day refresh token in an httpOnly cookie, access token in memory; no Amplify SDK on client |
 | Hosting | AWS Amplify (frontend) · Lambda + API Gateway v2 (backend) | `serverless-http` wraps Express; all resources owned by CloudFormation stack `pashto-dictionary` |
 | CI/CD | GitHub Actions + AWS SAM | Test gate on PRs; `sam build && sam deploy` on merge to `main` |
 | Validation | express-validator | All mutation endpoints validated before DB access |

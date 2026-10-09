@@ -280,7 +280,7 @@ Use the e2e-tester agent: compare every sentence in docs/USER-FLOWS.md against e
 
 **T2 — Fix agent drift**
 ```
-The client does not use @aws-amplify/auth. It calls /api/auth/* via axios and stores the access token in sessionStorage (see client/src/services/api.js and client/src/context/AuthContext.jsx).
+The client does not use @aws-amplify/auth. It calls /api/auth/* via axios, keeps the access token in memory and restores it from an httpOnly refresh cookie via POST /api/auth/refresh (see client/src/services/authSession.js and client/src/context/AuthContext.jsx).
 Fix every claim otherwise in .claude/agents/e2e-tester.md, coder.md, and refactor.md. In e2e-tester.md, check e2e/helpers/ and e2e/global-setup.js to describe how auth actually works for tests.
 Also remove VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID from client/.env.example after confirming nothing in client/ reads them.
 Suggested commit: docs(agents): correct client auth model

@@ -30,7 +30,7 @@ This file holds the rules. Read the docs below only when the task touches their 
 | Frontend | React 19, Vite, Tailwind CSS v4 |
 | Backend | Node.js 22, Express, TypeScript (strict) |
 | Database | MongoDB via Mongoose |
-| Auth | AWS Cognito — server-side only (Cognito SDK in authController · aws-jwt-verify in middleware). Client calls `/api/auth/*` via axios and keeps the access token in `sessionStorage`; no Amplify SDK on the client |
+| Auth | AWS Cognito — server-side only (Cognito SDK in authController/sessionController · aws-jwt-verify in middleware). Refresh token in an httpOnly cookie (30 days); client keeps the access token in memory only and restores it via `POST /api/auth/refresh`; no Amplify SDK on the client |
 | Validation | express-validator (server), native React state (client) |
 | CI/CD | GitHub Actions (test gate on PRs + `sam build && sam deploy` on merge to main) |
 | Hosting | AWS Amplify (frontend) · AWS Lambda + API Gateway via SAM, stack `pashto-dictionary` (backend) |
@@ -211,6 +211,8 @@ COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
 COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 AWS_REGION=ap-southeast-1
 NODE_ENV=development
+FRONTEND_ORIGIN=http://localhost:5173
+COOKIE_SAMESITE=strict
 
 # client/.env
 VITE_API_URL=http://localhost:5000

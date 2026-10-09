@@ -30,7 +30,13 @@ As a guest I should be able to click Login in the navbar to go to the Login page
 
 As a user I should be able to register with a username, email, and password. I can optionally add my region and village. The region dropdown shows the current region list maintained by admins — the same list used on the Submit form — and the server rejects a region that is not active.
 
-As a user I should be able to log in with my email and password. My session should survive a page refresh — I should not be logged out when I reload the browser.
+As a user I should be able to log in with my email and password. Once I log in I stay logged in on this browser for up to 30 days: reloading, opening the site in a new tab, or closing and reopening the browser keeps me logged in. After 30 days I log in again.
+
+As a user, while the site checks my session on load, protected pages wait instead of briefly sending me to the Login page.
+
+As a user, if my session has expired or been revoked, the next action that needs me to be logged in takes me to the Login page.
+
+As a user, when I log out in one tab, every other open tab of the site logs out too and shows the guest navbar; a tab on a protected page takes me to the Login page.
 
 As a user, if I enter an incorrect email or password on the Login page, I stay on the page and see a visible error message ("Invalid email or password"). My entered email stays in the field, and the message clears when I start typing again. Other failures, such as too many attempts, show the server's message in the same place.
 
@@ -72,7 +78,7 @@ As a user, "Complete this" opens a form with inputs only for the blank details; 
 
 ## Moderator
 
-As a moderator I should be able to log in and access the Dashboard. Refreshing the page should not log me out.
+As a moderator I should be able to log in and access the Dashboard. Refreshing the page or opening the Dashboard in a new tab should not log me out.
 
 As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking anywhere on the concept row, or on the toggle, expands or collapses a dropdown listing that concept's variants awaiting review. Clicking the row's Approve, Reject, Publish, or Edit buttons does not toggle it.
 
