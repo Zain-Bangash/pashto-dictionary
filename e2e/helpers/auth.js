@@ -7,8 +7,8 @@ const CREDENTIALS = {
 };
 
 /**
- * Logs in as the given role by injecting the JWT into localStorage and reloading
- * so AuthContext rehydrates the user object from /api/auth/me.
+ * Logs in through the API. page.request shares the browser context's cookie jar, so the
+ * httpOnly refresh cookie lands in the browser and AuthContext restores the session on load.
  *
  * @param {import('@playwright/test').Page} page
  * @param {'admin'|'moderator'|'user'} role
@@ -16,15 +16,14 @@ const CREDENTIALS = {
 async function loginAs(page, role) {
   const { email, password } = CREDENTIALS[role];
 
-  const res = await page.request.post('http://localhost:5000/api/auth/login', {
+  await page.request.post('http://localhost:5000/api/auth/login', {
     data: { email, password },
   });
-  const body = await res.json();
-  const token = body.data.token;
 
-  await page.goto('/');
-  await page.evaluate((t) => localStorage.setItem('token', t), token);
-  await page.reload();
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/auth/refresh')),
+    page.goto('/'),
+  ]);
 }
 
 module.exports = { loginAs };
