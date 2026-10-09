@@ -18,12 +18,26 @@ Parameters:
   CognitoClientSecret:
     Type: String
     NoEcho: true
+  FrontendOrigin:
+    Type: String
+    Default: https://main.d1jgu2lev5krpe.amplifyapp.com
+  # 'none' while the API is cross-site from Amplify; 'strict' once Amplify proxies /api/*
+  CookieSameSite:
+    Type: String
+    Default: strict
+    AllowedValues: [strict, lax, none]
 
 Resources:
   PashtoApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       Tags: {}
+      CorsConfiguration:
+        AllowOrigins: !Split [',', !Ref FrontendOrigin]
+        AllowCredentials: true
+        AllowHeaders: [content-type, authorization, x-requested-with]
+        AllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        MaxAge: 600
 
   PashtoBackend:
     Type: AWS::Serverless::Function
@@ -37,6 +51,8 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
           COGNITO_CLIENT_ID: !Ref CognitoClientId
           COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+          COOKIE_SAMESITE: !Ref CookieSameSite
       Policies:
         - Statement:
             - Effect: Allow
@@ -44,6 +60,7 @@ Resources:
                 - cognito-idp:AdminConfirmSignUp
                 - cognito-idp:AdminDeleteUser
                 - cognito-idp:InitiateAuth
+                - cognito-idp:RevokeToken
               Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
       Events:
         Api:

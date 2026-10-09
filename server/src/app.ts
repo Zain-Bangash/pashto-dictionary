@@ -2,6 +2,7 @@ import 'express-async-errors';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import logger from './utils/logger';
+import { allowedOrigins } from './utils/origins';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import moderationRouter from './routes/moderation';
@@ -16,10 +17,8 @@ import suggestionsRouter from './routes/suggestions';
 const app = express();
 
 app.use(cors({
-  origin: [
-    'https://main.d1jgu2lev5krpe.amplifyapp.com',
-    'http://localhost:5173',
-  ],
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins().includes(origin)),
+  credentials: true,
 }));
 app.use(express.json());
 
