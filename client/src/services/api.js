@@ -1,49 +1,31 @@
 import axios from 'axios';
+import { installAuthInterceptors, SESSION_REQUEST } from './authSession';
 
-const TOKEN_KEY = 'auth_token';
-const AUTH_ATTEMPT_PATHS = ['/api/auth/login', '/api/auth/register'];
-
-// Initialise from sessionStorage so token survives a page refresh within the tab.
-let _token = sessionStorage.getItem(TOKEN_KEY) ?? null;
-let _logoutHandler = null;
-
-export function setToken(token) {
-  _token = token;
-  sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken() {
-  _token = null;
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-
-export function getToken() {
-  return _token;
-}
-
-export function setLogoutHandler(fn) {
-  _logoutHandler = fn;
-}
+export {
+  setToken,
+  clearToken,
+  getToken,
+  setLogoutHandler,
+  refreshSession,
+} from './authSession';
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL });
 
-api.interceptors.request.use((config) => {
-  if (_token) config.headers.Authorization = `Bearer ${_token}`;
-  return config;
-});
+installAuthInterceptors(api);
 
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    const isAuthAttempt = AUTH_ATTEMPT_PATHS.some((p) => err.config?.url?.endsWith(p));
-    if (err.response?.status === 401 && !isAuthAttempt) {
-      clearToken();
-      if (_logoutHandler) _logoutHandler();
-      window.location.replace('/login');
-    }
-    return Promise.reject(err);
-  }
-);
+// ── Auth session functions ─────────────────────────────────────────────────
+
+export function loginRequest(body) {
+  return api.post('/api/auth/login', body, SESSION_REQUEST);
+}
+
+export function registerRequest(body) {
+  return api.post('/api/auth/register', body, SESSION_REQUEST);
+}
+
+export function logoutRequest() {
+  return api.post('/api/auth/logout', null, SESSION_REQUEST);
+}
 
 // ── Concept service functions ──────────────────────────────────────────────
 
