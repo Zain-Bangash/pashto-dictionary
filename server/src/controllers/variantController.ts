@@ -12,6 +12,7 @@ import VariantSuggestion from '../models/VariantSuggestion';
 import { isDuplicateKey } from '../utils/duplicateKey';
 import { completionStages, missingMatch, optionalExtraKeys } from '../utils/blankFields';
 import { lockedFields, lockClash, rejectOpenSuggestions } from '../utils/suggestions';
+import { rejectOpenClips, staleClips, retireClips, needsRetireConfirm, slotSnapshot } from '../utils/audioClips';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -246,6 +247,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const textBefore = slotSnapshot(variant);
   if (pashto !== undefined)          variant.pashto         = pashto;
   if (phonetic !== undefined)        variant.phonetic       = phonetic;
   if (region !== undefined)          variant.region         = region;
@@ -258,6 +260,8 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
   variant.moderatorNote = undefined;
   variant.isDeleted = false;
   variant.deletedAt = undefined;
+  const stale = await staleClips(variant._id as Types.ObjectId, textBefore, slotSnapshot(variant), concept?.partOfSpeech);
+  if (await needsRetireConfirm(req, res, stale)) return;
   try {
     await variant.save();
   } catch (err) {
@@ -267,6 +271,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
     }
     throw err;
   }
+  await retireClips(stale, req.user!.id, "The word's text changed");
 
   await new ModerationLog({
     targetModel: 'Variant',
@@ -382,6 +387,7 @@ async function transitionVariantStatus(req: Request, res: Response): Promise<voi
 
   if (status === 'rejected') {
     await rejectOpenSuggestions([variant._id as Types.ObjectId], req.user!.id, `The word was rejected: ${moderatorNote}`);
+    await rejectOpenClips([variant._id as Types.ObjectId], req.user!.id, `The word was rejected: ${moderatorNote}`);
   }
 
   res.status(200).json({ success: true, data: variant });
@@ -479,6 +485,7 @@ async function deleteVariant(req: Request, res: Response): Promise<void> {
   }).save();
 
   await rejectOpenSuggestions([variant._id as Types.ObjectId], req.user!.id, 'The word was removed');
+  await rejectOpenClips([variant._id as Types.ObjectId], req.user!.id, 'The word was removed');
 
   res.status(200).json({ success: true, data: variant });
 }
@@ -535,6 +542,7 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     before[field as string] = variant[field];
   }
   const beforeConceptId = variant.concept.toString();
+  const textBefore = slotSnapshot(variant);
 
   const changes: Record<string, unknown> = {};
 
@@ -597,6 +605,9 @@ async function editVariant(req: Request, res: Response): Promise<void> {
   }
   Object.assign(changes, applyExtra(variant, extra.values), applyForms(variant, forms.forms));
 
+  const stale = await staleClips(variant._id as Types.ObjectId, textBefore, slotSnapshot(variant), formsConcept?.partOfSpeech);
+  if (await needsRetireConfirm(req, res, stale)) return;
+
   try {
     await variant.save();
   } catch (err) {
@@ -606,6 +617,7 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     }
     throw err;
   }
+  await retireClips(stale, req.user!.id, "The word's text changed");
 
   // Compute diff for simple fields
   for (const field of simpleFields) {

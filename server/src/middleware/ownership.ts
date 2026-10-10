@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import Variant from '../models/Variant';
 import VariantSuggestion from '../models/VariantSuggestion';
+import AudioClip from '../models/AudioClip';
 
 type Loader = (id: string) => Promise<{ submittedBy?: string } | null>;
 
@@ -29,3 +30,4 @@ function loadOwned(key: string, label: string, load: Loader) {
 
 export const loadOwnedVariant = loadOwned('variant', 'variant', (id) => Variant.findById(id));
 export const loadOwnedSuggestion = loadOwned('suggestion', 'suggestion', (id) => VariantSuggestion.findById(id));
+export const loadOwnedClip = loadOwned('clip', 'recording', (id) => AudioClip.findById(id));
