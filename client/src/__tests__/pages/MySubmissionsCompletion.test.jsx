@@ -13,6 +13,8 @@ vi.mock('../../services/api', () => ({
   updateVariant: vi.fn(),
   createSuggestion: vi.fn(),
   resubmitSuggestion: vi.fn(),
+  getMyAudio: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
+  withdrawAudio: vi.fn(),
 }));
 
 vi.mock('../../context/AuthContext', () => ({

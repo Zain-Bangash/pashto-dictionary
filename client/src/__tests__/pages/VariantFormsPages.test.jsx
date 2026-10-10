@@ -23,6 +23,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     createVariant: vi.fn(),
     updateVariant: vi.fn(),
     checkCrossConceptPashto: vi.fn(() => Promise.resolve({ data: { data: { conflicts: [] } } })),
+    getMyAudio: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
+    withdrawAudio: vi.fn(),
   };
 });
 
