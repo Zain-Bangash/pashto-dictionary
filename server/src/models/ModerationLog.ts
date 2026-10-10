@@ -6,7 +6,7 @@ const moderationLogSchema = new Schema<IModerationLog>({
   targetId: { type: Schema.Types.ObjectId },
   action: {
     type: String,
-    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied', 'retired', 'withdrawn', 'audio_published'],
+    enum: ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied', 'retired', 'withdrawn', 'audio_published', 'role_changed'],
     required: true,
   },
   performedBy: { type: String, required: true },
