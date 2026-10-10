@@ -498,6 +498,112 @@ Create and resubmit share a rate limiter (30 requests per 15 minutes) built the 
 
 ---
 
+## Pronunciation audio
+
+Logged-in users record or upload a short clip of a published word. Clips are moderated like everything else, and nothing unreviewed is ever served to the public.
+
+```
+AudioClip { variant, slot, storageKey, mimeType, sizeBytes, durationMs, status, lane?,
+            replaces?, submittedBy, reviewedBy, moderatorNote, retiredReason?, fileDeletedAt?, timestamps }
+```
+
+### Why a separate collection
+
+The reasons are the same as for suggestions. A clip has its own reviewer, its own note and its own audit trail, and a published word must not change, or leave the site, while a clip is under review. Embedding clips in the variant would mix two lifecycles in one document and make "one live clip per slot" an application rule instead of an index.
+
+### Slots
+
+A clip belongs to one **slot** of one variant:
+
+- `headword`: the word itself.
+- `example`: the example sentence. This slot only exists while the variant has example text, because a sentence with no text cannot be checked.
+- `form:<slot>`: one grammatical form, for example `form:masculine.plural.direct` or `form:past`. Every slot the concept's part of speech allows can take a clip **even if that form has no text yet**, so a speaker can supply a plural nobody has typed. A form clip is the form's Pashto word only, not the form's example.
+
+`utils/audioSlots.ts` builds the slot list from the variant and the concept's part of speech. Every upload, approve and publish is checked against the list as it is at that moment.
+
+### Status and the lane index
+
+```
+pending   → approved   (moderator or admin; not on your own clip)
+pending   → rejected   (moderator or admin, note required)
+pending   → withdrawn  (the speaker)
+approved  → published  (admin only)
+approved  → rejected   (admin only, note required)
+published → rejected   (admin only, note required — takedown)
+published → retired    (system: replaced, or its text changed)
+```
+
+`rejected`, `retired` and `withdrawn` are final. Audio cannot be edited, so instead of a resubmit flow the speaker records again, which creates a new clip.
+
+A derived `lane` field is `live` for `published`, `open` for `pending`/`approved`, and unset otherwise. One unique partial index on `{ variant, slot, lane }` therefore enforces both rules at once: at most one live clip and at most one open clip per slot. This avoids two partial indexes on the same key pattern, which older MongoDB versions refuse. A replacement waits in the `open` lane beside the live clip, and anyone can record one. The moderation queue plays the two side by side.
+
+### Storage: Cloudflare R2, through Lambda
+
+Files go to a private R2 bucket via the S3-compatible AWS SDK, behind `utils/storage.ts` (`putObject`, `removeObject`, `signedUrl`, `listKeys`). The provider is chosen only by the `STORAGE_*` env vars, so Backblaze B2 or S3 is a config change. R2 has no egress fees, which suits audio that is played far more often than it is uploaded.
+
+Uploads pass **through Lambda**, not through presigned PUTs. The largest legal clip (20 s of AAC) is about 320 KB, roughly 430 KB once API Gateway base64-encodes it. That is far below the 6 MB Lambda payload limit, and `express.raw` caps the body at 1 MB. Going through Lambda means:
+- the server has the real bytes in hand before anything is stored;
+- abandoned presigned uploads cannot leave orphan files;
+- the bucket needs no CORS.
+
+Playback uses short-lived (1 hour) signed GET URLs, which are computed locally without a network call. Only published clips get one on public pages. Pending clips are signed only for staff and for their speaker.
+
+### Server-side duration check
+
+The limit per slot is `min(cap, ceil(chars / 3) + 2)` seconds:
+- `chars` is the slot's text without whitespace; an empty form slot uses the headword;
+- `cap` is 10 s for the headword and forms, and 20 s for the example;
+- the server allows 0.5 s over, because recorders stop slightly late.
+
+The client's timer stops early, but **the server measures the file itself**. `utils/audioProbe.ts` detects the container from magic bytes and reads the real duration, with no dependencies:
+
+| Container | Where it comes from | How the duration is read |
+|---|---|---|
+| WebM/Opus | Chrome, Firefox, Android | Chrome writes no Duration element, so the last block timecode is used |
+| MP4/AAC | Safari, iPhone, `.m4a` | `mvhd`, or the sum of fragment durations for MediaRecorder's fragmented MP4 |
+| Ogg/Opus | WhatsApp voice notes | Last granule position minus pre-skip |
+| MP3 | Android recorder apps, e.g. Xiaomi | Frame count; ID3 tags skipped |
+
+Video tracks, multiplexed streams and unknown bytes are refused. The declared `Content-Type` must agree with what the bytes are; a generic `application/octet-stream` is allowed because Android file pickers often send it. Nothing is transcoded: the browser's own recording is stored and served as-is.
+
+MP3 and Ogg are accepted because the file-upload fallback matters in Pakistan. Most users are on Android Chrome, where in-browser recording works, but links opened inside WhatsApp or Facebook often have no microphone permission. Those users upload a recording made in their phone's own recorder app instead.
+
+### Ordering: never lose the live clip, never leave orphans
+
+There are no transactions, so each step is a conditional write, and files are deleted only after the database stops pointing at them.
+
+- **Upload:** validate → `putObject` → insert. If the insert fails (for example a 409 on the open-lane index), the file is removed.
+- **Publish a replacement:**
+  1. Retire the live clip.
+  2. Publish the new clip with `findOneAndUpdate({ status: 'approved' })`. If this fails, step 1 is undone.
+  3. Delete the old file.
+- **Reject, retire, withdraw:** status write first, then delete the file.
+- A failed delete leaves `fileDeletedAt` unset. `npm run audio:clean` (`scripts/cleanOrphanAudio.ts`) retries those, and also deletes bucket files no clip refers to that are older than an hour.
+
+### Cascades and text changes
+
+- **The word leaves the site** (variant rejected or deleted, or its concept rejected or deleted): open clips are rejected with a note naming the cause. Live clips are kept but not served, because public reads only include published variants. If the word is republished with the same text, its audio comes back.
+- **The recorded text changes.** This happens when a staff edit, a resubmit, a part-of-speech change, a merge or a concept reassignment:
+  - changes a slot's text;
+  - empties the example;
+  - removes a form;
+  - or makes a form slot invalid.
+
+  The affected live and open clips are **retired** and their files deleted. The server first answers `409 { field: 'confirmAudioRetire', retiring: [...] }`, and the client shows which recordings will go and who recorded them. Only a resend with `confirmAudioRetire: true` saves. Filling an empty form for the first time does not retire its clip.
+
+### Audit log
+
+Clip transitions log under `targetModel: 'AudioClip'`, with the usual actions plus `retired` and `withdrawn`. Publishing also writes `audio_published` on the **Variant** (`{ slot, clipId, replaced? }`), so the word's own history shows when its audio changed.
+
+### Client
+
+- `hooks/useRecorder.js` picks the best supported format with `MediaRecorder.isTypeSupported` (WebM/Opus, then MP4) and stops at the slot's limit.
+- `components/audio/AudioRecorder.jsx` shows the text to say, a preview, and the file-upload fallback.
+- `AudioPlayButton` checks `canPlayType` and says "Can't play on this device" instead of failing silently. Old iPhones (before iOS 17.4) cannot play WebM/Opus.
+- The retire warning is one hook, `useAudioRetireConfirm`, shared by every form that can change recorded text.
+
+---
+
 ## API Design
 
 All API responses use a consistent envelope regardless of success or failure:

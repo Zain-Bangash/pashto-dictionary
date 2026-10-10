@@ -93,7 +93,7 @@ published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on `Concept`, `Variant` and `VariantSuggestion` (fill-only proposals for a user's own published variant; see ARCHITECTURE). Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
+Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on `Concept`, `Variant`, `VariantSuggestion` (fill-only proposals for a user's own published variant) and `AudioClip` (pronunciation recordings, which add `withdrawn` and `retired` and have no resubmit; see ARCHITECTURE). Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
 
 ---
 
@@ -213,12 +213,17 @@ AWS_REGION=ap-southeast-1
 NODE_ENV=development
 FRONTEND_ORIGIN=http://localhost:5173
 COOKIE_SAMESITE=strict
+STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+STORAGE_REGION=auto
+STORAGE_BUCKET=pashto-dictionary-audio-dev
+STORAGE_ACCESS_KEY_ID=xxxxxxxxxxxxxxxx
+STORAGE_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxx
 
 # client/.env
 VITE_API_URL=http://localhost:5000
 ```
 
-Production values are not stored in files: they live in GitHub Secrets (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`, plus `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` for the deploy user). `deploy.yml` passes them to `template.yaml` as CloudFormation parameters. IAM details are in [docs/BuildHistory.md](docs/BuildHistory.md).
+Production values are not stored in files: they live in GitHub Secrets (`MONGODB_URI`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`, `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, plus `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` for the deploy user). `deploy.yml` passes them to `template.yaml` as CloudFormation parameters. IAM details are in [docs/BuildHistory.md](docs/BuildHistory.md).
 
 Keep `.env.example` files updated whenever a new variable is added.
 

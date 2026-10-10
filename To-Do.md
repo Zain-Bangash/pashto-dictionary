@@ -17,7 +17,10 @@ _No active phase._
 6. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
-7. ~~why can't i open two tabs on differents pages without having to sign in in the other tab again.~~ Done: persistent sessions (see Completed)
+7. admin can't edit a variant or concept in any state, why?
+9. Add proper filters everywhere (my submissions, queue etc)
+10. Some submission have a add form button others dont
+11. Have a wanted audio page
 
 ## Backlog
 
@@ -74,6 +77,7 @@ _No active phase._
 - Admin-editable preset lists `[S4a]`: `Lookup` collection for region and part of speech (immutable key, editable label, deactivate-not-delete); admin page at `/dashboard/lists`; `lookup_changed` audit action; built-in values seeded on server start
 - Admin-defined custom fields `[S4b]`: `FieldDefinition` collection (text / long text / dropdown, server-generated keys, deactivate-not-delete); values in `Concept.extra` / `Variant.extra`; shown on Submit, moderation edit and resubmit forms, ConceptDetail and queue rows; admin page at `/dashboard/fields`; `field_changed` audit action; not searchable by design
 
+- Pronunciation audio `[S5]`: `AudioClip` collection (own state machine, one live + one open clip per slot, replacements reviewed side by side); any logged-in user records the headword, example or any form slot; Cloudflare R2 via S3 SDK behind `utils/storage.ts`, uploads through Lambda, 1-hour signed URLs; server reads real duration/format (WebM, MP4, Ogg, MP3); text edits retire clips after a confirm; Audio queue tab, My Recordings, admin takedown
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

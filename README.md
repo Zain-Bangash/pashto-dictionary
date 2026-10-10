@@ -73,6 +73,8 @@ Concept  — the meaning anchor (English gloss, part of speech, moderation statu
 
 Lookup   — admin-editable lists (region, part of speech): immutable key, editable label
 FieldDefinition — admin-defined extra fields; values stored in Concept.extra / Variant.extra
+VariantSuggestion — fill-only proposals for a user's own published variant
+AudioClip — a pronunciation recording for one slot of a published variant (headword, example, a form); file in Cloudflare R2
 ```
 
 Each Concept and each Variant has its own independent moderation lifecycle. A single bad variant does not block other valid regional forms of the same concept.
@@ -92,6 +94,8 @@ rejected  → pending    (user edits and resubmits)
 ```
 
 Users can also propose missing details (phonetic, example, forms, optional extra fields) for their own published words. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
+
+Any logged-in user can record a pronunciation for a published word. Clips follow the same review flow in their own `AudioClip` records, plus `withdrawn` (by the speaker, while pending) and `retired` (replaced by a newer clip, or the text it speaks was edited). Only published clips are ever played to the public.
 
 Every transition on Concept or Variant writes a record to `ModerationLog` with the actor, action, timestamp, and optional note. Invalid transitions return 400. Moderators cannot approve their own submissions.
 
@@ -113,7 +117,7 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | GET | `/api/concepts/search?q=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms) |
 | GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
 | GET | `/api/concepts/wanted?region=&q=` | — | Published concepts with no variant (any status) in the region; paginated, `meta.total` reflects the filters |
-| GET | `/api/concepts/:id` | — | Concept + its published variants |
+| GET | `/api/concepts/:id` | — | Concept + its published variants, each with `audio` (published clips by slot, signed URL and speaker), `audioOpen` (slots under review) and `audioSlots` (recordable slots with text and time limit) |
 | POST | `/api/concepts` | Token | Submit new concept (optional `extra` values for custom fields) |
 | POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields; optional `forms` allowed by the concept's part of speech) |
 | PATCH | `/api/variants/:id` | Token (submitter) | Edit and resubmit a rejected variant (rejected → pending), including `extra` and `forms`. `409` if the word was added meanwhile |
@@ -122,6 +126,11 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | PATCH | `/api/suggestions/:id` | Token (submitter) | Edit and resubmit a rejected suggestion (rejected → pending) |
 | PATCH | `/api/suggestions/:id/edit` | Moderator+ | Staff edit of a suggestion (note required, still fill-only). Moderators: pending and not their own; admins: pending or approved |
 | PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
+| POST | `/api/variants/:id/audio?slot=` | Token | Upload a pronunciation clip for a published word. Raw body (`audio/webm`, `audio/mp4`, `audio/ogg`, `audio/mpeg`), max 1 MB; `slot` is `headword`, `example` or `form:<slot>`. The server reads the real duration (limit per slot) and format from the bytes. `409` if a clip for that slot is already under review; rate-limited |
+| DELETE | `/api/audio/:id` | Token (speaker) | Withdraw my pending clip (its file is deleted) |
+| GET | `/api/audio/mine` | Token | My clips with status, note, word and a signed URL while pending/approved/published (paginated) |
+| PATCH | `/api/audio/:id/status` | Moderator+ | Approve / reject (note) / publish (admin). Publishing a replacement retires the old clip; rejecting an approved or published clip is admin-only; moderators cannot review their own |
+| GET | `/api/moderation/audio?status=` | Moderator+ | Clips under review with the word, the slot text and limit, signed URLs, and the current live clip for side-by-side review (admins may pass `status=approved`) |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
@@ -129,8 +138,8 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting an approved or published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
 | PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting an approved or published variant is admin-only. Rejecting a variant also rejects its open suggestion |
 | PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
-| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required), including `forms` (replaces the list). Published variants are admin-only. Fields an open suggestion proposes are locked (`409`) |
-| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`, including `VariantSuggestion` and `suggestion_applied`) |
+| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required), including `forms` (replaces the list). Published variants are admin-only. Fields an open suggestion proposes are locked (`409`). An edit that changes text with recordings returns `409` (`field: confirmAudioRetire`, `retiring: [...]`) until resent with `confirmAudioRetire: true` — same for concept edits that change the part of speech, merges and resubmits |
+| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`, including `VariantSuggestion`, `AudioClip`, `suggestion_applied`, `audio_published`, `retired`, `withdrawn`) |
 | GET | `/api/lookups?type=` | — | Region and part-of-speech list values, including inactive ones (`active: false`) |
 | POST | `/api/lookups` | Admin | Add a list value `{ type, label }` — the key is the label at creation and never changes |
 | PATCH | `/api/lookups/:id` | Admin | Rename the label and/or change the order. `key`, `type`, `isSystem`, `active` are rejected |
@@ -183,6 +192,11 @@ AWS_REGION=ap-southeast-1
 NODE_ENV=development
 FRONTEND_ORIGIN=http://localhost:5173   # comma-separated; CORS + refresh/logout origin check
 COOKIE_SAMESITE=strict                  # production only: strict | lax | none
+STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com   # pronunciation clips (any S3-compatible bucket)
+STORAGE_REGION=auto
+STORAGE_BUCKET=pashto-dictionary-audio-dev
+STORAGE_ACCESS_KEY_ID=xxxxxxxx
+STORAGE_SECRET_ACCESS_KEY=xxxxxxxx
 
 # client/.env
 VITE_API_URL=http://localhost:5000

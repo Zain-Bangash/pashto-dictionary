@@ -271,6 +271,38 @@ Step 3 — update docs/ARCHITECTURE.md (data model; why `extra` map, why deactiv
 Finish with: summary, test results, and suggested commits split by layer. Don't commit.
 ```
 
+**S5 — Community pronunciation audio**
+```
+Full-stack feature: logged-in users record or upload a short pronunciation clip for a published variant. Clips are moderated; nothing unreviewed is public.
+
+Step 1 — plan only. Read CLAUDE.md, docs/ARCHITECTURE.md (Moderation State Machine, "Filling gaps" › Suggestions, Variant grammatical forms), docs/USER-FLOWS.md, server/src/models/Variant.ts, VariantSuggestion.ts, variantFormSchema.ts, server/src/utils/variantForms.ts, the suggestion controller/routes, template.yaml, deploy.yml, and the client files that show a variant: pages/ConceptDetail.jsx, pages/MySubmissions.jsx, the moderation queue components.
+Explore what else you need, then give me the plan in the Step 1 format below and stop for approval. Ask me anything that is unclear before proposing.
+
+Decisions already made (don't re-ask):
+- Storage: Cloudflare R2, private bucket, via the S3-compatible AWS SDK, behind a small storage util so the provider can be swapped (Backblaze B2 is the fallback). Playback via short-lived signed URLs. I create the Cloudflare account, bucket and API token myself; document the steps in BuildHistory and add the env vars to .env.example, template.yaml and deploy.yml.
+- New `AudioClip` collection (like VariantSuggestion) so a published variant never changes during review. Own state machine, ModerationLog entries, self-approval ban. Parent variant must be published.
+- Slots: headword, example, and every grammatical form slot. A form slot accepts a clip even if that form has no text yet.
+- One live clip per variant + slot. A replacement may wait pending beside the published clip; on publish the old clip is retired and its file deleted.
+- Max duration = min(cap, ceil(chars/3) + 2) seconds; cap 10 s for headword and forms, 20 s for examples; an empty slot uses the headword's length. The server enforces it by parsing the real file duration (not the client), plus a file-size cap and MIME/magic-byte check.
+- Formats: store what the browser records (WebM/Opus on Chrome/Firefox, MP4/AAC on Safari), no transcoding. Choose with MediaRecorder.isTypeSupported(); offer a file-upload fallback.
+- In the moderation queue, a replacement clip shows the current and new clips side by side, each playable. This is required.
+- Access: logged-in users only, rate limited. Guests can listen to published clips.
+- Out of scope: transcoding, waveforms, guest uploads, automatic speech/profanity checks.
+
+Step 1 format:
+- Endpoints (method, path, auth, request/response shape), including how the upload reaches R2 (through Lambda vs presigned; check the 6 MB payload limit) and how signed URLs are issued.
+- AudioClip schema and indexes (the one-live-clip rule plus the pending replacement), and how the slot is validated for empty form slots.
+- Duration parsing: which library, and whether it bundles with esbuild/SAM and runs on Lambda.
+- Transitions, cascade when a variant is rejected/deleted, ordering of DB and R2 operations so a failure never loses the live clip or leaves orphans. New ModerationLog actions and audit-log badge/label changes.
+- Client: recorder, player, slot buttons on ConceptDetail, My Submissions, and the side-by-side moderation view. Flag any file that would pass ~150 lines.
+- User-flow sentences for docs/USER-FLOWS.md, and the test list (server Jest, client RTL, E2E).
+- Risks (e.g. old iPhones not playing WebM/Opus, clip uploaded to the wrong slot) and anything you want me to decide.
+
+Step 2 — build backend first (tests green, `npx tsc --noEmit` clean), then frontend (tests green). Run only the affected test files while working, then both full suites once at the end.
+Step 3 — update docs/ARCHITECTURE.md (why a separate collection, R2, the slot model, the server-side duration check), docs/USER-FLOWS.md, docs/BuildHistory.md (R2 setup), the README API table, and To-Do.md.
+Finish with: summary, test results, and suggested commits split by layer. Don't commit.
+```
+
 ### Tests & docs
 
 **T1 — E2E coverage gaps**
