@@ -43,6 +43,7 @@ export interface IVariantForm {
   normalizedPashto?: string;
   phonetic?: string;
   example?: string;
+  addedBy?: string;
 }
 
 export interface IVariant extends Document {
@@ -172,7 +173,8 @@ export interface IModerationLog extends Document {
     | 'suggestion_applied'
     | 'retired'
     | 'withdrawn'
-    | 'audio_published';
+    | 'audio_published'
+    | 'role_changed';
   performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;

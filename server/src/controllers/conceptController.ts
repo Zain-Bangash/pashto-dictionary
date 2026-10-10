@@ -5,7 +5,7 @@ import Concept from '../models/Concept';
 import { IConcept } from '../types/models';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
-import { enrichActors } from '../utils/enrichActors';
+import { enrichActors, enrichFormCredits } from '../utils/enrichActors';
 import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 import { isDuplicateKey } from '../utils/duplicateKey';
@@ -149,7 +149,7 @@ async function getConcept(req: Request, res: Response): Promise<void> {
   const rawVariants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }, { 'forms.normalizedPashto': 0 }).lean();
 
   const [enrichedConcept] = await enrichActors([found as unknown as Doc], 'submittedBy');
-  const enrichedVariants = await enrichActors(rawVariants as unknown as Doc[], 'submittedBy');
+  const enrichedVariants = await enrichFormCredits(await enrichActors(rawVariants as unknown as Doc[], 'submittedBy'));
   const variants = await attachAudio(enrichedVariants as Parameters<typeof attachAudio>[0], found.partOfSpeech);
 
   res.status(200).json({ success: true, data: { ...enrichedConcept, variants } });
@@ -476,13 +476,8 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (req.user!.role === 'moderator' && concept.submittedBy && concept.submittedBy.toString() === req.user!.id) {
-    res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
-    return;
-  }
-
-  if (req.user!.role === 'moderator' && concept.status === 'published') {
-    res.status(403).json({ success: false, error: { message: 'Only admins can edit published entries' } });
+  if (concept.status === 'rejected') {
+    res.status(400).json({ success: false, error: { message: "Rejected entries can't be edited — the submitter resubmits them" } });
     return;
   }
 

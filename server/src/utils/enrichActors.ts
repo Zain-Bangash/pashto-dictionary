@@ -32,3 +32,15 @@ export async function enrichActors(
 
   return docs.map(d => ({ ...d, [field]: byId[d[field] as string] ?? d[field] }));
 }
+
+// Replaces each form's addedBy sub with the contributor's public profile, for "Added by" credits
+export async function enrichFormCredits(variants: Doc[]): Promise<Doc[]> {
+  const subs = [...new Set(variants.flatMap((v) => ((v.forms as Doc[] | undefined) ?? []).map((f) => f.addedBy).filter((s): s is string => typeof s === 'string')))];
+  if (!subs.length) return variants;
+  const users = await User.find({ cognitoSub: { $in: subs } }, 'username region village cognitoSub').lean();
+  const bySub = new Map(users.map((u) => [u.cognitoSub as string, u]));
+  return variants.map((v) => ({
+    ...v,
+    forms: ((v.forms as Doc[] | undefined) ?? []).map((f) => (typeof f.addedBy === 'string' ? { ...f, addedBy: bySub.get(f.addedBy) ?? f.addedBy } : f)),
+  }));
+}

@@ -73,7 +73,7 @@ Concept  — the meaning anchor (English gloss, part of speech, moderation statu
 
 Lookup   — admin-editable lists (region, part of speech): immutable key, editable label
 FieldDefinition — admin-defined extra fields; values stored in Concept.extra / Variant.extra
-VariantSuggestion — fill-only proposals for a user's own published variant
+VariantSuggestion — fill-only proposals for a published variant (any field from its submitter, forms from anyone)
 AudioClip — a pronunciation recording for one slot of a published variant (headword, example, a form); file in Cloudflare R2
 ```
 
@@ -93,7 +93,7 @@ published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Users can also propose missing details (phonetic, example, forms, optional extra fields) for their own published words. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
+Users can propose missing details (phonetic, example, forms, optional extra fields) for their own published words, and anyone signed in can propose missing grammatical forms for any published word, credited by name once published. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
 
 Any logged-in user can record a pronunciation for a published word. Clips follow the same review flow in their own `AudioClip` records, plus `withdrawn` (by the speaker, while pending) and `retired` (replaced by a newer clip, or the text it speaks was edited). Only published clips are ever played to the public.
 
@@ -122,9 +122,10 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields; optional `forms` allowed by the concept's part of speech) |
 | PATCH | `/api/variants/:id` | Token (submitter) | Edit and resubmit a rejected variant (rejected → pending), including `extra` and `forms`. `409` if the word was added meanwhile |
 | GET | `/api/variants/my-submissions?needs=completion&missing=&region=` | Token | My variants with `missingFields`, `fillableFields` and `latestSuggestion`; `meta.needsCompletionCount` |
-| POST | `/api/variants/:id/suggestions` | Token (submitter) | Propose values for blank fields of my published variant `{ phonetic?, example?, forms?, extra? }` — fill-only, one open per variant, rate-limited |
-| PATCH | `/api/suggestions/:id` | Token (submitter) | Edit and resubmit a rejected suggestion (rejected → pending) |
-| PATCH | `/api/suggestions/:id/edit` | Moderator+ | Staff edit of a suggestion (note required, still fill-only). Moderators: pending and not their own; admins: pending or approved |
+| POST | `/api/variants/:id/suggestions` | Token | Propose values for blank fields of a published variant `{ phonetic?, example?, forms?, extra? }`. Only the word's submitter may send fields other than `forms` (`400` otherwise). Fill-only, one open suggestion per person per word (`409`), rate-limited |
+| GET | `/api/suggestions/mine?scope=&status=&concept=` | Token | My suggestions with their word and concept, newest first. `scope=others` leaves out my own words; `status=open` and `concept=` narrow it |
+| PATCH | `/api/suggestions/:id` | Token (suggestion's sender) | Edit and resubmit a rejected suggestion (rejected → pending); still forms-only for someone else's word |
+| PATCH | `/api/suggestions/:id/edit` | Admin | Edit a pending or approved suggestion (note required, still fill-only) |
 | PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
 | POST | `/api/variants/:id/audio?slot=` | Token | Upload a pronunciation clip for a published word. Raw body (`audio/webm`, `audio/mp4`, `audio/ogg`, `audio/mpeg`), max 1 MB; `slot` is `headword`, `example` or `form:<slot>`. The server reads the real duration (limit per slot) and format from the bytes. `409` if a clip for that slot is already under review; rate-limited |
 | DELETE | `/api/audio/:id` | Token (speaker) | Withdraw my pending clip (its file is deleted) |
@@ -134,12 +135,15 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
 | GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
-| GET | `/api/moderation/suggestions?status=&concept=` | Moderator+ | Suggestions with their live word and submitter (admins may pass `status=approved`; `concept=` lists open suggestions on one concept) |
+| GET | `/api/moderation/suggestions?status=&concept=` | Moderator+ | Suggestions grouped by word: `data: [{ variant, suggestions[] }]`, paginated by word, oldest first (admins may pass `status=approved`; `concept=` lists open suggestions on one concept) |
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting an approved or published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
 | PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting an approved or published variant is admin-only. Rejecting a variant also rejects its open suggestion |
-| PATCH | `/api/concepts/:id/edit` | Moderator+ | Staff edit in place (note required). Published concepts are admin-only |
-| PATCH | `/api/variants/:id/edit` | Moderator+ | Staff edit in place (note required), including `forms` (replaces the list). Published variants are admin-only. Fields an open suggestion proposes are locked (`409`). An edit that changes text with recordings returns `409` (`field: confirmAudioRetire`, `retiring: [...]`) until resent with `confirmAudioRetire: true` — same for concept edits that change the part of speech, merges and resubmits |
-| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`, including `VariantSuggestion`, `AudioClip`, `suggestion_applied`, `audio_published`, `retired`, `withdrawn`) |
+| PATCH | `/api/concepts/:id/edit` | Admin | Edit in place (note required) at pending, approved or published; rejected returns `400` |
+| POST | `/api/concepts/:sourceId/merge` | Admin | Move the source concept's variants to `targetConceptId` and soft-delete the source (duplicates skipped) |
+| PATCH | `/api/variants/:id/edit` | Admin | Edit in place (note required), including `forms` (replaces the list), at pending, approved or published; rejected returns `400`. Fields an open suggestion proposes are locked (`409`). An edit that changes text with recordings returns `409` (`field: confirmAudioRetire`, `retiring: [...]`) until resent with `confirmAudioRetire: true` — same for concept edits that change the part of speech, merges and resubmits |
+| GET | `/api/users` | Admin | Paginated user list (`page`, `limit` up to 100) |
+| PATCH | `/api/users/:id/role` | Admin | Set `role` to `user` or `moderator`, optional `note`; logs `role_changed`. Admins, yourself and `role: 'admin'` return `400` |
+| GET | `/api/moderation/log` | Admin | Audit log (filter by `action`, `targetModel`, including `VariantSuggestion`, `AudioClip`, `User`, `suggestion_applied`, `audio_published`, `retired`, `withdrawn`, `role_changed`) |
 | GET | `/api/lookups?type=` | — | Region and part-of-speech list values, including inactive ones (`active: false`) |
 | POST | `/api/lookups` | Admin | Add a list value `{ type, label }` — the key is the label at creation and never changes |
 | PATCH | `/api/lookups/:id` | Admin | Rename the label and/or change the order. `key`, `type`, `isSystem`, `active` are rejected |
@@ -170,6 +174,7 @@ cd server && npm install
 cp .env.example .env   # fill in MONGODB_URI and the COGNITO_* values
 npm run dev            # ts-node src/index.ts on :5000 (inserts any missing built-in list values on start)
 npm run seed:lookups -- --dry-run   # optional: report which built-in list values are missing
+npm run migrate:suggestion-index -- --dry-run   # one-off: swap the old one-suggestion-per-word index (see ARCHITECTURE › Suggestions)
 
 # Client (separate terminal)
 cd client && npm install

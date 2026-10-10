@@ -127,12 +127,15 @@ function summary(form: IVariantForm): Record<string, string> {
   };
 }
 
-// Replaces the stored forms and returns `edited`-style diffs keyed `forms.<slot>`; null means added or removed
+// Replaces the stored forms and returns `edited`-style diffs keyed `forms.<slot>`; null means added or removed.
+// A contributor's credit stays with its slot, so correcting a form's text keeps their name on it.
 export function applyForms(doc: { forms?: IVariantForm[] }, forms: IVariantForm[] | undefined): Record<string, unknown> {
   if (forms === undefined) return {};
   const before = new Map((doc.forms ?? []).map((f) => [formSlot(f), summary(f)]));
   const after = new Map(forms.map((f) => [formSlot(f), summary(f)]));
-  doc.forms = forms.length ? forms : undefined;
+  const credit = new Map((doc.forms ?? []).filter((f) => f.addedBy).map((f) => [formSlot(f), f.addedBy as string]));
+  const credited = forms.map((f) => (credit.has(formSlot(f)) ? { ...f, addedBy: credit.get(formSlot(f)) } : f));
+  doc.forms = credited.length ? credited : undefined;
 
   const changes: Record<string, unknown> = {};
   for (const slot of SLOT_ORDER) {

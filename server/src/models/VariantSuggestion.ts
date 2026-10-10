@@ -30,10 +30,10 @@ const variantSuggestionSchema = new Schema<IVariantSuggestion>(
 
 variantSuggestionSchema.index({ status: 1, createdAt: -1 });
 variantSuggestionSchema.index({ submittedBy: 1 });
-// At most one open suggestion per variant
+// At most one open suggestion per person per variant; different people may propose for the same word
 variantSuggestionSchema.index(
-  { variant: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: OPEN_SUGGESTION_STATUSES } } }
+  { variant: 1, submittedBy: 1 },
+  { unique: true, name: 'one_open_per_user', partialFilterExpression: { status: { $in: OPEN_SUGGESTION_STATUSES } } }
 );
 
 export = model<IVariantSuggestion>('VariantSuggestion', variantSuggestionSchema);

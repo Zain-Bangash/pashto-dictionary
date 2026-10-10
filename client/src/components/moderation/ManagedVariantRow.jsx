@@ -6,7 +6,8 @@ import useLookups from '../../hooks/useLookups';
 import { proposedFields } from '../../utils/suggestions';
 import PublishedClips from '../audio/PublishedClips';
 
-export default function PublishedVariantRow({ variant, concept, openSuggestion, onReject, onSave }) {
+// onReject is only passed for published words; entries still in review are approved or rejected from the queue
+export default function ManagedVariantRow({ variant, concept, openSuggestions = [], onReject, onSave }) {
   const { labelFor } = useLookups();
   const [editing, setEditing] = useState(false);
 
@@ -23,9 +24,9 @@ export default function PublishedVariantRow({ variant, concept, openSuggestion, 
           </div>
           <p className="text-sm font-ui text-muted">{variant.definition}</p>
           {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
-          {openSuggestion && (
+          {openSuggestions.length > 0 && (
             <p className="text-[11px] font-ui text-amber-300/90">
-              Suggestion {openSuggestion.status} from the submitter — its fields are locked here.{' '}
+              {openSuggestions.length === 1 ? `Suggestion ${openSuggestions[0].status}` : `${openSuggestions.length} open suggestions`} — the fields they propose are locked here.{' '}
               <Link to="/dashboard/queue?view=suggestions" className="underline hover:text-amber-200">Review it in Suggestions</Link>
             </p>
           )}
@@ -35,14 +36,14 @@ export default function PublishedVariantRow({ variant, concept, openSuggestion, 
           <PublishedClips variant={variant} />
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => onReject(variant)} aria-label={`Reject variant ${variant.pashto}`} className={REJECT_BTN}>Reject</button>
+          {onReject && <button onClick={() => onReject(variant)} aria-label={`Reject variant ${variant.pashto}`} className={REJECT_BTN}>Reject</button>}
           <button onClick={() => setEditing((e) => !e)} aria-label={`Edit variant ${variant.pashto}`} className={EDIT_BTN}>Edit</button>
         </div>
       </div>
       {editing && (
         <VariantEditForm
           item={{ ...variant, concept }}
-          lockedFields={proposedFields(openSuggestion)}
+          lockedFields={openSuggestions.flatMap(proposedFields)}
           onSave={(updated) => { setEditing(false); onSave(updated); }}
           onCancel={() => setEditing(false)}
         />

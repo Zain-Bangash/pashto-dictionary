@@ -12,12 +12,13 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
-import api, { getConcept, transitionConceptStatus, transitionVariantStatus } from '../../services/api';
+import api, { getConcept, getVariants, transitionConceptStatus, transitionVariantStatus } from '../../services/api';
 import DashboardConcepts from '../../pages/dashboard/DashboardConcepts';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   getConcept: vi.fn(),
+  getVariants: vi.fn(),
   getSuggestionQueue: vi.fn(() => Promise.resolve({ data: { data: [] } })),
   transitionConceptStatus: vi.fn(),
   transitionVariantStatus: vi.fn(),
@@ -114,10 +115,31 @@ describe('Expanding published concepts', () => {
     expect(screen.queryByRole('region', { name: /manage water/i })).not.toBeInTheDocument();
   });
 
-  it('admin cannot expand a concept that is not published', async () => {
+  it.each(['pending', 'approved'])('admin can expand a %s concept to edit it and its variants still in review, without reject buttons', async (status) => {
     const user = userEvent.setup();
     asAdmin();
-    mockList([listConcept({ status: 'pending' })]);
+    mockList([listConcept({ status })]);
+    getVariants.mockResolvedValue({ data: { success: true, data: [
+      publishedVariant({ status: 'pending' }),
+      publishedVariant({ _id: 'v2', pashto: 'رد', status: 'rejected' }),
+    ] } });
+
+    renderPage();
+    const panel = await openPanel(user);
+
+    expect(getVariants).toHaveBeenCalledWith({ conceptId: 'c1', limit: 50 });
+    expect(getConcept).not.toHaveBeenCalled();
+    expect(await within(panel).findByText('اوبه')).toBeInTheDocument();
+    expect(within(panel).queryByText('رد')).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /edit concept/i })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /edit variant/i })).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /reject/i })).not.toBeInTheDocument();
+  });
+
+  it('admin cannot expand a rejected concept', async () => {
+    const user = userEvent.setup();
+    asAdmin();
+    mockList([listConcept({ status: 'rejected' })]);
 
     renderPage();
     await user.click(await screen.findByText('water'));

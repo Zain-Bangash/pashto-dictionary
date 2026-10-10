@@ -92,20 +92,32 @@ export async function validateProposal(
   return { proposed };
 }
 
-export async function findOpenSuggestion(variantId: Types.ObjectId | string) {
-  return VariantSuggestion.findOne({ variant: variantId, status: { $in: OPEN_SUGGESTION_STATUSES } });
+// Each person may have one open suggestion per word
+export async function findOpenSuggestion(variantId: Types.ObjectId | string, submittedBy: string) {
+  return VariantSuggestion.findOne({ variant: variantId, submittedBy, status: { $in: OPEN_SUGGESTION_STATUSES } });
 }
 
-// Fields an open suggestion proposes; staff edits outside the suggestion review cannot touch them
+// Only the word's submitter may fill phonetic, example and extra fields; anyone else may only propose forms
+export function formsOnlyError(input: Record<string, unknown>, submittedBy: string, wordOwner?: string): FieldError | undefined {
+  if (submittedBy === wordOwner) return undefined;
+  const filled = (v: unknown) => v !== undefined && v !== null && v !== '';
+  const field = (['phonetic', 'example'] as const).find((k) => filled(input[k]))
+    ?? (input.extra && typeof input.extra === 'object' && Object.values(input.extra).some(filled) ? 'extra' : undefined);
+  if (!field) return undefined;
+  return { message: "Only the word's submitter can suggest this detail. You can suggest grammatical forms.", field };
+}
+
+// Fields any open suggestion proposes; staff edits outside the suggestion review cannot touch them
 export async function lockedFields(variantId: Types.ObjectId | string): Promise<Set<string>> {
-  const open = await findOpenSuggestion(variantId);
-  if (!open) return new Set();
-  const plain = proposalToPlain(open.proposed);
-  return new Set([
-    ...(['phonetic', 'example'] as const).filter((k) => plain[k]),
-    ...(plain.forms ?? []).map((f) => `forms.${formSlot(f)}`),
-    ...Object.keys(plain.extra ?? {}).map((k) => `extra.${k}`),
-  ]);
+  const open = await VariantSuggestion.find({ variant: variantId, status: { $in: OPEN_SUGGESTION_STATUSES } });
+  const locked = new Set<string>();
+  for (const s of open) {
+    const plain = proposalToPlain(s.proposed);
+    (['phonetic', 'example'] as const).filter((k) => plain[k]).forEach((k) => locked.add(k));
+    (plain.forms ?? []).forEach((f) => locked.add(`forms.${formSlot(f)}`));
+    Object.keys(plain.extra ?? {}).forEach((k) => locked.add(`extra.${k}`));
+  }
+  return locked;
 }
 
 export async function logSuggestion(id: Types.ObjectId, action: string, performedBy: string, note?: string, changes?: Record<string, unknown>) {
@@ -144,5 +156,5 @@ export function lockClash(
   const field = changed.find((f) => locked.has(f));
   if (!field) return undefined;
   const label = LOCK_LABELS[field] ?? (field.startsWith('forms.') ? `Form (${slotName(field.slice(6))})` : 'This field');
-  return { message: `${label} has an open suggestion from the submitter. Review it in Suggestions first.`, field };
+  return { message: `${label} has an open suggestion. Review it in Suggestions first.`, field };
 }

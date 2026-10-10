@@ -4,7 +4,7 @@ import Concept from '../models/Concept';
 import VariantSuggestion from '../models/VariantSuggestion';
 import ModerationLog from '../models/ModerationLog';
 import { IVariant, IVariantSuggestion } from '../types/models';
-import { validateForms, applyForms } from './variantForms';
+import { validateForms, applyForms, formSlot } from './variantForms';
 import { normalizePashto, normalizePhonetic } from './normalize';
 import { validateProposal, proposalToPlain, logSuggestion, PlainProposal } from './suggestions';
 
@@ -13,9 +13,9 @@ export type ApplyResult =
   | { suggestion: IVariantSuggestion; variant: IVariant; error?: undefined }
   | { error: FieldError; status: number };
 
-type LeanVariant = Pick<IVariant, 'phonetic' | 'example' | 'forms' | 'extra' | 'concept' | 'updatedAt' | 'status' | 'isDeleted'> & { _id: Types.ObjectId; extra?: Record<string, string> };
+type LeanVariant = Pick<IVariant, 'phonetic' | 'example' | 'forms' | 'extra' | 'concept' | 'updatedAt' | 'status' | 'isDeleted' | 'submittedBy'> & { _id: Types.ObjectId; extra?: Record<string, string> };
 
-function buildUpdate(variant: LeanVariant, proposed: PlainProposal, partOfSpeech?: string) {
+function buildUpdate(variant: LeanVariant, proposed: PlainProposal, contributor: string, partOfSpeech?: string) {
   const set: Record<string, unknown> = {};
   const changes: Record<string, unknown> = {};
 
@@ -33,10 +33,16 @@ function buildUpdate(variant: LeanVariant, proposed: PlainProposal, partOfSpeech
     changes[`extra.${key}`] = { from: '', to: value };
   }
   if (proposed.forms?.length) {
-    const current = (variant.forms ?? []).map(({ normalizedPashto: _n, ...f }) => f);
+    const current = (variant.forms ?? []).map(({ normalizedPashto: _n, addedBy: _a, ...f }) => f);
     const merged = validateForms([...current, ...proposed.forms], partOfSpeech, current);
     if (merged.error) return { error: merged.error };
-    const forms = (merged.forms ?? []).map((f) => ({ ...f, normalizedPashto: normalizePashto(f.pashto) }));
+    // Credit the contributor on each new form; forms with no addedBy belong to the word's submitter
+    const credit = new Map((variant.forms ?? []).filter((f) => f.addedBy).map((f) => [formSlot(f), f.addedBy as string]));
+    if (contributor !== variant.submittedBy) proposed.forms.forEach((f) => credit.set(formSlot(f), contributor));
+    const forms = (merged.forms ?? []).map((f) => {
+      const addedBy = credit.get(formSlot(f));
+      return { ...f, ...(addedBy && { addedBy }), normalizedPashto: normalizePashto(f.pashto) };
+    });
     Object.assign(changes, applyForms({ forms: variant.forms }, forms));
     set.forms = forms;
   }
@@ -72,7 +78,7 @@ export async function applySuggestion(id: string, adminId: string): Promise<Appl
       return { status: 400, error: { ...check.error, message: `Cannot publish: ${check.error.message}. Edit or reject the suggestion.` } };
     }
 
-    const update = buildUpdate(variant, check.proposed, concept?.partOfSpeech);
+    const update = buildUpdate(variant, check.proposed, claimed.submittedBy, concept?.partOfSpeech);
     if ('error' in update && update.error) {
       await revert(claimed._id as Types.ObjectId);
       return { status: 400, error: update.error };

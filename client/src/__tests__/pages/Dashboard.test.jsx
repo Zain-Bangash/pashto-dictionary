@@ -26,9 +26,14 @@ import DashboardLog from '../../pages/dashboard/DashboardLog';
 // ---------------------------------------------------------------------------
 // Global mock for api service
 // ---------------------------------------------------------------------------
-vi.mock('../../services/api', () => ({
-  default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
-}));
+vi.mock('../../services/api', () => {
+  const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+  return {
+    default: api,
+    getUsers: (params) => api.get('/api/users', { params }),
+    changeUserRole: (id, body) => api.patch(`/api/users/${id}/role`, body),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // AuthContext mock — overridden per describe block via mockReturnValue
@@ -597,7 +602,7 @@ describe('DashboardUsers page — user list (admin only)', () => {
       },
     });
     renderUsers('admin');
-    expect(await screen.findByText(/moderator/i)).toBeInTheDocument();
+    expect(await screen.findByText('moderator')).toBeInTheDocument();
   });
 
   it('redirects a moderator away from /dashboard/users', () => {
@@ -624,7 +629,8 @@ describe('DashboardUsers page — user list (admin only)', () => {
     renderUsers('admin');
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/users/)
+        expect.stringMatching(/\/api\/users/),
+        { params: { page: 1, limit: 20 } }
       );
     });
   });

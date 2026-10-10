@@ -51,7 +51,7 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
               <button onClick={() => onReject('concepts', concept._id)} className={REJECT_BTN}>Reject</button>
             </>
           )}
-          <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>
+          {isAdmin && <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>}
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
       )}
 
       {showSimilar && concept.status === 'pending' && (
-        <SimilarConceptsPanel item={concept} onMergeRequest={onMergeRequest} />
+        <SimilarConceptsPanel item={concept} onMergeRequest={isAdmin ? onMergeRequest : undefined} />
       )}
 
       {count === 0 ? (

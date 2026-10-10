@@ -340,9 +340,32 @@ describe('Rejection note modal — Variants tab', () => {
 // 3.  Inline edit form — Concepts tab
 // ===========================================================================
 
+describe('Moderators cannot edit or merge', () => {
+  it('shows no Edit button on queue concepts or variants for a moderator', async () => {
+    const user = userEvent.setup();
+    asModerator();
+    mockQueueWithConcepts([mockConcept({ englishGloss: 'river' })], []);
+
+    renderQueue();
+    await screen.findByText('river');
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByText('river'));
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+  });
+
+  it('shows no Merge button on the Concepts list for a moderator', async () => {
+    asModerator();
+    api.get.mockResolvedValue({ data: { success: true, data: [mockConcept({ englishGloss: 'river', status: 'published' })], meta: {} } });
+
+    render(<MemoryRouter><DashboardConcepts /></MemoryRouter>);
+    await screen.findByText('river');
+    expect(screen.queryByRole('button', { name: /merge/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('Inline edit form — Concepts tab', () => {
   it('renders an Edit button for each concept in the queue', async () => {
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept()], []);
 
     renderQueue();
@@ -351,7 +374,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('does NOT navigate away when Edit is clicked — form appears inline', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ englishGloss: 'river' })], []);
 
     renderQueue();
@@ -367,7 +390,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('pre-populates the concept edit form with the existing englishGloss', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ englishGloss: 'mountain', partOfSpeech: 'noun' })], []);
 
     renderQueue();
@@ -382,7 +405,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('pre-populates the concept edit form with the existing partOfSpeech', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ englishGloss: 'mountain', partOfSpeech: 'noun' })], []);
 
     renderQueue();
@@ -398,7 +421,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('disables the edit form submit button when the note field is empty', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept()], []);
 
     renderQueue();
@@ -410,7 +433,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('calls editConcept with the existing _id and form data on submit', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c42', englishGloss: 'fire', partOfSpeech: 'noun' })], []);
     api.patch.mockResolvedValueOnce({
       data: { success: true, data: { _id: 'c42', englishGloss: 'fire updated', partOfSpeech: 'noun', status: 'pending' } },
@@ -448,7 +471,7 @@ describe('Inline edit form — Concepts tab', () => {
 
   it('updates the item in the list after a successful concept edit (no full reload)', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c55', englishGloss: 'old gloss', partOfSpeech: 'noun' })], []);
     api.patch.mockResolvedValueOnce({
       data: { success: true, data: { _id: 'c55', englishGloss: 'new gloss', partOfSpeech: 'noun', status: 'pending' } },
@@ -486,7 +509,7 @@ describe('Inline edit form — Variants tab', () => {
 
   it('renders an Edit button for each variant in the queue', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
@@ -496,7 +519,7 @@ describe('Inline edit form — Variants tab', () => {
 
   it('pre-populates the variant edit form with pashto field', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant({ pashto: 'کور', definition: 'a house' })]);
 
     renderQueue();
@@ -512,7 +535,7 @@ describe('Inline edit form — Variants tab', () => {
 
   it('pre-populates the variant edit form with definition field', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant({ pashto: 'کور', definition: 'a dwelling place' })]);
 
     renderQueue();
@@ -528,7 +551,7 @@ describe('Inline edit form — Variants tab', () => {
 
   it('disables the variant edit form submit button when note is empty', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
@@ -541,7 +564,7 @@ describe('Inline edit form — Variants tab', () => {
 
   it('calls editVariant with the existing _id and form data on submit', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant({ _id: 'v77', pashto: 'کور', definition: 'a dwelling' })]);
     api.patch.mockResolvedValueOnce({
       data: { success: true, data: { _id: 'v77', pashto: 'کور', definition: 'a dwelling place', status: 'pending' } },
@@ -576,7 +599,7 @@ describe('Variant concept reassignment field in edit form', () => {
 
   it('shows a concept search input inside the variant edit form', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant()]);
 
     renderQueue();
@@ -591,7 +614,7 @@ describe('Variant concept reassignment field in edit form', () => {
 
   it('calls suggestConcepts when typing in the concept search input', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant()]);
     api.get.mockResolvedValueOnce({
       data: { success: true, data: [{ _id: 'c99', englishGloss: 'love', status: 'published' }] },
@@ -615,7 +638,7 @@ describe('Variant concept reassignment field in edit form', () => {
 
   it('displays suggestion with englishGloss and _id', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant()]);
     api.get.mockResolvedValueOnce({
       data: { success: true, data: [{ _id: 'cSuggest1', englishGloss: 'love', status: 'published' }] },
@@ -636,7 +659,7 @@ describe('Variant concept reassignment field in edit form', () => {
 
   it('sets the concept field to the selected suggestion _id', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([], [mockVariant({ _id: 'v88' })]);
     api.patch.mockResolvedValueOnce({
       data: { success: true, data: { _id: 'v88', status: 'pending' } },
@@ -679,7 +702,7 @@ describe('Variant concept reassignment field in edit form', () => {
 
 describe('Similar concepts panel in Concepts tab', () => {
   it('calls suggestConcepts with the item englishGloss when rendering a concept in the queue', async () => {
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
 
     renderQueue();
@@ -693,7 +716,7 @@ describe('Similar concepts panel in Concepts tab', () => {
   });
 
   it('shows a similar concepts panel when suggestConcepts returns other concepts', async () => {
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     // Third get call is the suggestConcepts for the item
     api.get.mockResolvedValueOnce({
@@ -708,7 +731,7 @@ describe('Similar concepts panel in Concepts tab', () => {
   });
 
   it('does NOT show a similar concepts panel when suggestConcepts returns empty', async () => {
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     api.get.mockResolvedValueOnce({
       data: { success: true, data: [] },
@@ -723,7 +746,7 @@ describe('Similar concepts panel in Concepts tab', () => {
   });
 
   it('does NOT include the item itself in the similar concepts panel', async () => {
-    asModerator();
+    asAdmin();
     // suggestConcepts might return the item itself — UI must filter it out
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     api.get.mockResolvedValueOnce({
@@ -749,7 +772,7 @@ describe('Similar concepts panel in Concepts tab', () => {
 describe('Merge confirmation modal — DashboardQueue', () => {
   it('opens a confirmation modal when "Merge into this" is clicked', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     api.get.mockResolvedValueOnce({
       data: { success: true, data: [{ _id: 'c2', englishGloss: 'home', status: 'published' }] },
@@ -771,7 +794,7 @@ describe('Merge confirmation modal — DashboardQueue', () => {
 
   it('calls mergeConcepts with sourceId, targetConceptId and note when confirmed', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     // c2 is the source in the queue; c1 is the target we're merging INTO
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     api.get.mockResolvedValueOnce({
@@ -804,7 +827,7 @@ describe('Merge confirmation modal — DashboardQueue', () => {
 
   it('removes the source concept from the queue list after a successful merge', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueueWithConcepts([mockConcept({ _id: 'c1', englishGloss: 'house' })], []);
     api.get.mockResolvedValueOnce({
       data: { success: true, data: [{ _id: 'c2', englishGloss: 'home', status: 'published' }] },
@@ -838,7 +861,7 @@ describe('Merge confirmation modal — DashboardQueue', () => {
 
 describe('Merge from Concepts list — DashboardConcepts', () => {
   it('renders a Merge button on each concept row', async () => {
-    asModerator();
+    asAdmin();
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
@@ -853,7 +876,7 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
 
   it('opens a modal with a concept search input when Merge is clicked', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
@@ -873,7 +896,7 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
 
   it('calls suggestConcepts when typing into the merge target search', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     api.get.mockResolvedValueOnce({
       data: {
         success: true,
@@ -902,7 +925,7 @@ describe('Merge from Concepts list — DashboardConcepts', () => {
 
   it('calls mergeConcepts when a target is selected and merge is confirmed', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     api.get.mockResolvedValueOnce({
       data: {
         success: true,

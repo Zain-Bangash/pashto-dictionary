@@ -14,6 +14,8 @@ export const variantFormSchema = new Schema<IVariantForm>(
     normalizedPashto: { type: String },
     phonetic: { type: String, trim: true, maxlength: FORM_MAX.phonetic },
     example: { type: String, trim: true, maxlength: FORM_MAX.example },
+    // Cognito sub of whoever's suggestion added this form; set server-side only, absent means the word's submitter
+    addedBy: { type: String },
   },
   { _id: false }
 );

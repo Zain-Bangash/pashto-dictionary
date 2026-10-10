@@ -82,7 +82,7 @@ export default function LogChanges({ log }) {
     return <LookupChange changes={changes} />;
   }
 
-  if ((action === 'edited' || action === 'suggestion_applied') && changes && typeof changes === 'object') {
+  if (['edited', 'suggestion_applied', 'role_changed'].includes(action) && changes && typeof changes === 'object') {
     const fields = Object.entries(changes).filter(([, v]) => v && typeof v === 'object' && 'from' in v);
     if (fields.length === 0) return null;
     return (

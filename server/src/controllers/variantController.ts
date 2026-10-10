@@ -418,10 +418,11 @@ async function searchVariants(req: Request, res: Response): Promise<void> {
 
 type Doc = Record<string, unknown>;
 
-async function attachLatestSuggestions(variants: Doc[]): Promise<Doc[]> {
+// The owner's own latest suggestion per word; other people's suggestions on the word are not theirs to manage
+async function attachLatestSuggestions(variants: Doc[], owner: string): Promise<Doc[]> {
   const ids = variants.filter((v) => v.status === 'published').map((v) => v._id as Types.ObjectId);
   if (!ids.length) return variants.map((v) => ({ ...v, latestSuggestion: null }));
-  const suggestions = await VariantSuggestion.find({ variant: { $in: ids } }, 'variant status moderatorNote proposed updatedAt')
+  const suggestions = await VariantSuggestion.find({ variant: { $in: ids }, submittedBy: owner }, 'variant status moderatorNote proposed updatedAt')
     .sort({ updatedAt: -1 }).lean();
   const latest = new Map<string, unknown>();
   for (const s of suggestions) if (!latest.has(String(s.variant))) latest.set(String(s.variant), s);
@@ -454,7 +455,7 @@ async function getMyVariantSubmissions(req: Request, res: Response): Promise<voi
     Variant.aggregate([{ $match: live }, ...stages, { $match: missingMatch('any') }, { $count: 'n' }]),
   ]);
 
-  const data = await attachLatestSuggestions(list.data as Doc[]);
+  const data = await attachLatestSuggestions(list.data as Doc[], req.user!.id);
   const total = (list.total[0]?.n as number) ?? 0;
   res.status(200).json({ success: true, data, meta: { page, limit, total, needsCompletionCount: count?.n ?? 0 } });
 }
@@ -510,13 +511,8 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (req.user!.role === 'moderator' && variant.submittedBy && variant.submittedBy.toString() === req.user!.id) {
-    res.status(403).json({ success: false, error: { message: 'Moderators cannot edit their own submissions' } });
-    return;
-  }
-
-  if (req.user!.role === 'moderator' && variant.status === 'published') {
-    res.status(403).json({ success: false, error: { message: 'Only admins can edit published entries' } });
+  if (variant.status === 'rejected') {
+    res.status(400).json({ success: false, error: { message: "Rejected entries can't be edited — the submitter resubmits them" } });
     return;
   }
 

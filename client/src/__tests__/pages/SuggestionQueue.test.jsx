@@ -5,7 +5,7 @@ import { vi, beforeEach, describe, it, expect } from 'vitest';
 import DashboardQueue from '../../pages/dashboard/DashboardQueue';
 import DashboardLog from '../../pages/dashboard/DashboardLog';
 import VariantEditForm from '../../components/moderation/VariantEditForm';
-import PublishedVariantRow from '../../components/moderation/PublishedVariantRow';
+import ManagedVariantRow from '../../components/moderation/ManagedVariantRow';
 import api, { getSuggestionQueue, transitionSuggestion, editSuggestion } from '../../services/api';
 import { LookupsWrapper } from '../helpers/lookups';
 import { FieldsWrapper } from '../helpers/fields';
@@ -39,9 +39,11 @@ const suggestion = (overrides = {}) => ({
   ...overrides,
 });
 
+// The queue is grouped by word; each suggestion here becomes its own group
 function mockQueue(items, meta = {}) {
+  const groups = items.map(({ variant, ...s }) => ({ variant, suggestions: [s] }));
   getSuggestionQueue.mockResolvedValue({
-    data: { data: items, meta: { page: 1, limit: 20, total: items.length, pendingCount: items.length, approvedCount: 0, ...meta } },
+    data: { data: groups, meta: { page: 1, limit: 20, total: groups.length, pendingCount: items.length, approvedCount: 0, ...meta } },
   });
 }
 
@@ -83,7 +85,7 @@ describe('Moderation queue — Suggestions view', () => {
     expect(within(proposed).getByText(/^Register/)).toBeInTheDocument();
     expect(within(proposed).getByText('Formal')).toBeInTheDocument();
     expect(within(proposed).getByText(/Form \(Masculine plural, direct\)/)).toBeInTheDocument();
-    expect(screen.getByText('by zain')).toBeInTheDocument();
+    expect(within(proposed).getByText(/Proposed by zain/)).toBeInTheDocument();
   });
 
   it('moderator approves a pending suggestion and the list refreshes', async () => {
@@ -160,11 +162,11 @@ describe('Admin published panel — open suggestion lock', () => {
     render(
       <LookupsWrapper>
         <MemoryRouter>
-          <PublishedVariantRow variant={variant} concept={concept} openSuggestion={suggestion()} onReject={() => {}} onSave={() => {}} />
+          <ManagedVariantRow variant={variant} concept={concept} openSuggestions={[suggestion()]} onReject={() => {}} onSave={() => {}} />
         </MemoryRouter>
       </LookupsWrapper>
     );
-    expect(screen.getByText(/suggestion pending from the submitter/i)).toBeInTheDocument();
+    expect(screen.getByText(/suggestion pending — the fields they propose are locked/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /review it in suggestions/i })).toHaveAttribute('href', '/dashboard/queue?view=suggestions');
   });
 

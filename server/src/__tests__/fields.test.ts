@@ -376,8 +376,8 @@ describe('extra values on submissions', () => {
 });
 
 describe('extra values on edits', () => {
-  test('moderator edit merges extra, keeps omitted and deactivated values, and logs extra diffs', async () => {
-    const { token } = await makeUser('moderator');
+  test('admin edit merges extra, keeps omitted and deactivated values, and logs extra diffs', async () => {
+    const { token } = await makeUser('admin');
     await defineField({ key: 'plural', label: 'Plural' });
     await defineField({ key: 'register', label: 'Register', type: 'select', options: ['Formal', 'Slang'] });
     await defineField({ key: 'old', label: 'Old', active: false });
@@ -394,7 +394,7 @@ describe('extra values on edits', () => {
   });
 
   test('a deactivated field may be sent unchanged but not changed', async () => {
-    const { token } = await makeUser('moderator');
+    const { token } = await makeUser('admin');
     await defineField({ key: 'old', label: 'Old', active: false });
     const concept = await makeConcept();
     const variant = await makeVariant(concept, { extra: { old: 'keep me' } });
@@ -419,7 +419,7 @@ describe('extra values on edits', () => {
 
   test('user resubmit and concept edits validate extra the same way', async () => {
     const { id, token } = await makeUser('user');
-    const { token: modToken } = await makeUser('moderator');
+    const { token: adminToken } = await makeUser('admin');
     await defineField({ appliesTo: 'concept', key: 'etymology', label: 'Etymology' });
     const concept = await makeConcept({ status: 'rejected', submittedBy: id });
 
@@ -427,7 +427,7 @@ describe('extra values on edits', () => {
     expect((await send('patch', `/api/concepts/${concept._id}`, token, { extra: { etymology: 'Persian' } })).status).toBe(200);
     expect((await Concept.findById(concept._id).lean()).extra).toEqual({ etymology: 'Persian' });
 
-    const edit = await send('patch', `/api/concepts/${concept._id}/edit`, modToken, { note: 'n', extra: { etymology: 'Arabic' } });
+    const edit = await send('patch', `/api/concepts/${concept._id}/edit`, adminToken, { note: 'n', extra: { etymology: 'Arabic' } });
     expect(edit.status).toBe(200);
     const log = await ModerationLog.findOne({ action: 'edited' });
     expect(log.changes).toEqual({ 'extra.etymology': { from: 'Persian', to: 'Arabic' } });

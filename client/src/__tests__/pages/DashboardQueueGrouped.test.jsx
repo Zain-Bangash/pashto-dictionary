@@ -148,7 +148,7 @@ describe('Grouped queue — concept rows with variant dropdowns', () => {
 
   it('does not toggle the row when a concept action button is clicked', async () => {
     const user = userEvent.setup();
-    asModerator();
+    asAdmin();
     mockQueue([mockGroup({}, [mockVariant({ _id: 'v1', pashto: 'کور' })])]);
 
     renderQueue();

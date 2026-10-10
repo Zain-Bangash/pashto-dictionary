@@ -23,12 +23,13 @@ const ACTION_STYLES = {
   audio_published: { color: '#22d3ee', bg: 'rgba(34,211,238,0.08)', border: 'rgba(34,211,238,0.3)' },
   retired:         { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
   withdrawn:       { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
+  role_changed:    { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.3)'  },
 };
 
 const ALL_ACTIONS = [
   'submitted', 'approved', 'rejected', 'published',
   'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed', 'field_changed', 'suggestion_applied',
-  'audio_published', 'retired', 'withdrawn',
+  'audio_published', 'retired', 'withdrawn', 'role_changed',
 ];
 
 const MODEL_NAMES = { VariantSuggestion: 'Suggestion', AudioClip: 'Recording' };
@@ -66,6 +67,8 @@ function TargetLabel({ log }) {
         {t.slot && <span className="text-muted/60"> · {audioSlotLabel(t.slot)}</span>}
       </>
     );
+  } else if (model === 'User' && t?.username) {
+    label = <span className="text-warm/80">{t.username}</span>;
   } else if (model === 'Lookup' && log.changes?.type) {
     const { type, key } = log.changes;
     label = (

@@ -274,48 +274,44 @@ describe('Resubmitting after an admin rejects a published item', () => {
   });
 });
 
-describe('Editing published items is admin-only', () => {
-  test('moderator cannot edit a published concept', async () => {
+describe('Editing is admin-only and never touches rejected entries', () => {
+  test.each(['pending', 'approved', 'published'])('moderator cannot edit a %s concept or variant', async (status) => {
     const mod = await makeUser('moderator');
-    const concept = await makeConcept({ status: 'published' });
+    const concept = await makeConcept({ status });
+    const variant = await makeVariant(concept, { status });
 
-    const res = await patch(`/api/concepts/${concept._id}/edit`, mod.token, { englishGloss: 'changed', note: 'n' });
+    const c = await patch(`/api/concepts/${concept._id}/edit`, mod.token, { englishGloss: 'changed', note: 'n' });
+    const v = await patch(`/api/variants/${variant._id}/edit`, mod.token, { definition: 'changed', note: 'n' });
 
-    expect(res.status).toBe(403);
-    expect(res.body.error.message).toBe('Only admins can edit published entries');
+    expect(c.status).toBe(403);
+    expect(v.status).toBe(403);
   });
 
-  test('moderator cannot edit a published variant', async () => {
-    const mod = await makeUser('moderator');
-    const concept = await makeConcept({ status: 'published' });
-    const variant = await makeVariant(concept, { status: 'published' });
-
-    const res = await patch(`/api/variants/${variant._id}/edit`, mod.token, { definition: 'changed', note: 'n' });
-
-    expect(res.status).toBe(403);
-    expect(res.body.error.message).toBe('Only admins can edit published entries');
-  });
-
-  test('moderator can still edit a pending concept', async () => {
-    const mod = await makeUser('moderator');
-    const concept = await makeConcept({ status: 'pending' });
-
-    const res = await patch(`/api/concepts/${concept._id}/edit`, mod.token, { englishGloss: 'changed', note: 'n' });
-
-    expect(res.status).toBe(200);
-  });
-
-  test('admin can edit a published concept and variant', async () => {
+  test.each(['pending', 'approved', 'published'])('admin can edit a %s concept and variant without changing its status', async (status) => {
     const admin = await makeUser('admin');
-    const concept = await makeConcept({ status: 'published' });
-    const variant = await makeVariant(concept, { status: 'published' });
+    const concept = await makeConcept({ status });
+    const variant = await makeVariant(concept, { status });
 
     const c = await patch(`/api/concepts/${concept._id}/edit`, admin.token, { englishGloss: 'changed', note: 'n' });
     const v = await patch(`/api/variants/${variant._id}/edit`, admin.token, { definition: 'changed', note: 'n' });
 
     expect(c.status).toBe(200);
-    expect(c.body.data.status).toBe('published');
+    expect(c.body.data.status).toBe(status);
     expect(v.status).toBe(200);
-    expect(v.body.data.status).toBe('published');
+    expect(v.body.data.status).toBe(status);
+  });
+
+  test('admin cannot edit a rejected concept or variant', async () => {
+    const admin = await makeUser('admin');
+    const concept = await makeConcept({ status: 'rejected' });
+    const variant = await makeVariant(concept, { status: 'rejected' });
+
+    const c = await patch(`/api/concepts/${concept._id}/edit`, admin.token, { englishGloss: 'changed', note: 'n' });
+    const v = await patch(`/api/variants/${variant._id}/edit`, admin.token, { definition: 'changed', note: 'n' });
+
+    expect(c.status).toBe(400);
+    expect(c.body.error.message).toMatch(/Rejected entries can't be edited/);
+    expect(v.status).toBe(400);
+    expect((await Variant.findById(variant._id)).definition).not.toBe('changed');
   });
 });
