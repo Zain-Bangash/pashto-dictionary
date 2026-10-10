@@ -26,6 +26,20 @@ Parameters:
     Type: String
     Default: strict
     AllowedValues: [strict, lax, none]
+  # S3-compatible object storage for pronunciation clips (Cloudflare R2)
+  StorageEndpoint:
+    Type: String
+  StorageRegion:
+    Type: String
+    Default: auto
+  StorageBucket:
+    Type: String
+  StorageAccessKeyId:
+    Type: String
+    NoEcho: true
+  StorageSecretAccessKey:
+    Type: String
+    NoEcho: true
 
 Resources:
   PashtoApi:
@@ -53,6 +67,11 @@ Resources:
           COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
           FRONTEND_ORIGIN: !Ref FrontendOrigin
           COOKIE_SAMESITE: !Ref CookieSameSite
+          STORAGE_ENDPOINT: !Ref StorageEndpoint
+          STORAGE_REGION: !Ref StorageRegion
+          STORAGE_BUCKET: !Ref StorageBucket
+          STORAGE_ACCESS_KEY_ID: !Ref StorageAccessKeyId
+          STORAGE_SECRET_ACCESS_KEY: !Ref StorageSecretAccessKey
       Policies:
         - Statement:
             - Effect: Allow
