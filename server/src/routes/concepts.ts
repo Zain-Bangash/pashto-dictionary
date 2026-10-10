@@ -71,8 +71,8 @@ router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id', verifyToken, updateValidators, updateConcept);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionConceptStatus);
-router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editValidators, editConcept);
-router.post('/:sourceId/merge', verifyToken, requireModeratorOrAdmin, mergeConcepts);
+router.patch('/:id/edit', verifyToken, requireRole('admin'), editValidators, editConcept);
+router.post('/:sourceId/merge', verifyToken, requireRole('admin'), mergeConcepts);
 router.delete('/:id', verifyToken, requireRole('admin'), deleteConcept);
 
 export = router;

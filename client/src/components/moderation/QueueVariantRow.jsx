@@ -73,7 +73,7 @@ export default function QueueVariantRow({ variant, concept, isAdmin, conflicts, 
                 <button onClick={() => onReject('variants', variant._id)} className={REJECT_BTN}>Reject</button>
               </>
             )}
-            <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>
+            {isAdmin && <button onClick={() => setEditing((e) => !e)} className={EDIT_BTN}>Edit</button>}
           </div>
           {hint && <p className="text-[11px] font-ui text-amber-300/80">{hint}</p>}
         </div>

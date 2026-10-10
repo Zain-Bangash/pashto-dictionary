@@ -424,8 +424,8 @@ describe('entries validate against active list values', () => {
     expect(changed.body.error.field).toBe('region');
   });
 
-  test('moderator edit keeps an unchanged inactive region, rejects a newly chosen inactive one, and rejects an empty one', async () => {
-    const { token } = await makeUser('moderator');
+  test('admin edit keeps an unchanged inactive region, rejects a newly chosen inactive one, and rejects an empty one', async () => {
+    const { token } = await makeUser('admin');
     await retired('region', 'Bajaur');
     const concept = await Concept.create({ englishGloss: 'water', partOfSpeech: 'noun' });
     const variant = await Variant.create({ concept: concept._id, pashto: 'اوبه', region: 'Kohat', definition: 'd', status: 'pending' });
@@ -441,13 +441,13 @@ describe('entries validate against active list values', () => {
 
   test('concept edit and resubmit follow the same rule for part of speech', async () => {
     const { id, token } = await makeUser('user');
-    const { token: modToken } = await makeUser('moderator');
+    const { token: adminToken } = await makeUser('admin');
     await retired('partOfSpeech', 'particle');
     const pending = await Concept.create({ englishGloss: 'water', partOfSpeech: 'noun' });
     const rejected = await Concept.create({ englishGloss: 'just', partOfSpeech: 'particle', status: 'rejected', submittedBy: id });
 
-    expect((await send('patch', `/api/concepts/${pending._id}/edit`, modToken, { partOfSpeech: 'particle', note: 'n' })).status).toBe(400);
-    expect((await send('patch', `/api/concepts/${pending._id}/edit`, modToken, { partOfSpeech: 'verb', note: 'n' })).status).toBe(200);
+    expect((await send('patch', `/api/concepts/${pending._id}/edit`, adminToken, { partOfSpeech: 'particle', note: 'n' })).status).toBe(400);
+    expect((await send('patch', `/api/concepts/${pending._id}/edit`, adminToken, { partOfSpeech: 'verb', note: 'n' })).status).toBe(200);
     expect((await send('patch', `/api/concepts/${rejected._id}`, token, { partOfSpeech: 'particle', englishGloss: 'only' })).status).toBe(200);
   });
 });

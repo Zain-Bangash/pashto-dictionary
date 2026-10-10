@@ -5,6 +5,7 @@ import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import VariantSuggestion from '../models/VariantSuggestion';
 import AudioClip from '../models/AudioClip';
+import User from '../models/User';
 import { enrichActors } from '../utils/enrichActors';
 import { getGroupedQueuePage, countQueueItems, QueueStatus } from '../utils/groupedQueue';
 
@@ -100,7 +101,7 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied', 'retired', 'withdrawn', 'audio_published'];
+  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied', 'retired', 'withdrawn', 'audio_published', 'role_changed'];
   const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition', 'VariantSuggestion', 'AudioClip'];
   const filter: Record<string, unknown> = {};
 
@@ -122,6 +123,7 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const variantIds: string[] = [];
   const suggestionIds: string[] = [];
   const clipIds: string[] = [];
+  const userIds: string[] = [];
   for (const log of withPerformers) {
     const id = String(log.targetId ?? '');
     if (!id) continue;
@@ -129,6 +131,7 @@ async function getLog(req: Request, res: Response): Promise<void> {
     if (log.targetModel === 'Variant') variantIds.push(id);
     if (log.targetModel === 'VariantSuggestion') suggestionIds.push(id);
     if (log.targetModel === 'AudioClip') clipIds.push(id);
+    if (log.targetModel === 'User') userIds.push(id);
   }
 
   // Suggestions and recordings are labelled by the word they belong to
@@ -144,9 +147,10 @@ async function getLog(req: Request, res: Response): Promise<void> {
   }
   for (const c of clips) clipSlot[String(c._id)] = c.slot;
 
-  const [concepts, variants] = await Promise.all([
+  const [concepts, variants, users] = await Promise.all([
     conceptIds.length ? Concept.find({ _id: { $in: conceptIds } }, 'englishGloss').lean() : Promise.resolve([]),
     variantIds.length ? Variant.find({ _id: { $in: variantIds } }, 'pashto region').lean() : Promise.resolve([]),
+    userIds.length ? User.find({ _id: { $in: userIds } }, 'username').lean() : Promise.resolve([]),
   ]);
 
   const conceptMap: Record<string, unknown> = {};
@@ -155,10 +159,14 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const variantMap: Record<string, unknown> = {};
   for (const v of variants) variantMap[String((v as unknown as Doc)._id)] = v;
 
+  const userMap: Record<string, unknown> = {};
+  for (const u of users) userMap[String(u._id)] = u;
+
   const data = withPerformers.map(log => ({
     ...log,
     target: log.targetModel === 'Concept' ? (conceptMap[String(log.targetId)] ?? null)
           : log.targetModel === 'Variant' ? (variantMap[String(log.targetId)] ?? null)
+          : log.targetModel === 'User' ? (userMap[String(log.targetId)] ?? null)
           : log.targetModel === 'VariantSuggestion' ? (variantMap[parentVariant[String(log.targetId)]] ?? null)
           : log.targetModel === 'AudioClip' && variantMap[parentVariant[String(log.targetId)]]
             ? { ...(variantMap[parentVariant[String(log.targetId)]] as Doc), slot: clipSlot[String(log.targetId)] }

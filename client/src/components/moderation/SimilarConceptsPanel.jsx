@@ -27,12 +27,12 @@ export default function SimilarConceptsPanel({ item, onMergeRequest }) {
           <p className="text-xs font-ui text-amber-300">
             Similar concept: &ldquo;{s.englishGloss}&rdquo;
           </p>
-          <button
+          {onMergeRequest && <button
             onClick={() => onMergeRequest(item, s)}
             className="px-2.5 py-1 bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-ui font-semibold rounded-[8px] hover:bg-amber-400/20 transition-colors whitespace-nowrap"
           >
             Merge into this
-          </button>
+          </button>}
         </div>
       ))}
     </div>
