@@ -3,6 +3,7 @@ import { updateConcept } from '../../services/api';
 import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import { inputCls, labelCls, PRIMARY_BTN, CANCEL_BTN } from './styles';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
   const [englishGloss, setEnglishGloss] = useState(concept.englishGloss);
@@ -10,14 +11,15 @@ export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
   const [extra, setExtra] = useState(concept.extra || {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { send, dialog } = useAudioRetireConfirm();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      const res = await updateConcept(concept._id, { englishGloss, partOfSpeech, extra });
-      onSave(res.data.data);
+      const res = await send((confirm) => updateConcept(concept._id, { englishGloss, partOfSpeech, extra, ...confirm }));
+      if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
     } finally {
@@ -72,6 +74,7 @@ export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
           Cancel
         </button>
       </div>
+      {dialog}
     </form>
   );
 }

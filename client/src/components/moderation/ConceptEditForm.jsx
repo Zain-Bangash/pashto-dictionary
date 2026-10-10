@@ -5,6 +5,7 @@ const editConcept = (id, data) => api.patch(`/api/concepts/${id}/edit`, data);
 
 import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 export default function ConceptEditForm({ item, onSave, onCancel }) {
   const [englishGloss, setEnglishGloss] = useState(item.englishGloss || '');
@@ -13,6 +14,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { send, dialog } = useAudioRetireConfirm();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,8 +22,8 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
     setSaving(true);
     setError('');
     try {
-      const res = await editConcept(item._id, { englishGloss, partOfSpeech, extra, note });
-      onSave(res.data.data);
+      const res = await send((confirm) => editConcept(item._id, { englishGloss, partOfSpeech, extra, note, ...confirm }));
+      if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
     } finally {
@@ -86,6 +88,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
           Save
         </button>
       </div>
+      {dialog}
     </form>
   );
 }

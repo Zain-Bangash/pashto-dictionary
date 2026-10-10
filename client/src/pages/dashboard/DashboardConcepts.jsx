@@ -3,6 +3,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import PublishedConceptPanel from '../../components/moderation/PublishedConceptPanel';
 import useLookups from '../../hooks/useLookups';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 // Use api.get/post directly so vi.fn() mocks on api.* work in tests
 const suggestConcepts = (q) => api.get(`/api/concepts/suggest?q=${encodeURIComponent(q)}`);
@@ -140,6 +141,7 @@ export default function DashboardConcepts() {
   const [actionError, setActionError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const isAdmin = useAuth()?.user?.role === 'admin';
+  const { send, dialog } = useAudioRetireConfirm();
 
   const fetchConcepts = (statusFilter, searchQuery) => {
     setLoading(true);
@@ -174,7 +176,7 @@ export default function DashboardConcepts() {
   const handleMergeConfirm = async (targetConceptId, note) => {
     setActionError(null);
     try {
-      await mergeConcepts(mergeSource._id, { targetConceptId, note });
+      await send((confirm) => mergeConcepts(mergeSource._id, { targetConceptId, note, ...confirm }));
       setMergeSource(null);
       fetchConcepts(status, search);
     } catch (err) {
@@ -301,6 +303,7 @@ export default function DashboardConcepts() {
           onCancel={() => setMergeSource(null)}
         />
       )}
+      {dialog}
     </div>
   );
 }

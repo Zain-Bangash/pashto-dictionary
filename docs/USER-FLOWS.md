@@ -18,6 +18,10 @@ As a guest, a concept's detail page also shows any extra field values admins hav
 
 As a guest, under each regional variant on a concept page I can expand a "Forms" list showing the word's grammatical forms (for example masculine plural direct, or past tense), each with its Pashto text, phonetic and example sentence. Searching for any form's Pashto text, such as a plural, finds the word.
 
+As a guest, a regional variant on a concept page has a play button beside the word when a published recording exists, with "Recorded by <username> (village, region)" under it. Recordings of the example sentence and of grammatical forms are listed in the region's panel, each with its text, a play button and the speaker's credit. If my device cannot play a recording's format (for example an older iPhone and a WebM clip), I see "Can't play on this device" instead of a broken button. Recordings that are still under review are never played to me.
+
+As a guest, clicking "Record a pronunciation" on a concept page takes me to the Login page.
+
 As a guest I can open Wanted Words from the navbar. It lists published concepts that have no word yet in the selected region — any submitted word for that region, even one under review or rejected, removes the concept from the list. I can switch region with the pills (the choice stays in the URL), search by English meaning, and page through the results. Clicking "Add your [Region] word" sends me to log in, then straight back to the Submit page.
 
 As a guest I should be able to click Register in the navbar to go to the Register page.
@@ -74,6 +78,16 @@ As a user, My Submissions has a "Needs completion (n)" chip. It lists my publish
 
 As a user, "Complete this" opens a form with inputs only for the blank details; forms I already have are shown but cannot be picked again. My word stays live and unchanged while a moderator reviews my suggestion and an admin publishes it. The row then shows "Suggestion pending" or "Suggestion approved". If it is rejected, I see the moderator's note and can edit and resubmit it. I can have only one open suggestion per word, and I cannot change a detail that is already filled — the server names the field.
 
+As a user, on any published word I can click "Record a pronunciation", including words other people added. I pick what I am recording: the word, the example sentence (only if it has text), or any grammatical form the part of speech allows, even a form with no text yet. The recorder shows the Pashto text I should say and a time limit (longer words and the example get more time, up to 10 seconds for a word and 20 for an example). Recording stops by itself at the limit. I can listen back, discard it and record again, then submit it for review.
+
+As a user, if my browser cannot record, or I deny the microphone, I am told so and can upload a recording instead (WebM, M4A, MP3 or Ogg such as a WhatsApp voice note, up to 1 MB). The server checks the real length of the file; a recording that is too long, too short, not audio, or in another format is refused with a message.
+
+As a user, if someone's recording for the same word and slot is already under review, that slot is marked "under review" and I cannot pick it until the review ends. A slot that already has a published recording can still be recorded again; mine waits for review beside the current one and replaces it only if an admin publishes it.
+
+As a user, My Submissions lists "Your recordings" with each one's status (pending, approved, published, rejected, replaced or withdrawn), a play button while it is under review or live, and the moderator's note if it was rejected. I can withdraw a recording that is still pending. A rejected recording is final; to try again I record a new one.
+
+As a user, when I edit and resubmit my rejected word, if my change alters text that has recordings (the word, the example, or a form) I am warned which recordings will be removed, and nothing is saved unless I confirm.
+
 ---
 
 ## Moderator
@@ -114,6 +128,8 @@ As a moderator I should be able to trigger a merge from the Concepts list page i
 
 As a moderator, the Moderation Queue has Entries and Suggestions views. Entries is the queue described above. Suggestions lists pending suggestions, each showing the live word and every proposed value next to its blank current value, and who sent it. I can approve one, or reject it with a note, but not one I submitted myself. I can edit a pending suggestion that is not mine (a note is required, and the change is logged); fill-only still applies.
 
+As a moderator, the Moderation Queue also has an Audio view listing pending recordings. Each row shows the word, its region and concept, the slot and the Pashto text the speaker should be saying, the recording's length and who recorded it. When a recording would replace a published one, the current and the replacement recordings are shown side by side and both can be played. I can approve one, or reject it with a note; I cannot review a recording I made myself (the buttons are disabled and the server returns 403).
+
 As a moderator, when I reject a concept, all of that concept's pending, approved, or published variants are automatically rejected and removed from the variant queue. Each variant's submitter sees "Concept "X" was rejected: <reason>" in My Submissions and can resubmit. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
 
 As a moderator I cannot edit or reject a published concept or variant — only admins can. The server rejects the attempt with a 403.
@@ -139,6 +155,16 @@ As an admin, the Suggestions view has its own Pending / Approved filter with cou
 As an admin, a published word with an open suggestion shows "Suggestion pending — review it in Suggestions" in the Concepts panel, and its Edit form locks the proposed fields until the suggestion is resolved. Other fields stay editable.
 
 As an admin, when I reject or delete a published word, any open suggestion on it is rejected automatically with a note naming the cause.
+
+As an admin, the Audio view has its own Pending / Approved filter with counts. Publishing an approved recording makes it live on the concept page; if it replaces a published recording, the old one is retired and its audio deleted. I can reject an approved recording with a note. Moderators cannot publish.
+
+As an admin, a published word in the Concepts panel lists its live recordings with play buttons and a Remove button; removing one needs a note and takes it off the site.
+
+As an admin, when I reject or delete a published word, recordings under review for it are rejected automatically. Its published recordings are hidden while the word is off the site and come back if it is republished with the same text.
+
+As an admin or moderator, if an edit would change text that has recordings — the word's Pashto, the example (including clearing it), a form's Pashto or removing a form, the concept's part of speech, a merge, or moving the variant to a concept with a different part of speech — I see a warning listing the recordings that will be removed and who recorded them. Nothing is saved unless I confirm; on confirm the recordings are retired, their audio is deleted and each removal is logged. Filling in a form that had no text keeps its recording.
+
+As an admin, the Moderation Log includes recordings (filter type "Recording"): submitted, approved, rejected, published, retired and withdrawn, each labelled with the word and slot, plus an `audio_published` entry on the word itself saying whether a recording was added or replaced.
 
 As an admin I should be able to publish an approved concept or variant, which moves it to the published state and writes a ModerationLog record. Once published, variants appear on the public Concepts and Concept Detail pages.
 

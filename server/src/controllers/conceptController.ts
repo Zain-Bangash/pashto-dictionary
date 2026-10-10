@@ -10,6 +10,8 @@ import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 import { isDuplicateKey } from '../utils/duplicateKey';
 import { rejectOpenSuggestions } from '../utils/suggestions';
+import { attachAudio, rejectOpenClips, staleClips, retireClips, needsRetireConfirm, slotSnapshot } from '../utils/audioClips';
+import { IAudioClip } from '../types/models';
 
 type Doc = Record<string, unknown>;
 
@@ -147,7 +149,8 @@ async function getConcept(req: Request, res: Response): Promise<void> {
   const rawVariants = await Variant.find({ concept: id, status: 'published', isDeleted: { $ne: true } }, { 'forms.normalizedPashto': 0 }).lean();
 
   const [enrichedConcept] = await enrichActors([found as unknown as Doc], 'submittedBy');
-  const variants = await enrichActors(rawVariants as unknown as Doc[], 'submittedBy');
+  const enrichedVariants = await enrichActors(rawVariants as unknown as Doc[], 'submittedBy');
+  const variants = await attachAudio(enrichedVariants as Parameters<typeof attachAudio>[0], found.partOfSpeech);
 
   res.status(200).json({ success: true, data: { ...enrichedConcept, variants } });
 }
@@ -362,6 +365,7 @@ async function transitionConceptStatus(req: Request, res: Response): Promise<voi
       })
     );
     await rejectOpenSuggestions(variantsToDelete.map((v) => v._id as mongoose.Types.ObjectId), req.user!.id, cascadeNote);
+    await rejectOpenClips(variantsToDelete.map((v) => v._id as mongoose.Types.ObjectId), req.user!.id, cascadeNote);
   }
 
   res.status(200).json({ success: true, data: concept });
@@ -447,6 +451,7 @@ async function deleteConcept(req: Request, res: Response): Promise<void> {
 
   const variantIds = await Variant.distinct('_id', { concept: concept._id });
   await rejectOpenSuggestions(variantIds, req.user!.id, `Concept "${concept.englishGloss}" was removed`);
+  await rejectOpenClips(variantIds, req.user!.id, `Concept "${concept.englishGloss}" was removed`);
 
   res.status(200).json({ success: true, data: concept });
 }
@@ -503,11 +508,15 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     before[field as string] = concept[field];
   }
 
+  const stale = await clipsStaleAfterPosChange(concept._id as mongoose.Types.ObjectId, concept.partOfSpeech, req.body.partOfSpeech as string | undefined);
+  if (await needsRetireConfirm(req, res, stale)) return;
+
   if (req.body.englishGloss !== undefined) concept.englishGloss = req.body.englishGloss as string;
   if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech as string;
   const extraChanges = applyExtra(concept, extra.values);
 
   await concept.save();
+  await retireClips(stale, req.user!.id, 'The part of speech changed');
 
   const changes: Record<string, unknown> = { ...extraChanges };
   for (const field of editableFields) {
@@ -526,6 +535,18 @@ async function editConcept(req: Request, res: Response): Promise<void> {
   }).save();
 
   res.status(200).json({ success: true, data: concept });
+}
+
+// Form-slot clips on the concept's variants that a part-of-speech change would orphan
+async function clipsStaleAfterPosChange(conceptId: mongoose.Types.ObjectId, current: string, next: string | undefined): Promise<IAudioClip[]> {
+  if (next === undefined || next === current) return [];
+  const variants = await Variant.find({ concept: conceptId }, 'pashto example forms');
+  const stale: IAudioClip[] = [];
+  for (const variant of variants) {
+    const text = slotSnapshot(variant);
+    stale.push(...(await staleClips(variant._id as mongoose.Types.ObjectId, text, text, next)));
+  }
+  return stale;
 }
 
 async function mergeConcepts(req: Request, res: Response): Promise<void> {
@@ -589,9 +610,19 @@ async function mergeConcepts(req: Request, res: Response): Promise<void> {
     }
   }
 
+  const stale: IAudioClip[] = [];
+  if (targetConcept.partOfSpeech !== sourceConcept.partOfSpeech) {
+    for (const variant of sourceVariants.filter((v) => movedIds.some((id) => id.equals(v._id as mongoose.Types.ObjectId)))) {
+      const text = slotSnapshot(variant);
+      stale.push(...(await staleClips(variant._id as mongoose.Types.ObjectId, text, text, targetConcept.partOfSpeech)));
+    }
+  }
+  if (await needsRetireConfirm(req, res, stale)) return;
+
   if (movedIds.length > 0) {
     await Variant.updateMany({ _id: { $in: movedIds } }, { concept: targetConceptId });
   }
+  await retireClips(stale, req.user!.id, 'The word moved to a concept with a different part of speech');
 
   sourceConcept.isDeleted = true;
   sourceConcept.deletedAt = new Date();
@@ -660,12 +691,16 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const stale = await clipsStaleAfterPosChange(concept._id as mongoose.Types.ObjectId, concept.partOfSpeech, partOfSpeech);
+  if (await needsRetireConfirm(req, res, stale)) return;
+
   if (englishGloss !== undefined) concept.englishGloss = englishGloss;
   if (partOfSpeech !== undefined) concept.partOfSpeech = partOfSpeech;
   applyExtra(concept, extra.values);
   concept.status = 'pending';
   concept.moderatorNote = undefined;
   await concept.save();
+  await retireClips(stale, req.user!.id, 'The part of speech changed');
 
   await new ModerationLog({
     targetModel: 'Concept',

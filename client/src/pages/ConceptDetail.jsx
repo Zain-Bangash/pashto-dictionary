@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
 import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
-import FormsDisplay from '../components/forms/FormsDisplay';
+import VariantCard from '../components/concept/VariantCard';
 
 export default function ConceptDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
   const { labelFor } = useLookups();
-  const navigate = useNavigate();
   const [concept, setConcept] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedRegionIdx, setSelectedRegionIdx] = useState({});
 
   useEffect(() => {
     api.get(`/api/concepts/${id}`)
@@ -77,84 +73,9 @@ export default function ConceptDetail() {
               <section>
                 <h2 className="font-ui text-muted text-xs uppercase tracking-widest mb-3">Regional Variants</h2>
                 <ul className="space-y-4">
-                  {variantGroups.map((group) => {
-                    const pashtoWord = group[0].pashto;
-                    const activeIdx  = selectedRegionIdx[pashtoWord] ?? 0;
-                    const selected   = group[activeIdx];
-
-                    return (
-                      <li
-                        key={pashtoWord}
-                        className="bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-6 space-y-3"
-                      >
-                        {/* Pashto word */}
-                        <div
-                          dir="rtl"
-                          className="font-pashto text-warm font-bold"
-                          style={{ fontSize: 56, lineHeight: 1.7 }}
-                        >
-                          {pashtoWord}
-                        </div>
-
-                        {/* Region tab strip */}
-                        <div className="flex gap-2 flex-wrap">
-                          {group.map((v, idx) => (
-                            <button
-                              key={v._id}
-                              type="button"
-                              onClick={() => setSelectedRegionIdx((prev) => ({ ...prev, [pashtoWord]: idx }))}
-                              className="text-xs font-ui px-3 py-1 rounded-full transition-all"
-                              style={{
-                                background: activeIdx === idx ? 'rgba(0,245,180,0.12)' : 'rgba(255,255,255,0.05)',
-                                border: `1px solid ${activeIdx === idx ? 'rgba(0,245,180,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                                color: activeIdx === idx ? '#00f5b4' : '#888',
-                              }}
-                            >
-                              {labelFor('region', v.region)}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Per-region: phonetic, definition, example */}
-                        {selected.phonetic && (
-                          <p className="font-display text-lg italic text-gold">{selected.phonetic}</p>
-                        )}
-                        <p className="font-ui text-warm/80 text-sm leading-relaxed">{selected.definition}</p>
-                        {selected.example && (
-                          <p className="font-ui text-muted text-sm italic">{selected.example}</p>
-                        )}
-                        <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
-                        <FormsDisplay key={selected._id} forms={selected.forms} />
-
-                        {selected.submittedBy?.username && (
-                          <p className="text-[11px] font-ui text-muted/40">
-                            Added by {selected.submittedBy.username}
-                            {(selected.submittedBy.village || selected.submittedBy.region) && (
-                              <span className="ml-1">
-                                ({[selected.submittedBy.village, labelFor('region', selected.submittedBy.region)].filter(Boolean).join(', ')})
-                              </span>
-                            )}
-                          </p>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!user) { navigate('/login'); return; }
-                            const params = new URLSearchParams({
-                              conceptId: concept._id,
-                              pashto: pashtoWord,
-                              ...(selected.phonetic && { phonetic: selected.phonetic }),
-                            });
-                            navigate(`/submit?${params.toString()}`);
-                          }}
-                          className="mt-1 text-xs font-ui text-gold/70 hover:text-gold transition-colors"
-                        >
-                          + I also say this in my region
-                        </button>
-                      </li>
-                    );
-                  })}
+                  {variantGroups.map((group) => (
+                    <VariantCard key={group[0].pashto} group={group} conceptId={concept._id} />
+                  ))}
                 </ul>
               </section>
             )}

@@ -13,6 +13,7 @@ import statsRouter from './routes/stats';
 import lookupsRouter from './routes/lookups';
 import fieldsRouter from './routes/fields';
 import suggestionsRouter from './routes/suggestions';
+import audioRouter from './routes/audio';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/stats', statsRouter);
 app.use('/api/lookups', lookupsRouter);
 app.use('/api/fields', fieldsRouter);
 app.use('/api/suggestions', suggestionsRouter);
+app.use('/api/audio', audioRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(err.message);

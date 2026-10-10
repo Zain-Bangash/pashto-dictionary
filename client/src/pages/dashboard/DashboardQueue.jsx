@@ -1,13 +1,16 @@
 import { useSearchParams } from 'react-router-dom';
 import EntryQueue from '../../components/moderation/EntryQueue';
 import SuggestionQueue from '../../components/moderation/SuggestionQueue';
+import AudioQueue from '../../components/audio/AudioQueue';
 
-const VIEWS = [['entries', 'Entries'], ['suggestions', 'Suggestions']];
+const VIEWS = [['entries', 'Entries'], ['suggestions', 'Suggestions'], ['audio', 'Audio']];
+const QUEUES = { entries: EntryQueue, suggestions: SuggestionQueue, audio: AudioQueue };
 const TAB = 'font-ui text-sm px-4 py-1.5 rounded-[10px] transition-colors';
 
 export default function DashboardQueue() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = searchParams.get('view') === 'suggestions' ? 'suggestions' : 'entries';
+  const view = QUEUES[searchParams.get('view')] ? searchParams.get('view') : 'entries';
+  const Queue = QUEUES[view];
 
   return (
     <div>
@@ -25,7 +28,7 @@ export default function DashboardQueue() {
           </button>
         ))}
       </div>
-      {view === 'entries' ? <EntryQueue /> : <SuggestionQueue />}
+      <Queue />
     </div>
   );
 }

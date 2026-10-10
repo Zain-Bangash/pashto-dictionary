@@ -130,6 +130,32 @@ export function getSuggestionQueue(params = {}) {
   return api.get('/api/moderation/suggestions', { params });
 }
 
+// ── Pronunciation audio ──────────────────────────────────────────────────────
+
+// The body is the raw recording; the server reads the real format from its bytes
+export function uploadAudio(variantId, slot, blob) {
+  return api.post(`/api/variants/${variantId}/audio`, blob, {
+    params: { slot },
+    headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+  });
+}
+
+export function withdrawAudio(id) {
+  return api.delete(`/api/audio/${id}`);
+}
+
+export function transitionAudio(id, body) {
+  return api.patch(`/api/audio/${id}/status`, body);
+}
+
+export function getAudioQueue(params = {}) {
+  return api.get('/api/moderation/audio', { params });
+}
+
+export function getMyAudio(params = {}) {
+  return api.get('/api/audio/mine', { params });
+}
+
 // ── Lookup (preset list) functions ────────────────────────────────────────────
 
 export function getLookups() {

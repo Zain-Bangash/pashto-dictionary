@@ -435,3 +435,28 @@ Safari blocks the cross-site refresh cookie, so Safari users are logged out on r
 2. Set the Amplify env var `VITE_API_URL` to the Amplify origin and redeploy the frontend.
 3. Change the `CookieSameSite` default in `template.yaml` to `strict` and deploy.
 4. Check in a branch preview that `Set-Cookie` passes through the rewrite before relying on it.
+
+---
+
+## Pronunciation Audio `[S5]`
+
+Logged-in users record or upload a short clip for any slot of a published word (headword, example, each grammatical form slot). Clips are moderated in their own `AudioClip` collection, stored in a private Cloudflare R2 bucket and played through 1-hour signed URLs. Why and trade-offs: ARCHITECTURE.md › *Pronunciation audio*.
+
+- Server: `models/AudioClip.ts`; `utils/audioProbe.ts` (WebM/MP4/Ogg/MP3 magic bytes and real duration, no dependencies); `utils/audioSlots.ts`; `utils/audioClips.ts` (cascades, retire-on-text-change, `attachAudio`); `utils/storage.ts` (S3-compatible client); `controllers/audioController.ts`; `routes/audio.ts`; `middleware/rawAudio.ts` (1 MB raw body, after auth); `audioLimiter` (20 / 15 min); `scripts/cleanOrphanAudio.ts` (`npm run audio:clean`, `--dry-run` supported).
+- Hooks in existing controllers: concept/variant reject and delete cascade to open clips; staff edit, resubmit, part-of-speech change and merge return `409 confirmAudioRetire` before retiring clips.
+- Client: `components/audio/` (recorder, play button, variant audio list, queue + row, My Recordings, admin published clips, retire dialog); `hooks/useRecorder.js`, `hooks/useAudioRetireConfirm.jsx`; `components/concept/VariantCard.jsx` extracted from `ConceptDetail.jsx`; Audio tab in the moderation queue; audit-log badges.
+- Dependencies: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` (bundled by esbuild; the Lambda bundle builds at about 6.4 MB unminified).
+- Test fixtures: real Chrome MediaRecorder output (`server/src/__tests__/fixtures/audio/`, WebM/Opus and fragmented MP4), recorded with Playwright's Chromium. MP3 and Ogg are built in the test.
+
+### Manual step — Cloudflare R2 bucket and token
+
+1. Create a Cloudflare account (free) → **R2 Object Storage** → enable R2. A card is required, but the free tier (10 GB storage, 1M writes and 10M reads per month, no egress fees) covers this project.
+2. **Create bucket**: `pashto-dictionary-audio` (production) and `pashto-dictionary-audio-dev` (local development). Location: Automatic (or Asia-Pacific). Leave **public access off**: clips are only served through signed URLs.
+3. No CORS rule is needed: uploads go through Lambda, and `<audio>` playback of a signed URL is not a CORS request.
+4. **R2 → Manage R2 API Tokens → Create API token**: permission **Object Read & Write**, scoped to the two buckets only, no expiry (or rotate yearly). Copy the **Access Key ID** and **Secret Access Key**; the secret is shown once.
+5. Note the S3 endpoint shown on the bucket page: `https://<account-id>.r2.cloudflarestorage.com`.
+6. Local: add to `server/.env` (see `.env.example`): `STORAGE_ENDPOINT`, `STORAGE_REGION=auto`, `STORAGE_BUCKET=pashto-dictionary-audio-dev`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`.
+7. GitHub → Settings → Secrets and variables → Actions → add `STORAGE_ENDPOINT`, `STORAGE_BUCKET` (`pashto-dictionary-audio`), `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`. `deploy.yml` passes them to the new `template.yaml` parameters (`StorageEndpoint`, `StorageBucket`, `StorageAccessKeyId`, `StorageSecretAccessKey`; the last two are `NoEcho`). **Add the secrets before merging to `main`**, or `sam deploy` fails on the missing parameters.
+8. Optional, recommended: once a month run `npm run audio:clean -- --dry-run` against production, then without `--dry-run` if it reports files.
+
+Swapping to Backblaze B2 (the fallback) is the same steps with a B2 bucket and application key: set `STORAGE_ENDPOINT` to the B2 S3 endpoint (for example `https://s3.us-west-004.backblazeb2.com`) and `STORAGE_REGION` to its region. No code changes.

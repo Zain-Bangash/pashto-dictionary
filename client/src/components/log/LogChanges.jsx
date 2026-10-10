@@ -1,5 +1,6 @@
 import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 import { slotLabel } from '../../utils/forms';
+import { audioSlotLabel } from '../../utils/audio';
 
 const OWNER = { Concept: 'concept', Variant: 'variant', VariantSuggestion: 'variant' };
 
@@ -100,6 +101,14 @@ export default function LogChanges({ log }) {
         {moved} variant{moved !== 1 ? 's' : ''} moved
         {skipped > 0 && <>, {skipped} skipped (duplicate)</>}
         {note && <> · <span className="italic">{note}</span></>}
+      </p>
+    );
+  }
+
+  if (action === 'audio_published' && changes?.slot) {
+    return (
+      <p className="text-[11px] font-ui text-muted/70 mt-1.5">
+        {audioSlotLabel(changes.slot)} recording {changes.replaced ? 'replaced' : 'added'}
       </p>
     );
   }

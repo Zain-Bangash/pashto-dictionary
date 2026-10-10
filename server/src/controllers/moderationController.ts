@@ -4,6 +4,7 @@ import Concept from '../models/Concept';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import VariantSuggestion from '../models/VariantSuggestion';
+import AudioClip from '../models/AudioClip';
 import { enrichActors } from '../utils/enrichActors';
 import { getGroupedQueuePage, countQueueItems, QueueStatus } from '../utils/groupedQueue';
 
@@ -99,8 +100,8 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied'];
-  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition', 'VariantSuggestion'];
+  const VALID_ACTIONS = ['submitted', 'approved', 'rejected', 'published', 'resubmitted', 'profile_updated', 'deleted', 'edited', 'merged', 'lookup_changed', 'field_changed', 'suggestion_applied', 'retired', 'withdrawn', 'audio_published'];
+  const VALID_MODELS  = ['Concept', 'Variant', 'User', 'Lookup', 'FieldDefinition', 'VariantSuggestion', 'AudioClip'];
   const filter: Record<string, unknown> = {};
 
   const actionParam = req.query.action as string;
@@ -120,21 +121,28 @@ async function getLog(req: Request, res: Response): Promise<void> {
   const conceptIds: string[] = [];
   const variantIds: string[] = [];
   const suggestionIds: string[] = [];
+  const clipIds: string[] = [];
   for (const log of withPerformers) {
     const id = String(log.targetId ?? '');
     if (!id) continue;
     if (log.targetModel === 'Concept') conceptIds.push(id);
     if (log.targetModel === 'Variant') variantIds.push(id);
     if (log.targetModel === 'VariantSuggestion') suggestionIds.push(id);
+    if (log.targetModel === 'AudioClip') clipIds.push(id);
   }
 
-  // A suggestion is labelled by the word it completes
-  const suggestions = suggestionIds.length ? await VariantSuggestion.find({ _id: { $in: suggestionIds } }, 'variant').lean() : [];
-  const suggestionVariant: Record<string, string> = {};
-  for (const s of suggestions) {
-    suggestionVariant[String(s._id)] = String(s.variant);
+  // Suggestions and recordings are labelled by the word they belong to
+  const [suggestions, clips] = await Promise.all([
+    suggestionIds.length ? VariantSuggestion.find({ _id: { $in: suggestionIds } }, 'variant').lean() : Promise.resolve([]),
+    clipIds.length ? AudioClip.find({ _id: { $in: clipIds } }, 'variant slot').lean() : Promise.resolve([]),
+  ]);
+  const parentVariant: Record<string, string> = {};
+  const clipSlot: Record<string, string> = {};
+  for (const s of [...suggestions, ...clips]) {
+    parentVariant[String(s._id)] = String(s.variant);
     variantIds.push(String(s.variant));
   }
+  for (const c of clips) clipSlot[String(c._id)] = c.slot;
 
   const [concepts, variants] = await Promise.all([
     conceptIds.length ? Concept.find({ _id: { $in: conceptIds } }, 'englishGloss').lean() : Promise.resolve([]),
@@ -151,7 +159,9 @@ async function getLog(req: Request, res: Response): Promise<void> {
     ...log,
     target: log.targetModel === 'Concept' ? (conceptMap[String(log.targetId)] ?? null)
           : log.targetModel === 'Variant' ? (variantMap[String(log.targetId)] ?? null)
-          : log.targetModel === 'VariantSuggestion' ? (variantMap[suggestionVariant[String(log.targetId)]] ?? null)
+          : log.targetModel === 'VariantSuggestion' ? (variantMap[parentVariant[String(log.targetId)]] ?? null)
+          : log.targetModel === 'AudioClip' && variantMap[parentVariant[String(log.targetId)]]
+            ? { ...(variantMap[parentVariant[String(log.targetId)]] as Doc), slot: clipSlot[String(log.targetId)] }
           : null,
   }));
 

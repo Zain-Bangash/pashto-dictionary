@@ -11,6 +11,7 @@ import {
   getLog,
 } from '../controllers/moderationController';
 import { getSuggestionQueue } from '../controllers/suggestionController';
+import { getAudioQueue } from '../controllers/audioController';
 
 const router = Router();
 
@@ -27,6 +28,13 @@ const suggestionQueueValidators = [
 ];
 
 router.get('/suggestions', requireModeratorOrAdmin, suggestionQueueValidators, rejectInvalid, getSuggestionQueue);
+const audioQueueValidators = [
+  query('status').optional().isIn(['pending', 'approved']).withMessage('status must be pending or approved'),
+  query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive number'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+];
+
+router.get('/audio', requireModeratorOrAdmin, audioQueueValidators, rejectInvalid, getAudioQueue);
 router.get('/stats', requireModeratorOrAdmin, getStats);
 router.get('/log', requireRole('admin'), getLog);
 

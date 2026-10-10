@@ -17,8 +17,11 @@ import {
   crossConceptCheck,
 } from '../controllers/variantController';
 import { createSuggestion } from '../controllers/suggestionController';
+import { uploadClip } from '../controllers/audioController';
+import { rawAudio } from '../middleware/rawAudio';
+import { SLOT_PATTERN } from '../utils/audioSlots';
 import { loadOwnedVariant } from '../middleware/ownership';
-import { suggestionLimiter } from '../middleware/rateLimit';
+import { suggestionLimiter, audioLimiter } from '../middleware/rateLimit';
 import { rejectInvalid } from '../utils/sendValidationError';
 import { idParam, proposalValidators } from '../utils/suggestionValidators';
 import { MISSING_PATTERN } from '../utils/blankFields';
@@ -65,6 +68,11 @@ const crossConceptCheckValidators = [
   query('conceptId').isMongoId().withMessage('conceptId must be a valid MongoDB ObjectId'),
 ];
 
+const audioValidators = [
+  idParam,
+  query('slot').isString().matches(SLOT_PATTERN).withMessage('Invalid recording slot'),
+];
+
 // static paths must come before /:id
 router.get('/search', searchVariants);
 router.get('/my-submissions', verifyToken, mySubmissionsValidators, rejectInvalid, getMyVariantSubmissions);
@@ -73,6 +81,7 @@ router.get('/', verifyToken, requireModeratorOrAdmin, listVariants);
 router.get('/:id', optionalVerifyToken, getVariant);
 router.post('/', verifyToken, createValidators, createVariant);
 router.post('/:id/suggestions', verifyToken, suggestionLimiter, idParam, ...proposalValidators, rejectInvalid, loadOwnedVariant, createSuggestion);
+router.post('/:id/audio', verifyToken, audioLimiter, audioValidators, rejectInvalid, rawAudio, uploadClip);
 router.patch('/:id/edit', verifyToken, requireModeratorOrAdmin, editValidators, editVariant);
 router.patch('/:id/status', verifyToken, requireModeratorOrAdmin, statusValidators, transitionVariantStatus);
 router.patch('/:id', verifyToken, updateValidators, updateVariant);

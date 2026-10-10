@@ -35,4 +35,8 @@ jobs:
               MongodbUri="${{ secrets.MONGODB_URI }}" \
               CognitoUserPoolId="${{ secrets.COGNITO_USER_POOL_ID }}" \
               CognitoClientId="${{ secrets.COGNITO_CLIENT_ID }}" \
-              CognitoClientSecret="${{ secrets.COGNITO_CLIENT_SECRET }}"
+              CognitoClientSecret="${{ secrets.COGNITO_CLIENT_SECRET }}" \
+              StorageEndpoint="${{ secrets.STORAGE_ENDPOINT }}" \
+              StorageBucket="${{ secrets.STORAGE_BUCKET }}" \
+              StorageAccessKeyId="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
+              StorageSecretAccessKey="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}"

@@ -4,6 +4,7 @@ import VariantEditForm from './VariantEditForm';
 import { REJECT_BTN, EDIT_BTN } from './queueButtons';
 import useLookups from '../../hooks/useLookups';
 import { proposedFields } from '../../utils/suggestions';
+import PublishedClips from '../audio/PublishedClips';
 
 export default function PublishedVariantRow({ variant, concept, openSuggestion, onReject, onSave }) {
   const { labelFor } = useLookups();
@@ -31,6 +32,7 @@ export default function PublishedVariantRow({ variant, concept, openSuggestion, 
           {variant.submittedBy?.username && (
             <p className="text-xs font-ui text-muted/60">by {variant.submittedBy.username}</p>
           )}
+          <PublishedClips variant={variant} />
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => onReject(variant)} aria-label={`Reject variant ${variant.pashto}`} className={REJECT_BTN}>Reject</button>
