@@ -105,11 +105,17 @@ Actor fields hold the Cognito `sub` as a plain string, so a direct `===` compari
 
 Admins are exempt from this restriction. The rationale is that admins operate at a higher trust level and are accountable for overall system integrity in a way that moderators are not. This rule was chosen over more complex alternatives (e.g. blocking anyone who touched the document at any prior stage) because it is simple to reason about, auditable in the ModerationLog, and covers the primary conflict-of-interest case without introducing ambiguous edge cases.
 
-The same self-separation rule extends to moderator edits (see *Moderator and Admin Edits* below). Moderators cannot edit their own submissions; admins can. The asymmetry is intentional for the same reason: admin is the final authority and must be able to correct their own mistakes without escalating to another admin.
+Moderators cannot edit at all (see *Admin Edits* below), so there is no self-edit rule to enforce. Admins can edit their own submissions: admin is the final authority and must be able to correct their own mistakes without escalating to another admin.
+
+### Granting and removing the moderator role
+
+Admins move people between `user` and `moderator` from the Users page (`PATCH /api/users/:id/role`). The endpoint never touches the admin tier: promoting anyone to admin, demoting an admin, and changing your own role are all refused with a 400. Those changes are made directly in the database. Keeping them out of the app means no single admin session, stolen or mistaken, can lock out the other admins or create new ones.
+
+The change takes effect on the user's next request, because `auth.ts` reads the role from MongoDB every time rather than from the token. Each change writes a `role_changed` ModerationLog entry (`targetModel: 'User'`, `changes: { role: { from, to } }`). The note is optional: only admins can read the log, so the person affected never sees it.
 
 ---
 
-## Moderator and Admin Edits
+## Admin Edits
 
 ### Two separate edit paths
 
@@ -117,7 +123,9 @@ The system has two distinct mechanisms for changing a submission's content, and 
 
 **User resubmission** (`PATCH /api/variants/:id`) — available only when the variant's status is `rejected`. The submitter corrects their own entry and it re-enters the `pending` state. This is a user action and is logged as `resubmitted`.
 
-**Moderator/admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`) — available at any status, except that only admins may edit a `published` entry (moderators get a 403). A staff member corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff.
+**Admin edit** (`PATCH /api/concepts/:id/edit`, `PATCH /api/variants/:id/edit`, and `PATCH /api/suggestions/:id/edit` for suggestions) — admin-only via `requireRole('admin')`, at `pending`, `approved` or `published`. An admin corrects an entry in place without changing its moderation status. This is logged as `edited` with a full before/after diff. Editing a `rejected` entry returns 400: a rejected entry belongs to its submitter, who fixes and resubmits it, so a staff edit would change words the submitter never saw before they resubmit.
+
+Moderators review only — approve, or reject with a note. Edits and merges were taken away from them so that every change to an entry's content is made by one accountable role; moderators flag problems by rejecting with a note.
 
 Keeping these as two different routes with different semantics prevents ambiguity about who changed what and why. A `resubmitted` log entry always means the original submitter took action; an `edited` entry always means staff did.
 
@@ -158,7 +166,7 @@ The merge tool (`POST /api/concepts/:sourceId/merge`) addresses the near-duplica
 2. Soft-deletes the source concept.
 3. Logs the entire operation on the source concept as a single `merged` entry.
 
-The response surfaces any skipped variants so the moderator knows they need manual attention. The merge is available to both moderators and admins, and is accessible from the moderation queue (via the similar-concepts panel) and from the concepts list in the dashboard.
+The response surfaces any skipped variants so the moderator knows they need manual attention. The merge is admin-only (`requireRole('admin')`), and is accessible from the moderation queue (via the similar-concepts panel) and from the concepts list in the dashboard.
 
 The similar-concepts panel calls the existing `GET /api/concepts/suggest` endpoint — no new query mechanism was needed. The panel filters out the current item from the results before rendering.
 
@@ -458,7 +466,9 @@ Only `missingFields` drives the **Needs completion** count, so the chip stays a 
 
 ### Suggestions — a separate record
 
-A user may propose values for the blank fields of their **own published** variant. The live word stays published and unchanged until an admin publishes the suggestion. Unpublished variants keep the existing Edit & Resubmit workflow.
+A user may propose values for the blank fields of their **own published** variant, and **anyone signed in may propose missing grammatical forms for any published variant**. The live word stays published and unchanged until an admin publishes the suggestion. Unpublished variants keep the existing Edit & Resubmit workflow.
+
+**Who may propose what.** `formsOnlyError()` refuses `phonetic`, `example` and `extra` from anyone but the word's submitter, on submit, resubmit and admin edit. Forms are the one detail that can be checked against the grammar (the slot model fixes what can be said, and fill-only stops anyone overwriting the submitter's words), so they are opened to the community; the phonetic spelling and example sentence are the submitter's own voice and stay theirs.
 
 ```
 VariantSuggestion { variant, proposed: { phonetic?, example?, forms?[], extra?: Map }, status,
@@ -477,11 +487,17 @@ approved → rejected   (admin only, note required)
 rejected → pending    (owner edits and resubmits)
 ```
 
-**One open suggestion per variant** is a partial unique index on `{ variant: 1 }` where `status ∈ { pending, approved }` (MongoDB 6.0+), with a pre-check for a clean 409.
+**One open suggestion per person per variant** is a partial unique index `one_open_per_user` on `{ variant: 1, submittedBy: 1 }` where `status ∈ { pending, approved }` (MongoDB 6.0+), with a pre-check for a clean 409. It replaced a `{ variant: 1 }` index (one open suggestion per word) when forms were opened to everyone: with that index, one person's pending suggestion would have blocked every other contributor. Mongoose creates new indexes but never drops old ones, so `npm run migrate:suggestion-index` (`scripts/migrateSuggestionIndex.ts`, idempotent, `--dry-run` supported) drops `variant_1` and creates the new index. It must run against production before the deploy that ships this change.
+
+**Competing proposals.** Two people may propose the same form slot. Nothing is merged or auto-rejected: the moderation queue (`GET /api/moderation/suggestions`) groups suggestions by word, paginated by word, and the client lays every proposed slot side by side, marking slots with more than one proposal ("Conflict") and slots the word has filled since ("Already filled"). The first proposal published wins; any later one touching that slot fails the publish-time fill-only check with the slot named, and staff reject it with a note or edit the clashing slot out. Auto-rejecting was ruled out because a suggestion can overlap only partly, and rejecting it would throw away its other forms.
+
+**Credit.** Each stored form has an optional `addedBy` (Cognito sub), set by `applySuggestion` when the suggestion's sender is not the word's submitter; the client can never send it (`validateForms` refuses unknown keys). A missing `addedBy` means the word's submitter, so forms from before this change needed no backfill. Credit belongs to the **slot**: `applyForms` carries it across an admin edit or a resubmit that rewrites the form's text, and drops it only when the slot is removed. `GET /api/concepts/:id` resolves it to the contributor's username, village and region (`enrichFormCredits`).
+
+**My Submissions** reads the owner's own latest suggestion per word only (`submittedBy` filter), so other people's suggestions never take over the owner's "Complete this" row. Contributors track theirs through `GET /api/suggestions/mine?scope=others`.
 
 **Fill-only, checked four times.** `validateProposal()` (in `utils/suggestions.ts`) runs on submit, resubmit, staff edit and approve, and again at publish. Every proposed value must go into a field that is blank on the live word *now*; otherwise the request fails with 400 and the field named (`phonetic`, `forms.masculine.plural.direct`, `extra.register`). Forms are fill-only **per slot**, so a suggestion can add the empty slots of a partly filled word. Forms are re-validated against the concept's current part of speech, and extra values with `validateExtra`. Core fields (`pashto`, `definition`, `region`, …) are rejected by the route validators.
 
-**Preventing conflicts instead of resolving them.** While a suggestion is open, a staff edit to the word cannot change the fields it proposes (409 naming the field); other fields stay editable. The admin's published-word panel shows a "Suggestion pending" badge, disables those inputs and hides the proposed form slots. Staff fix a suggestion *inside* the review instead (`PATCH /api/suggestions/:id/edit`, note required, logged as `edited` with a diff). The remaining ways a publish can fail — a split-second race, the concept's part of speech changing, a custom field being deactivated — refuse the publish with the field named. The suggestion stays approved, and the admin edits or rejects it.
+**Preventing conflicts instead of resolving them.** While suggestions are open, a staff edit to the word cannot change any field one of them proposes (409 naming the field); other fields stay editable. The admin's published-word panel shows a "Suggestion pending" badge, disables those inputs and hides the proposed form slots. Staff fix a suggestion *inside* the review instead (`PATCH /api/suggestions/:id/edit`, note required, logged as `edited` with a diff). The remaining ways a publish can fail — a split-second race, the concept's part of speech changing, a custom field being deactivated — refuse the publish with the field named. The suggestion stays approved, and the admin edits or rejects it.
 
 **Publish merge.** There are no transactions in this codebase (and Jest runs a standalone MongoDB), so publish uses conditional writes:
 

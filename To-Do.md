@@ -8,18 +8,24 @@ _No active phase._
 
 ---
 ## Rough Thoughts
+(Suggested order
+7 and 10 first, since they're likely bugs and are quick.
+5, a self-contained and clearly specified endpoint.
+4 and 6a.
+11, then 9.
+1, 8, 2 and 6b after you decide the rules.)
+
 1. 'Wanted Words' make it a drop down and show the variant thats present and have a 'Also spoken in Kohat' type button next to each variant (keep the Add your word button)
-8. Others can add 'forms' or audio and there name will be displayed (these things are easy to verify)
+8. ~~Others can add 'forms' or audio and there name will be displayed (these things are easy to verify)~~ done: forms via #10 (credited per form); audio was already open to everyone
 2. limit mod 'rights' and increase admin rights
-3. audio
 4. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
-5. admin should be promote users to mod or demote mods
+5. ~~admin should be promote users to mod or demote mods~~ done
 6. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
-7. admin can't edit a variant or concept in any state, why?
+7. ~~admin can't edit a variant or concept in any state, why?~~ done: admin edits pending/approved/published from Dashboard › Concepts; moderators no longer edit or merge; rejected entries can't be edited
 9. Add proper filters everywhere (my submissions, queue etc)
-10. Some submission have a add form button others dont
+10. ~~Some submission have a add form button others dont~~ done: older words had no forms, and only the owner could add them; anyone can now suggest forms from the concept page
 11. Have a wanted audio page
 
 ## Backlog

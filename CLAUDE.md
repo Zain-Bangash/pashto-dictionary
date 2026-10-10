@@ -93,7 +93,7 @@ published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on `Concept`, `Variant`, `VariantSuggestion` (fill-only proposals for a user's own published variant) and `AudioClip` (pronunciation recordings, which add `withdrawn` and `retired` and have no resubmit; see ARCHITECTURE). Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
+Every state transition **must** write a record to the ModerationLog collection. The state machine runs independently on `Concept`, `Variant`, `VariantSuggestion` (fill-only proposals for a published variant: any blank field from its submitter, grammatical forms from anyone) and `AudioClip` (pronunciation recordings, which add `withdrawn` and `retired` and have no resubmit; see ARCHITECTURE). Further rules (moderator self-approval ban, cascade-reject, publish concept before its variants) are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/USER-FLOWS.md](docs/USER-FLOWS.md).
 
 ---
 

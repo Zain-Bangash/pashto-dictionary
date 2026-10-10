@@ -22,6 +22,12 @@ As a guest, a regional variant on a concept page has a play button beside the wo
 
 As a guest, clicking "Record a pronunciation" on a concept page takes me to the Login page.
 
+As a guest, a form in a word's Forms list that was suggested by someone other than the word's submitter shows "Added by <username> (village, region)" under it. Forms the submitter added themselves, including every form added before suggestions existed, carry no separate credit.
+
+As a guest, clicking "+ Suggest forms" under a word on a concept page takes me to the Login page.
+
+As a user, a published word on a concept page shows "+ Suggest forms" when its part of speech has grammatical forms (noun, adjective, verb) and some of its form slots are still empty. It opens an inline editor where I can add any empty slot; slots the word already has cannot be picked. On sending, I see "Thanks — your forms will appear here once they are reviewed". A moderator reviews my suggestion and an admin publishes it; the word itself is unchanged until then. If I already have a suggestion under review for that word, the card says "Your suggestion for this word is under review" instead. I can suggest only grammatical forms for someone else's word — the server refuses phonetic, example or extra fields from anyone but the word's submitter. Several people can have a suggestion open on the same word at once, but I can have only one per word.
+
 As a guest I can open Wanted Words from the navbar. It lists published concepts that have no word yet in the selected region — any submitted word for that region, even one under review or rejected, removes the concept from the list. I can switch region with the pills (the choice stays in the URL), search by English meaning, and page through the results. Clicking "Add your [Region] word" sends me to log in, then straight back to the Submit page.
 
 As a guest I should be able to click Register in the navbar to go to the Register page.
@@ -76,7 +82,9 @@ As a user, if someone else adds the same word for the same concept and region wh
 
 As a user, My Submissions has a "Needs completion (n)" chip. It lists my published words that are missing a phonetic, an example, any grammatical forms (where the part of speech allows them) or an optional extra field, and shows what each one needs. I can narrow the list by the missing detail and by region; the region filter also works on my whole list. Words whose forms are only partly filled are not counted, but show a quiet "Forms 2/8" and an "Add details" link, and "Forms: some empty" in the filter finds them.
 
-As a user, "Complete this" opens a form with inputs only for the blank details; forms I already have are shown but cannot be picked again. My word stays live and unchanged while a moderator reviews my suggestion and an admin publishes it. The row then shows "Suggestion pending" or "Suggestion approved". If it is rejected, I see the moderator's note and can edit and resubmit it. I can have only one open suggestion per word, and I cannot change a detail that is already filled — the server names the field.
+As a user, My Submissions has a "Forms you suggested" section listing the forms I suggested for other people's words, each with the word, its concept (linking to the concept page), the forms I proposed and the suggestion's status. If one was rejected I see the moderator's note and can edit and resubmit its forms while the word is still published. The section is hidden when I have none.
+
+As a user, "Complete this" opens a form with inputs only for the blank details; forms I already have are shown but cannot be picked again. My word stays live and unchanged while a moderator reviews my suggestion and an admin publishes it. The row then shows "Suggestion pending" or "Suggestion approved". If it is rejected, I see the moderator's note and can edit and resubmit it. I can have only one open suggestion per word myself, and I cannot change a detail that is already filled — the server names the field. Suggestions other people send for my word do not appear on my row.
 
 As a user, on any published word I can click "Record a pronunciation", including words other people added. I pick what I am recording: the word, the example sentence (only if it has text), or any grammatical form the part of speech allows, even a form with no text yet. The recorder shows the Pashto text I should say and a time limit (longer words and the example get more time, up to 10 seconds for a word and 20 for an example). Recording stops by itself at the limit. I can listen back, discard it and record again, then submit it for review.
 
@@ -116,23 +124,23 @@ As a moderator I should not be able to access the Users, Log, Lists, or Fields p
 
 As a moderator I should be able to reject a pending item by clicking Reject, which opens a modal requiring me to type a reason before confirming. The reason is stored and shown to the submitter in their My Submissions page.
 
-As a moderator I should be able to edit any submission that was not submitted by me and is not yet published, using the Edit button on the queue card. The inline form opens pre-populated with the current values, including any extra fields. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change. Changes to extra fields appear in the edit's Moderation Log diff under the field's name. If the server rejects the edit, its message is shown in the form.
+As a moderator I cannot edit any entry, at any status — editing is admin-only. I approve, or reject with a note. The queue shows no Edit button, and the server returns 403 if I call an edit endpoint.
 
 As a moderator, each concept row and variant row in the queue shows the entry's extra field values, so I can review them without opening the Edit form. Variant rows also have a collapsible Forms list.
 
-As a moderator, the variant Edit form includes the variant's grammatical forms, which I can add, change or remove. Each changed form appears in the Moderation Log diff under its name (for example "form (Masculine plural, direct)"). If the concept's part of speech changed after forms were added, forms that no longer match are labelled so I can remove them; the server only rejects new or changed forms that do not match.
+As an admin, the variant Edit form includes the variant's grammatical forms, which I can add, change or remove. Each changed form appears in the Moderation Log diff under its name (for example "form (Masculine plural, direct)"). If the concept's part of speech changed after forms were added, forms that no longer match are labelled so I can remove them; the server only rejects new or changed forms that do not match.
 
-As a moderator I should see a "Similar concepts" panel on each concept card in the queue, populated by the suggest endpoint using that concept's English gloss. If a match is found I can click "Merge into this" to open a confirmation modal, enter a note, and merge the pending concept into the existing one. All variants are moved to the target; the source concept is soft-deleted.
+As a moderator I see a "Similar concepts" panel on each pending concept card in the queue, populated by the suggest endpoint using that concept's English gloss, so I can spot duplicates. Only an admin sees the "Merge into this" button, which opens a confirmation modal; after entering a note the pending concept is merged into the existing one. All variants are moved to the target; the source concept is soft-deleted.
 
-As a moderator I should be able to trigger a merge from the Concepts list page in the dashboard, not only from the queue.
+As an admin I can also trigger a merge from the Concepts list page in the dashboard. Moderators see no Merge button, and the server returns 403 if they call the merge endpoint.
 
-As a moderator, the Moderation Queue has Entries and Suggestions views. Entries is the queue described above. Suggestions lists pending suggestions, each showing the live word and every proposed value next to its blank current value, and who sent it. I can approve one, or reject it with a note, but not one I submitted myself. I can edit a pending suggestion that is not mine (a note is required, and the change is logged); fill-only still applies.
+As a moderator, the Moderation Queue has Entries and Suggestions views. Entries is the queue described above. Suggestions lists words that have pending suggestions, oldest first, 20 words per page. Each word shows its concept, Pashto, region, definition and submitter, and a "N suggestions" toggle (open by default). Inside, a table lists every proposed form slot with each person's proposal side by side: a slot two or more people proposed is marked "Conflict", and a slot the word has since filled is marked "Already filled". Below it each suggestion is listed with every proposed value next to its blank current value and "Proposed by <username>" (with "(the word's submitter)" when it is). I can approve one, or reject it with a note, but not one I submitted myself. Only one proposal per slot can be published; the others are refused at publish, so I reject the losers with a note. I cannot edit a suggestion — only admins can.
 
 As a moderator, the Moderation Queue also has an Audio view listing pending recordings. Each row shows the word, its region and concept, the slot and the Pashto text the speaker should be saying, the recording's length and who recorded it. When a recording would replace a published one, the current and the replacement recordings are shown side by side and both can be played. I can approve one, or reject it with a note; I cannot review a recording I made myself (the buttons are disabled and the server returns 403).
 
 As a moderator, when I reject a concept, all of that concept's pending, approved, or published variants are automatically rejected and removed from the variant queue. Each variant's submitter sees "Concept "X" was rejected: <reason>" in My Submissions and can resubmit. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
 
-As a moderator I cannot edit or reject a published concept or variant — only admins can. The server rejects the attempt with a 403.
+As a moderator I cannot reject a published concept or variant — only admins can. The server rejects the attempt with a 403.
 
 As a moderator or admin, after I approve, reject, or publish an item, the moderation queue automatically refreshes from the server to reflect the latest state — including any cascade effects from concept rejection.
 
@@ -150,9 +158,9 @@ As an admin I should be able to switch to the Approved filter to see all approve
 
 As an admin I can reject an approved concept, variant or suggestion with a required note instead of publishing it. Rejecting an approved concept also rejects its variants. Moderators get a 403.
 
-As an admin, the Suggestions view has its own Pending / Approved filter with counts. Publishing an approved suggestion fills the blank fields of the live word and logs a `suggestion_applied` entry with the diff. If the word changed so the suggestion no longer fits — a field was filled meanwhile, or the part of speech no longer allows its forms — the publish is refused with the field named, and I can edit or reject the suggestion. I can edit pending and approved suggestions.
+As an admin, the Suggestions view has its own Pending / Approved filter with counts. Publishing an approved suggestion fills the blank fields of the live word and logs a `suggestion_applied` entry with the diff. If the word changed so the suggestion no longer fits — a field was filled meanwhile, or the part of speech no longer allows its forms — the publish is refused with the field named, and I can edit or reject the suggestion. I can edit pending and approved suggestions; a suggestion from someone other than the word's submitter stays forms-only. When I edit a form's text, the contributor's credit stays on that form.
 
-As an admin, a published word with an open suggestion shows "Suggestion pending — review it in Suggestions" in the Concepts panel, and its Edit form locks the proposed fields until the suggestion is resolved. Other fields stay editable.
+As an admin, a published word with open suggestions shows "Suggestion pending" (or "N open suggestions") with a link to Suggestions in the Concepts panel, and its Edit form locks every field any of them proposes until they are resolved. Other fields stay editable.
 
 As an admin, when I reject or delete a published word, any open suggestion on it is rejected automatically with a note naming the cause.
 
@@ -162,25 +170,27 @@ As an admin, a published word in the Concepts panel lists its live recordings wi
 
 As an admin, when I reject or delete a published word, recordings under review for it are rejected automatically. Its published recordings are hidden while the word is off the site and come back if it is republished with the same text.
 
-As an admin or moderator, if an edit would change text that has recordings — the word's Pashto, the example (including clearing it), a form's Pashto or removing a form, the concept's part of speech, a merge, or moving the variant to a concept with a different part of speech — I see a warning listing the recordings that will be removed and who recorded them. Nothing is saved unless I confirm; on confirm the recordings are retired, their audio is deleted and each removal is logged. Filling in a form that had no text keeps its recording.
+As an admin, if an edit would change text that has recordings — the word's Pashto, the example (including clearing it), a form's Pashto or removing a form, the concept's part of speech, a merge, or moving the variant to a concept with a different part of speech — I see a warning listing the recordings that will be removed and who recorded them. Nothing is saved unless I confirm; on confirm the recordings are retired, their audio is deleted and each removal is logged. Filling in a form that had no text keeps its recording.
 
 As an admin, the Moderation Log includes recordings (filter type "Recording"): submitted, approved, rejected, published, retired and withdrawn, each labelled with the word and slot, plus an `audio_published` entry on the word itself saying whether a recording was added or replaced.
 
 As an admin I should be able to publish an approved concept or variant, which moves it to the published state and writes a ModerationLog record. Once published, variants appear on the public Concepts and Concept Detail pages.
 
-As an admin I should be able to view the Users page in the dashboard, which lists all registered users.
+As an admin I should be able to view the Users page in the dashboard, which lists registered users 20 per page with Previous / Next controls.
 
-As an admin I should be able to view the Moderation Log page, which shows a full audit trail of every status transition — submitted, approved, rejected, published, resubmitted, edited, merged, profile_updated, suggestion_applied — with the actor's username, timestamp, and for edited and suggestion_applied entries, the before/after field values. I can filter by the Suggestion type; suggestion entries are labelled with the word they complete.
+As an admin, each user row on the Users page has a "Make moderator" button and each moderator row a "Remove moderator" button. Clicking one opens a confirmation dialog with an optional note; nothing changes until I confirm. The row then shows the new role, the change applies on that person's next request, and a `role_changed` entry (with the note, if any) appears in the Moderation Log under their username. Admin rows and my own row have no button: admin roles can only be changed in the database, and the server returns 400 if anyone tries.
 
-As an admin I should be able to edit any submission including my own, using the same inline Edit form available to moderators.
+As an admin I should be able to view the Moderation Log page, which shows a full audit trail of every status transition — submitted, approved, rejected, published, resubmitted, edited, merged, profile_updated, suggestion_applied, role_changed — with the actor's username, timestamp, and for edited, suggestion_applied and role_changed entries, the before/after values. I can filter by the Suggestion type; suggestion entries are labelled with the word they complete.
+
+As an admin I can edit any pending, approved or published submission, including my own, with the inline Edit form on the queue card. The form opens pre-populated with the current values, including any extra fields. A note explaining the edit is required before saving. The item updates in place; its moderation status does not change. Changes to extra fields appear in the edit's Moderation Log diff under the field's name. If the server rejects the edit, its message is shown in the form. Rejected entries cannot be edited by anyone on staff — the server returns 400 — because only the submitter can fix and resubmit them.
 
 As an admin I should be able to reassign a variant to a different concept by using the Concept search field inside the variant Edit form. Suggestions show the concept's English gloss and ID. Selecting one and saving moves the variant to the new concept in place.
 
 As an admin, I cannot publish a variant whose parent concept has not yet been published. If I attempt to do so, I see an error message. I must publish the concept first, then publish its variants.
 
-As an admin, on the dashboard Concepts page, I can click a published concept's row (or its Manage button) to expand it. The panel shows the concept's published variants, and both the concept and each variant have Edit and Reject buttons. Moderators do not see the Manage button and cannot expand rows.
+As an admin, on the dashboard Concepts page, I can click any concept's row that is not rejected (or its Manage button) to expand it. For a published concept the panel shows its published variants, and both the concept and each variant have Edit and Reject buttons. For a pending or approved concept it shows the variants still under review (rejected ones are hidden) with Edit only; approving, rejecting and publishing stay in the queue. Rejected concepts cannot be expanded. Moderators do not see the Manage button and cannot expand rows.
 
-As an admin I can edit a published concept or variant from that panel using the same inline Edit form as the queue. A note is required, the item stays published, and an `edited` ModerationLog record is written.
+As an admin I can edit a concept or variant from that panel using the same inline Edit form as the queue. A note is required, the item keeps its status, and an `edited` ModerationLog record is written.
 
 As an admin I can reject a published concept from that panel. The Reject modal requires a reason and warns how many variants will also be rejected. On confirm, the concept leaves the public site, every one of its variants is rejected with the note "Concept "X" was rejected: <reason>", and the Concepts list refreshes.
 
