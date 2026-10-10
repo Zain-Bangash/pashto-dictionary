@@ -125,8 +125,37 @@ export interface IVariantSuggestion extends Document {
   updatedAt: Date;
 }
 
+export type AudioClipStatus = 'pending' | 'approved' | 'rejected' | 'published' | 'retired' | 'withdrawn';
+export const AUDIO_STATUSES: AudioClipStatus[] = ['pending', 'approved', 'rejected', 'published', 'retired', 'withdrawn'];
+
+// 'live' = the published clip of a slot, 'open' = one under review; a unique index allows one of each
+export function laneFor(status: AudioClipStatus): 'live' | 'open' | undefined {
+  if (status === 'published') return 'live';
+  if (status === 'pending' || status === 'approved') return 'open';
+  return undefined;
+}
+
+export interface IAudioClip extends Document {
+  variant: Types.ObjectId;
+  slot: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationMs: number;
+  status: AudioClipStatus;
+  lane?: 'live' | 'open';
+  replaces?: Types.ObjectId;
+  submittedBy: string;
+  reviewedBy?: string;
+  moderatorNote?: string;
+  retiredReason?: string;
+  fileDeletedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IModerationLog extends Document {
-  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup' | 'FieldDefinition' | 'VariantSuggestion';
+  targetModel?: 'Concept' | 'Variant' | 'User' | 'Lookup' | 'FieldDefinition' | 'VariantSuggestion' | 'AudioClip';
   targetId?: Types.ObjectId;
   action:
     | 'submitted'
@@ -140,7 +169,10 @@ export interface IModerationLog extends Document {
     | 'merged'
     | 'lookup_changed'
     | 'field_changed'
-    | 'suggestion_applied';
+    | 'suggestion_applied'
+    | 'retired'
+    | 'withdrawn'
+    | 'audio_published';
   performedBy: string;
   note?: string;
   changes?: Record<string, unknown>;

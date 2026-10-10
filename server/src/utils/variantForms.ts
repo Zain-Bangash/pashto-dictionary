@@ -39,10 +39,12 @@ export function formSlot(form: Pick<IVariantForm, 'kind' | 'gender' | 'number' |
   return form.kind === 'noun' ? `${form.gender}.${form.number}.${form.case}` : String(form.verbForm);
 }
 
-const SLOT_ORDER: string[] = [
-  ...GENDERS.flatMap((g) => NUMBERS.flatMap((n) => CASES.map((c) => `${g}.${n}.${c}`))),
-  ...VERB_FORMS,
-];
+export const SLOTS_BY_KIND: Record<FormKind, string[]> = {
+  noun: GENDERS.flatMap((g) => NUMBERS.flatMap((n) => CASES.map((c) => `${g}.${n}.${c}`))),
+  verb: [...VERB_FORMS],
+};
+
+const SLOT_ORDER: string[] = [...SLOTS_BY_KIND.noun, ...SLOTS_BY_KIND.verb];
 
 function sameContent(a: IVariantForm, b: IVariantForm): boolean {
   return formSlot(a) === formSlot(b)
