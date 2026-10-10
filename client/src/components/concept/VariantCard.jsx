@@ -6,6 +6,7 @@ import ExtraFieldsDisplay from '../fields/ExtraFieldsDisplay';
 import FormsDisplay from '../forms/FormsDisplay';
 import AudioPlayButton from '../audio/AudioPlayButton';
 import VariantAudio from '../audio/VariantAudio';
+import SuggestFormsPanel from './SuggestFormsPanel';
 import { speakerCredit } from '../../utils/audio';
 
 const TAB = 'text-xs font-ui px-3 py-1 rounded-full transition-all border';
@@ -13,7 +14,7 @@ const TAB_ON = 'bg-mint/[0.12] border-mint/35 text-mint';
 const TAB_OFF = 'bg-white/[0.05] border-white/[0.08] text-[#888]';
 
 // One Pashto word with a region tab strip; the same word from several regions shares a card
-export default function VariantCard({ group, conceptId }) {
+export default function VariantCard({ group, conceptId, partOfSpeech, openVariantIds, onSuggestionSent }) {
   const { user } = useAuth();
   const { labelFor } = useLookups();
   const navigate = useNavigate();
@@ -60,7 +61,14 @@ export default function VariantCard({ group, conceptId }) {
       <p className="font-ui text-warm/80 text-sm leading-relaxed">{selected.definition}</p>
       {selected.example && <p className="font-ui text-muted text-sm italic">{selected.example}</p>}
       <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
-      <FormsDisplay key={selected._id} forms={selected.forms} />
+      <FormsDisplay key={selected._id} forms={selected.forms} ownerSub={selected.submittedBy?.cognitoSub} />
+      <SuggestFormsPanel
+        key={`suggest-${selected._id}`}
+        variant={selected}
+        partOfSpeech={partOfSpeech}
+        hasOpen={openVariantIds?.has(String(selected._id))}
+        onSent={onSuggestionSent}
+      />
       <VariantAudio key={`audio-${selected._id}`} variant={selected} />
 
       {addedBy && <p className="text-[11px] font-ui text-muted/40">Added by {addedBy}</p>}

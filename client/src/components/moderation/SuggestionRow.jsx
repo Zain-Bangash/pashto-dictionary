@@ -16,19 +16,21 @@ function Proposed({ label, value }) {
   );
 }
 
-export default function SuggestionRow({ suggestion, isAdmin, userId, onApprove, onReject, onPublish, onSaved }) {
+// compact: shown inside a SuggestionGroup, which already shows the word
+export default function SuggestionRow({ suggestion, compact = false, isAdmin, onApprove, onReject, onPublish, onSaved }) {
   const { labelFor } = useLookups();
   const { fieldLabel } = useFieldDefinitions();
   const [editing, setEditing] = useState(false);
   const { variant, proposed = {}, status } = suggestion;
-  const own = Boolean(userId) && String(suggestion.submittedBy?._id) === String(userId);
-  const canEdit = isAdmin ? ['pending', 'approved'].includes(status) : status === 'pending' && !own;
+  const canEdit = isAdmin && ['pending', 'approved'].includes(status);
+  const proposer = suggestion.submittedBy?.username;
+  const byOwner = Boolean(proposer) && suggestion.submittedBy?.cognitoSub === variant?.submittedBy?.cognitoSub;
 
   return (
-    <li className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5">
+    <li className={compact ? 'bg-white/[0.025] border border-white/[0.06] rounded-[14px] p-4' : 'bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5'}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
-          {variant ? (
+          {compact ? null : variant ? (
             <>
               <p className="text-warm font-display text-lg font-semibold">{variant.concept?.englishGloss}</p>
               <div className="flex items-baseline gap-2 flex-wrap">
@@ -45,7 +47,9 @@ export default function SuggestionRow({ suggestion, isAdmin, userId, onApprove, 
           )}
 
           <section aria-label="Proposed details" className="mt-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-[10px] space-y-1">
-            <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider">Proposed by the submitter</p>
+            <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider">
+              Proposed by {proposer ?? 'unknown'}{byOwner && " (the word's submitter)"}
+            </p>
             {proposed.phonetic && <Proposed label="Phonetic" value={proposed.phonetic} />}
             {proposed.example && <Proposed label="Example" value={proposed.example} />}
             {Object.entries(proposed.extra ?? {}).map(([key, value]) => (
@@ -60,7 +64,6 @@ export default function SuggestionRow({ suggestion, isAdmin, userId, onApprove, 
             ))}
           </section>
 
-          <p className="text-xs font-ui text-muted/60">by {suggestion.submittedBy?.username}</p>
         </div>
 
         <div className="flex gap-2 shrink-0">

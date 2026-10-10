@@ -14,6 +14,7 @@ vi.mock('../../services/api', () => ({
   createSuggestion: vi.fn(),
   resubmitSuggestion: vi.fn(),
   getMyAudio: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
+  getMySuggestions: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
   withdrawAudio: vi.fn(),
 }));
 

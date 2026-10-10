@@ -1,7 +1,11 @@
 import { useId, useState } from 'react';
+import useLookups from '../../hooks/useLookups';
 import { formSlot, slotLabel, sortForms } from '../../utils/forms';
+import { speakerCredit } from '../../utils/audio';
 
-export default function FormsDisplay({ forms, className = '' }) {
+// ownerSub: the word's submitter; forms they added carry no separate credit
+export default function FormsDisplay({ forms, ownerSub, className = '' }) {
+  const { labelFor } = useLookups();
   const [open, setOpen] = useState(false);
   const panelId = useId();
   if (!forms?.length) return null;
@@ -29,6 +33,9 @@ export default function FormsDisplay({ forms, className = '' }) {
                 </div>
               </div>
               {form.example && <p dir="auto" className="font-ui text-muted text-xs italic mt-1">{form.example}</p>}
+              {typeof form.addedBy === 'object' && form.addedBy?.cognitoSub !== ownerSub && speakerCredit(form.addedBy, labelFor) && (
+                <p className="text-[10px] font-ui text-muted/50 mt-1">Added by {speakerCredit(form.addedBy, labelFor)}</p>
+              )}
             </li>
           ))}
         </ul>

@@ -3,7 +3,7 @@ import { getSuggestionQueue, transitionSuggestion } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Pagination from '../Pagination';
 import RejectModal from './RejectModal';
-import SuggestionRow from './SuggestionRow';
+import SuggestionGroup from './SuggestionGroup';
 
 const FILTERS = ['pending', 'approved'];
 const EMPTY_META = { total: 0, limit: 20, pendingCount: 0, approvedCount: 0 };
@@ -82,12 +82,11 @@ export default function SuggestionQueue() {
         <p className="text-muted font-ui text-sm">No suggestions waiting.</p>
       ) : (
         <ul className="space-y-3">
-          {items.map((s) => (
-            <SuggestionRow
-              key={s._id}
-              suggestion={s}
+          {items.map((group) => (
+            <SuggestionGroup
+              key={group.variant?._id ?? group.suggestions[0]?._id}
+              group={group}
               isAdmin={isAdmin}
-              userId={user?.id}
               onApprove={(id) => act(id, { status: 'approved' })}
               onPublish={(id) => act(id, { status: 'published' })}
               onReject={setRejectId}

@@ -7,6 +7,7 @@ import api from '../../services/api';
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
   getMyAudio: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
+  getMySuggestions: vi.fn(() => Promise.resolve({ data: { data: [], meta: { total: 0 } } })),
   withdrawAudio: vi.fn(),
 }));
 

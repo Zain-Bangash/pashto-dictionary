@@ -4,6 +4,8 @@ import api from '../services/api';
 import useLookups from '../hooks/useLookups';
 import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
 import VariantCard from '../components/concept/VariantCard';
+import useMyOpenSuggestions from '../hooks/useMyOpenSuggestions';
+import { useAuth } from '../context/AuthContext';
 
 export default function ConceptDetail() {
   const { id } = useParams();
@@ -11,6 +13,8 @@ export default function ConceptDetail() {
   const [concept, setConcept] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
+  const { openVariantIds, markOpen } = useMyOpenSuggestions(id, Boolean(user));
 
   useEffect(() => {
     api.get(`/api/concepts/${id}`)
@@ -74,7 +78,14 @@ export default function ConceptDetail() {
                 <h2 className="font-ui text-muted text-xs uppercase tracking-widest mb-3">Regional Variants</h2>
                 <ul className="space-y-4">
                   {variantGroups.map((group) => (
-                    <VariantCard key={group[0].pashto} group={group} conceptId={concept._id} />
+                    <VariantCard
+                      key={group[0].pashto}
+                      group={group}
+                      conceptId={concept._id}
+                      partOfSpeech={concept.partOfSpeech}
+                      openVariantIds={openVariantIds}
+                      onSuggestionSent={markOpen}
+                    />
                   ))}
                 </ul>
               </section>

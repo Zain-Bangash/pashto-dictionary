@@ -126,6 +126,10 @@ export function transitionSuggestion(id, body) {
   return api.patch(`/api/suggestions/${id}/status`, body);
 }
 
+export function getMySuggestions(params = {}) {
+  return api.get('/api/suggestions/mine', { params });
+}
+
 export function getSuggestionQueue(params = {}) {
   return api.get('/api/moderation/suggestions', { params });
 }
@@ -154,6 +158,16 @@ export function getAudioQueue(params = {}) {
 
 export function getMyAudio(params = {}) {
   return api.get('/api/audio/mine', { params });
+}
+
+// ── User admin functions ──────────────────────────────────────────────────────
+
+export function getUsers(params = {}) {
+  return api.get('/api/users', { params });
+}
+
+export function changeUserRole(id, body) {
+  return api.patch(`/api/users/${id}/role`, body);
 }
 
 // ── Lookup (preset list) functions ────────────────────────────────────────────
