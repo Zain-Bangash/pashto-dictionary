@@ -5,6 +5,7 @@ import Pagination from '../Pagination';
 import RejectModal from './RejectModal';
 import MergeModal from './MergeModal';
 import QueueConceptGroup from './QueueConceptGroup';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 // Use api.get/patch/post directly so vi.fn() mocks on api.* work in tests
 const getQueue = (status, page) => api.get(`/api/moderation/queue?status=${status}&page=${page}`);
@@ -27,6 +28,7 @@ async function loadConflicts(groups) {
 export default function EntryQueue() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { send, dialog } = useAudioRetireConfirm();
 
   const [groups, setGroups]           = useState([]);
   const [filter, setFilter]           = useState('pending');
@@ -88,7 +90,7 @@ export default function EntryQueue() {
   const handleMergeConfirm = async (note) => {
     const { sourceItem, targetItem } = mergeModal;
     setMergeModal(null);
-    await runAction(() => mergeConcepts(sourceItem._id, { targetConceptId: targetItem._id, note }), 'Merge failed');
+    await runAction(() => send((confirm) => mergeConcepts(sourceItem._id, { targetConceptId: targetItem._id, note, ...confirm })), 'Merge failed');
   };
 
   const handleConceptSave = (updated) =>
@@ -164,6 +166,7 @@ export default function EntryQueue() {
           onCancel={() => setMergeModal(null)}
         />
       )}
+      {dialog}
     </div>
   );
 }

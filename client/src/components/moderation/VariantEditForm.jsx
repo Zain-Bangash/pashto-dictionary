@@ -8,6 +8,7 @@ import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import FormsEditor from '../forms/FormsEditor';
 import { formKindFor, formsPayload } from '../../utils/forms';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 // lockedFields: fields an open suggestion proposes; they stay read-only until it is resolved
 export default function VariantEditForm({ item, onSave, onCancel, lockedFields = [] }) {
@@ -25,6 +26,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { send, dialog } = useAudioRetireConfirm();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,8 +34,9 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
     setSaving(true);
     setError('');
     try {
-      const res = await editVariant(item._id, { pashto, phonetic, region, definition, example, concept, extra, forms: formsPayload(forms), note });
-      onSave(res.data.data);
+      const body = { pashto, phonetic, region, definition, example, concept, extra, forms: formsPayload(forms), note };
+      const res = await send((confirm) => editVariant(item._id, { ...body, ...confirm }));
+      if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
     } finally {
@@ -144,6 +147,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           Save
         </button>
       </div>
+      {dialog}
     </form>
   );
 }

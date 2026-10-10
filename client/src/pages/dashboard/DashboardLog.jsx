@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import useLookups from '../../hooks/useLookups';
 import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 import LogChanges from '../../components/log/LogChanges';
+import { audioSlotLabel } from '../../utils/audio';
 
 const ACTION_STYLES = {
   submitted:       { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
@@ -19,14 +20,18 @@ const ACTION_STYLES = {
   lookup_changed:  { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)',  border: 'rgba(45,212,191,0.3)'  },
   field_changed:   { color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(244,114,182,0.3)' },
   suggestion_applied: { color: '#a3e635', bg: 'rgba(163,230,53,0.08)', border: 'rgba(163,230,53,0.3)' },
+  audio_published: { color: '#22d3ee', bg: 'rgba(34,211,238,0.08)', border: 'rgba(34,211,238,0.3)' },
+  retired:         { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
+  withdrawn:       { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
 };
 
 const ALL_ACTIONS = [
   'submitted', 'approved', 'rejected', 'published',
   'resubmitted', 'deleted', 'edited', 'merged', 'profile_updated', 'lookup_changed', 'field_changed', 'suggestion_applied',
+  'audio_published', 'retired', 'withdrawn',
 ];
 
-const MODEL_NAMES = { VariantSuggestion: 'Suggestion' };
+const MODEL_NAMES = { VariantSuggestion: 'Suggestion', AudioClip: 'Recording' };
 
 const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
 const FIELD_OWNER_NAMES = { concept: 'Concept field', variant: 'Variant field' };
@@ -53,11 +58,12 @@ function TargetLabel({ log }) {
     label = (
       <span className="text-warm/80">{t.englishGloss}</span>
     );
-  } else if ((model === 'Variant' || model === 'VariantSuggestion') && t?.pashto) {
+  } else if (['Variant', 'VariantSuggestion', 'AudioClip'].includes(model) && t?.pashto) {
     label = (
       <>
         <span dir="rtl" className="font-pashto text-warm/80" style={{ fontSize: 17, lineHeight: 1.5 }}>{t.pashto}</span>
         {t.region && <span className="text-muted/60"> · {labelFor('region', t.region)}</span>}
+        {t.slot && <span className="text-muted/60"> · {audioSlotLabel(t.slot)}</span>}
       </>
     );
   } else if (model === 'Lookup' && log.changes?.type) {
@@ -155,6 +161,7 @@ export default function DashboardLog() {
             <option value="Lookup"    style={{ background: '#1c1c15', color: '#fffef8' }}>List value</option>
             <option value="FieldDefinition" style={{ background: '#1c1c15', color: '#fffef8' }}>Custom field</option>
             <option value="VariantSuggestion" style={{ background: '#1c1c15', color: '#fffef8' }}>Suggestion</option>
+            <option value="AudioClip" style={{ background: '#1c1c15', color: '#fffef8' }}>Recording</option>
           </select>
         </div>
       </div>

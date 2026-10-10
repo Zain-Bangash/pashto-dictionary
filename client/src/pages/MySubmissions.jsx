@@ -9,6 +9,7 @@ import StatusBadge from '../components/submissions/StatusBadge';
 import ConceptResubmitForm from '../components/submissions/ConceptResubmitForm';
 import CompletionFilters from '../components/submissions/CompletionFilters';
 import MyVariantRow from '../components/submissions/MyVariantRow';
+import MyRecordings from '../components/audio/MyRecordings';
 
 const CARD = 'bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5';
 const HEADING = 'text-xs font-ui font-semibold text-muted uppercase tracking-widest mb-3';
@@ -130,6 +131,10 @@ export default function MySubmissions() {
             </section>
           </div>
         )}
+
+        <div className="mt-8">
+          <MyRecordings />
+        </div>
       </div>
     </div>
   );

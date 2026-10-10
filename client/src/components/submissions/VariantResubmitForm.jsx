@@ -5,6 +5,7 @@ import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import FormsEditor from '../forms/FormsEditor';
 import { formKindFor, formsPayload } from '../../utils/forms';
 import { inputCls, labelCls, PRIMARY_BTN, CANCEL_BTN } from './styles';
+import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 export default function VariantResubmitForm({ variant, onSave, onCancel }) {
   const [fields, setFields] = useState({
@@ -19,6 +20,7 @@ export default function VariantResubmitForm({ variant, onSave, onCancel }) {
   const [forms, setForms] = useState(variant.forms || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { send, dialog } = useAudioRetireConfirm();
 
   function set(key) {
     return (e) => setFields((f) => ({ ...f, [key]: e.target.value }));
@@ -36,8 +38,8 @@ export default function VariantResubmitForm({ variant, onSave, onCancel }) {
       if (!body.submissionNote) delete body.submissionNote;
       body.extra = extra;
       body.forms = formsPayload(forms);
-      const res = await updateVariant(variant._id, body);
-      onSave(res.data.data);
+      const res = await send((confirm) => updateVariant(variant._id, { ...body, ...confirm }));
+      if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
     } finally {
@@ -111,6 +113,7 @@ export default function VariantResubmitForm({ variant, onSave, onCancel }) {
           Cancel
         </button>
       </div>
+      {dialog}
     </form>
   );
 }
