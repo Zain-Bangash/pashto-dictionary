@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMySuggestions, resubmitSuggestion } from '../../services/api';
 import useLookups from '../../hooks/useLookups';
+import usePagedList, { MY_PAGE_SIZE } from '../../hooks/usePagedList';
+import useListFilters from '../../hooks/useListFilters';
 import Pagination from '../Pagination';
 import StatusBadge from './StatusBadge';
 import ContributeFormsForm from '../forms/ContributeFormsForm';
+import { StatusChips, EmptyList } from './SubmissionFilters';
 import { formKindFor, formSlot, slotLabel, sortForms } from '../../utils/forms';
 
-const CARD = 'bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-4';
-const HEADING = 'text-xs font-ui font-semibold text-muted uppercase tracking-widest mb-3';
+const CARD = 'bg-white/[0.035] border border-white/[0.08] rounded-[16px] p-4';
 const LINK_BTN = 'mt-2 self-start text-xs font-ui font-semibold text-terracotta hover:opacity-80 transition-opacity';
 
 function SuggestionItem({ suggestion, onResubmitted }) {
@@ -61,39 +63,32 @@ function SuggestionItem({ suggestion, onResubmitted }) {
   );
 }
 
-// Suggestions the user sent for other people's words; suggestions on their own words show on the word's row above
-export default function MySuggestions() {
-  const [page, setPage] = useState(1);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [result, setResult] = useState({ key: null, items: [], total: 0, limit: 20, error: null });
+const fetchSuggestions = (params) => getMySuggestions({ scope: 'others', ...params });
 
-  const key = `${page}|${refreshKey}`;
-  useEffect(() => {
-    let cancelled = false;
-    getMySuggestions({ scope: 'others', page })
-      .then((res) => {
-        if (!cancelled) setResult({ key, items: res.data.data || [], total: res.data.meta?.total ?? 0, limit: res.data.meta?.limit ?? 20, error: null });
-      })
-      .catch(() => { if (!cancelled) setResult((r) => ({ ...r, key, error: 'Could not load your suggestions.' })); });
-    return () => { cancelled = true; };
-  }, [key, page]);
-
-  const loading = result.key !== key;
-  if (loading && !result.items.length) return <p className="text-muted font-ui text-sm animate-pulse">Loading suggestions…</p>;
-  if (!loading && result.error) return <p className="text-red-400 font-ui text-sm">{result.error}</p>;
-  if (!result.items.length) return null;
-
-  const totalPages = Math.max(1, Math.ceil(result.total / result.limit));
+// Suggestions the user sent for other people's words; suggestions on their own words show on the word's row
+export default function MySuggestions({ counts, status = '', onStatusChange, onMutated = () => {} }) {
+  const { filters, setPage } = useListFilters({}, status);
+  const { items, totalPages, loading, loaded, error, reload } = usePagedList(
+    fetchSuggestions, { status, page: filters.page, limit: MY_PAGE_SIZE }, 'Could not load your suggestions.'
+  );
 
   return (
-    <section>
-      <h2 className={HEADING}>Forms you suggested</h2>
-      <ul className="space-y-3">
-        {result.items.map((s) => (
-          <SuggestionItem key={s._id} suggestion={s} onResubmitted={() => setRefreshKey((k) => k + 1)} />
-        ))}
-      </ul>
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
-    </section>
+    <>
+      <StatusChips counts={counts} value={status} onChange={onStatusChange} />
+      {!loaded ? (
+        <p className="text-muted font-ui text-sm animate-pulse">Loading suggestions…</p>
+      ) : error ? (
+        <p role="alert" className="text-red-400 font-ui text-sm">{error}</p>
+      ) : items.length === 0 ? (
+        <EmptyList>{status ? 'No suggestions match this status.' : 'You have not suggested anything yet.'}</EmptyList>
+      ) : (
+        <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
+          {items.map((s) => (
+            <SuggestionItem key={s._id} suggestion={s} onResubmitted={() => { reload(); onMutated(); }} />
+          ))}
+        </ul>
+      )}
+      {totalPages > 1 && <Pagination page={filters.page} totalPages={totalPages} onPageChange={setPage} />}
+    </>
   );
 }

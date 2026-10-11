@@ -1,20 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { MY_PAGE_SIZE } from './usePagedList';
 
-const EMPTY_META = { page: 1, limit: 20, total: 0, needsCompletionCount: 0 };
+const EMPTY_META = { page: 1, limit: MY_PAGE_SIZE, total: 0, needsCompletionCount: 0 };
 
 // Calls api.get directly so tests that mock the default export cover it.
 // loading is derived: the stored result belongs to an older request until its key matches.
-export default function useMyVariants({ completion, missing, region, page }) {
+export default function useMyVariants({ completion, missing, region, status, q, page }) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const key = `${completion}|${missing}|${region}|${page}|${refreshKey}`;
+  const key = `${completion}|${missing}|${region}|${status}|${q}|${page}|${refreshKey}`;
   const [result, setResult] = useState({ key: null, variants: [], meta: EMPTY_META, error: null });
 
   useEffect(() => {
     let cancelled = false;
     const params = {
+      limit: MY_PAGE_SIZE,
       ...(page > 1 && { page }),
       ...(region && { region }),
+      ...(status && !completion && { status }),
+      ...(q && { q }),
       ...(completion && { needs: 'completion', ...(missing && { missing }) }),
     };
     api.get('/api/variants/my-submissions', { params })
@@ -23,7 +27,7 @@ export default function useMyVariants({ completion, missing, region, page }) {
       })
       .catch(() => { if (!cancelled) setResult((r) => ({ ...r, key, error: 'Failed to load submissions' })); });
     return () => { cancelled = true; };
-  }, [key, completion, missing, region, page]);
+  }, [key, completion, missing, region, status, q, page]);
 
   const setVariants = useCallback((update) => setResult((r) => ({ ...r, variants: update(r.variants) })), []);
   const reload = useCallback(() => setRefreshKey((k) => k + 1), []);

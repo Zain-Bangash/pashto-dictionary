@@ -1,3 +1,4 @@
+import { searchRegex } from '../utils/mySubmissions';
 import { validationResult } from 'express-validator';
 import mongoose, { Types } from 'mongoose';
 import { Request, Response } from 'express';
@@ -429,7 +430,8 @@ async function attachLatestSuggestions(variants: Doc[], owner: string): Promise<
   return variants.map((v) => ({ ...v, latestSuggestion: latest.get(String(v._id)) ?? null }));
 }
 
-// ?needs=completion lists published words with blank optional fields; ?missing narrows it; ?region filters either list
+// ?needs=completion lists published words with blank optional fields (it overrides ?status); ?missing narrows it;
+// ?region, ?status and ?q (Pashto, phonetic, definition or English gloss) filter either list
 async function getMyVariantSubmissions(req: Request, res: Response): Promise<void> {
   const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
@@ -437,6 +439,12 @@ async function getMyVariantSubmissions(req: Request, res: Response): Promise<voi
 
   const own: Record<string, unknown> = { submittedBy: req.user!.id };
   if (req.query.region) own.region = req.query.region as string;
+  if (req.query.status) own.status = req.query.status as string;
+  const search = searchRegex(req.query.q);
+  if (search) {
+    const conceptIds = await Concept.distinct('_id', { englishGloss: search });
+    own.$and = [{ $or: [{ pashto: search }, { phonetic: search }, { definition: search }, { concept: { $in: conceptIds } }] }];
+  }
   const live = { ...own, status: 'published', isDeleted: { $ne: true } };
   const completion = req.query.needs === 'completion';
 

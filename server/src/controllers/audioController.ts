@@ -275,7 +275,10 @@ function slotInfo(variant: Doc | undefined, slot: string) {
 
 async function getMyClips(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = pageOf(req);
-  const filter = { submittedBy: req.user!.id };
+  const filter: Record<string, unknown> = { submittedBy: req.user!.id };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.slot === 'form') filter.slot = /^form:/;
+  else if (req.query.slot) filter.slot = req.query.slot;
   const [clips, total] = await Promise.all([
     AudioClip.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     AudioClip.countDocuments(filter),

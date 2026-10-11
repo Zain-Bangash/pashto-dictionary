@@ -22,6 +22,7 @@ import { rawAudio } from '../middleware/rawAudio';
 import { SLOT_PATTERN } from '../utils/audioSlots';
 import { suggestionLimiter, audioLimiter } from '../middleware/rateLimit';
 import { rejectInvalid } from '../utils/sendValidationError';
+import { statusFilter, searchFilter, pageFilters } from '../utils/mySubmissions';
 import { idParam, proposalValidators } from '../utils/suggestionValidators';
 import { MISSING_PATTERN } from '../utils/blankFields';
 
@@ -58,8 +59,9 @@ const mySubmissionsValidators = [
   query('needs').optional().isIn(['completion']).withMessage('needs must be completion'),
   query('missing').optional().matches(MISSING_PATTERN).withMessage('Invalid missing filter'),
   query('region').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid region'),
-  query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive number'),
-  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+  statusFilter(),
+  searchFilter(),
+  ...pageFilters(),
 ];
 
 const crossConceptCheckValidators = [

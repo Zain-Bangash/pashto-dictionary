@@ -8,7 +8,7 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-![alt text](image.png)
+![alt text](docs\image.png)
 These + i also say, + record or + suggest form can be pushed to the right side and made more appealing 
 
 1. 'Wanted Words' make it a drop down and show the variant thats present and have a 'Also spoken in Kohat' type button next to each variant (keep the Add your word button)
@@ -78,6 +78,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 - Admin-defined custom fields `[S4b]`: `FieldDefinition` collection (text / long text / dropdown, server-generated keys, deactivate-not-delete); values in `Concept.extra` / `Variant.extra`; shown on Submit, moderation edit and resubmit forms, ConceptDetail and queue rows; admin page at `/dashboard/fields`; `field_changed` audit action; not searchable by design
 
 - Pronunciation audio `[S5]`: `AudioClip` collection (own state machine, one live + one open clip per slot, replacements reviewed side by side); any logged-in user records the headword, example or any form slot; Cloudflare R2 via S3 SDK behind `utils/storage.ts`, uploads through Lambda, 1-hour signed URLs; server reads real duration/format (WebM, MP4, Ogg, MP3); text edits retire clips after a confirm; Audio queue tab, My Recordings, admin takedown
+- My Submissions dashboard: collapsible Concepts / Variants / Recordings / Forms-you-suggested sections (closed by default, lists load on open), a status totals strip, per-section status chips with counts, search, region / part-of-speech / recording-type filters and pagination; `GET /api/submissions/summary`
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

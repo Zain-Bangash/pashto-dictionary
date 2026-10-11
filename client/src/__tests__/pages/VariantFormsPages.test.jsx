@@ -8,6 +8,7 @@ import ConceptDetail from '../../pages/ConceptDetail';
 import api from '../../services/api';
 import { LookupsWrapper } from '../helpers/lookups';
 import { FieldsWrapper } from '../helpers/fields';
+import { mockSubmissionsApi, openSection } from '../helpers/mySubmissions';
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { _id: '1', role: 'user' }, token: 'jwt-token', login: vi.fn() })),
@@ -88,12 +89,11 @@ describe('MySubmissions resubmit with forms', () => {
       _id: 'v1', pashto: 'لیکل', definition: 'write', region: 'Kohat', status: 'rejected', moderatorNote: 'add forms',
       concept: { _id: 'c1', englishGloss: 'write', partOfSpeech: 'verb' }, createdAt: '2024-01-01T00:00:00.000Z',
     };
-    api.get
-      .mockResolvedValueOnce({ data: { data: [] } })
-      .mockResolvedValueOnce({ data: { data: [rejected] } });
+    mockSubmissionsApi(api, { variants: [rejected] });
     updateVariant.mockResolvedValue({ data: { data: { ...rejected, status: 'pending' } } });
     renderAt('/my-submissions', <MySubmissions />, '/my-submissions');
 
+    await openSection(user, 'Variants');
     await user.click(await screen.findByRole('button', { name: /edit & resubmit/i }));
     await user.click(screen.getByRole('button', { name: '+ Add form' }));
     await user.type(screen.getByLabelText('Pashto'), 'لیکل');

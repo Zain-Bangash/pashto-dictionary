@@ -19,6 +19,7 @@ import {
 } from '../controllers/conceptController';
 import { activeLookup, lookupFormat, isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
 import { rejectInvalid } from '../utils/sendValidationError';
+import { statusFilter, searchFilter, pageFilters } from '../utils/mySubmissions';
 
 const router = Router();
 
@@ -60,12 +61,19 @@ const wantedValidators = [
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 ];
 
+const myConceptsValidators = [
+  statusFilter(),
+  searchFilter(),
+  query('partOfSpeech').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid part of speech'),
+  ...pageFilters(),
+];
+
 // static paths must come before /:id
 router.get('/wotd',           getWotd);
 router.get('/wanted',         wantedValidators, rejectInvalid, getWanted);
 router.get('/suggest',        suggestConcepts);
 router.get('/search',         searchConcepts);
-router.get('/my-submissions', verifyToken, getMyConceptSubmissions);
+router.get('/my-submissions', verifyToken, myConceptsValidators, rejectInvalid, getMyConceptSubmissions);
 router.get('/',               optionalVerifyToken, listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
