@@ -73,7 +73,7 @@ Concept  — the meaning anchor (English gloss, part of speech, moderation statu
 
 Lookup   — admin-editable lists (region, part of speech): immutable key, editable label
 FieldDefinition — admin-defined extra fields; values stored in Concept.extra / Variant.extra
-VariantSuggestion — fill-only proposals for a published variant (any field from its submitter, forms from anyone)
+VariantSuggestion — proposals for a published variant: the submitter may fill blanks or replace Pashto, phonetic, definition and example (with a `baseline` of the replaced values), forms from anyone
 AudioClip — a pronunciation recording for one slot of a published variant (headword, example, a form); file in Cloudflare R2
 ```
 
@@ -93,7 +93,7 @@ published → rejected   (admin only, note required)
 rejected  → pending    (user edits and resubmits)
 ```
 
-Users can propose missing details (phonetic, example, forms, optional extra fields) for their own published words, and anyone signed in can propose missing grammatical forms for any published word, credited by name once published. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
+Users can propose missing details (forms, optional extra fields) or changes to the Pashto, phonetic, definition and example sentence for their own published words, shown to reviewers as before → after, and anyone signed in can propose missing grammatical forms for any published word, credited by name once published. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
 
 Any logged-in user can record a pronunciation for a published word. Clips follow the same review flow in their own `AudioClip` records, plus `withdrawn` (by the speaker, while pending) and `retired` (replaced by a newer clip, or the text it speaks was edited). Only published clips are ever played to the public.
 
@@ -122,11 +122,11 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/variants` | Token | Submit variant for a concept (optional `extra` values for custom fields; optional `forms` allowed by the concept's part of speech) |
 | PATCH | `/api/variants/:id` | Token (submitter) | Edit and resubmit a rejected variant (rejected → pending), including `extra` and `forms`. `409` if the word was added meanwhile |
 | GET | `/api/variants/my-submissions?needs=completion&missing=&region=` | Token | My variants with `missingFields`, `fillableFields` and `latestSuggestion`; `meta.needsCompletionCount` |
-| POST | `/api/variants/:id/suggestions` | Token | Propose values for blank fields of a published variant `{ phonetic?, example?, forms?, extra? }`. Only the word's submitter may send fields other than `forms` (`400` otherwise). Fill-only, one open suggestion per person per word (`409`), rate-limited |
+| POST | `/api/variants/:id/suggestions` | Token | Propose changes to a published variant `{ pashto?, phonetic?, definition?, example?, forms?, extra? }`. Only the word's submitter may send fields other than `forms` (`400` otherwise), and only they may replace a filled value; forms and custom fields stay fill-only. The response includes `baseline`, the replaced live values. A `pashto` duplicating another word of the concept and region is `400`. One open suggestion per person per word (`409`), rate-limited |
 | GET | `/api/suggestions/mine?scope=&status=&concept=` | Token | My suggestions with their word and concept, newest first. `scope=others` leaves out my own words; `status=open` and `concept=` narrow it |
 | PATCH | `/api/suggestions/:id` | Token (suggestion's sender) | Edit and resubmit a rejected suggestion (rejected → pending); still forms-only for someone else's word |
-| PATCH | `/api/suggestions/:id/edit` | Admin | Edit a pending or approved suggestion (note required, still fill-only) |
-| PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
+| PATCH | `/api/suggestions/:id/edit` | Admin | Edit a pending or approved suggestion (note required; takes a fresh `baseline`) |
+| PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Approve and publish refuse (`400` / `409`) if the word changed since the suggestion's `baseline`; publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
 | POST | `/api/variants/:id/audio?slot=` | Token | Upload a pronunciation clip for a published word. Raw body (`audio/webm`, `audio/mp4`, `audio/ogg`, `audio/mpeg`), max 1 MB; `slot` is `headword`, `example` or `form:<slot>`. The server reads the real duration (limit per slot) and format from the bytes. `409` if a clip for that slot is already under review; rate-limited |
 | DELETE | `/api/audio/:id` | Token (speaker) | Withdraw my pending clip (its file is deleted) |
 | GET | `/api/audio/mine` | Token | My clips with status, note, word and a signed URL while pending/approved/published (paginated) |
