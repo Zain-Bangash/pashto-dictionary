@@ -469,6 +469,23 @@ describe('GET /api/concepts/search', () => {
     expect(res.body.data[0].englishGloss).toBe('mountain');
   });
 
+  test('a Pashto query with vowel marks or Arabic kaf finds the plain spelling', async () => {
+    const concept = await Concept.create({ englishGloss: 'home', partOfSpeech: 'noun', status: 'published' });
+    await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Kohat', definition: 'a dwelling', status: 'published' });
+    for (const q of ['کَور', 'كور']) {
+      const res = await request.get(`/api/concepts/search?q=${encodeURIComponent(q)}`);
+      expect(res.body.data.map((c) => c.englishGloss)).toContain('home');
+    }
+  });
+
+  test('a query of only vowel marks matches no Pashto word', async () => {
+    const concept = await Concept.create({ englishGloss: 'home', partOfSpeech: 'noun', status: 'published' });
+    await Variant.create({ concept: concept._id, pashto: 'کور', region: 'Kohat', definition: 'a dwelling', status: 'published' });
+    const res = await request.get(`/api/concepts/search?q=${encodeURIComponent('َ')}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(0);
+  });
+
   test('response uses standard envelope shape', async () => {
     const res = await request.get('/api/concepts/search?q=house');
     expect(res.body).toHaveProperty('success', true);
@@ -851,6 +868,16 @@ describe('POST /api/variants — normalized duplicate detection', () => {
     expect(res.status).toBe(409);
     expect(res.body.success).toBe(false);
     expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
+  test('returns 409 when the new word differs only by keyboard look-alikes or vowel marks', async () => {
+    const token = await makeToken();
+    await Variant.create({ concept: conceptIdForDupTest, pashto: 'کور', region: 'Kohat', definition: 'existing dwelling', status: 'pending' });
+    const res = await request
+      .post('/api/variants')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ conceptId: conceptIdForDupTest, pashto: 'كَور', region: 'Kohat', definition: 'a dwelling place' });
+    expect(res.status).toBe(409);
   });
 
   test('returns 201 when same pashto word is submitted for a different region', async () => {

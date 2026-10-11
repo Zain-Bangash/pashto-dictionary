@@ -14,6 +14,7 @@ import { isDuplicateKey } from '../utils/duplicateKey';
 import { completionStages, missingMatch, optionalExtraKeys } from '../utils/blankFields';
 import { lockedFields, lockClash, rejectOpenSuggestions } from '../utils/suggestions';
 import { rejectOpenClips, staleClips, retireClips, needsRetireConfirm, slotSnapshot } from '../utils/audioClips';
+import { normalizePashto } from '../utils/normalize';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:  ['approved', 'rejected'],
@@ -74,7 +75,7 @@ async function createVariant(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const normalizedPashto = pashto.trim().normalize('NFC');
+  const normalizedPashto = normalizePashto(pashto);
   const duplicate = await Variant.findOne({
     normalizedPashto,
     concept: conceptId,
@@ -237,7 +238,7 @@ async function updateVariant(req: Request, res: Response): Promise<void> {
   const effectivePashto  = pashto  ?? variant.pashto;
   const effectiveRegion  = region  ?? variant.region;
   const duplicate = await Variant.findOne({
-    normalizedPashto: effectivePashto.trim().normalize('NFC'),
+    normalizedPashto: normalizePashto(effectivePashto),
     concept: variant.concept,
     region: effectiveRegion,
     isDeleted: { $ne: true },
@@ -566,7 +567,7 @@ async function editVariant(req: Request, res: Response): Promise<void> {
     // Compute the normalizedPashto that will be used after save
     const effectivePashto = req.body.pashto !== undefined ? req.body.pashto as string : variant.pashto;
     const effectiveRegion = req.body.region !== undefined ? req.body.region as string : variant.region;
-    const normalizedPashto = effectivePashto.trim().normalize('NFC');
+    const normalizedPashto = normalizePashto(effectivePashto);
 
     const duplicate = await Variant.findOne({
       concept: newConceptId,
@@ -653,7 +654,7 @@ async function crossConceptCheck(req: Request, res: Response): Promise<void> {
   const pashto = req.query.pashto as string;
   const conceptId = req.query.conceptId as string;
 
-  const normalizedPashto = pashto.trim().normalize('NFC');
+  const normalizedPashto = normalizePashto(pashto);
 
   const matches = await Variant.find({
     normalizedPashto,
