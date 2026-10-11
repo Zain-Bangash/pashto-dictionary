@@ -113,9 +113,9 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/auth/refresh` | Cookie | New access token + user from the refresh cookie. `401` when the session is missing, expired or revoked; `403` without `X-Requested-With` or from an unknown origin |
 | POST | `/api/auth/logout` | Cookie | Revokes the refresh token and clears the cookie. Always `200` |
 | GET | `/api/auth/me` | Token | Current user |
-| GET | `/api/concepts?domain=&status=` | — | List published concepts (paginated); `domain` filters by semantic domain key. Moderators and admins may pass `status` (one status, or `all`) |
-| GET | `/api/concepts/search?q=&domain=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms; Pashto matched after normalization); optional `domain` filter |
-| GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
+| GET | `/api/concepts?domain=&region=&status=` | — | List published concepts (paginated); `domain` filters by semantic domain key; `region` keeps concepts with a published word there and makes it the card's `firstVariant`. Each item has `firstVariant` (with `audio`: the live headword clip and signed URL, or `null`) and `variantCount`. Moderators and admins may pass `status` (one status, or `all`) |
+| GET | `/api/concepts/search?q=&domain=&region=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms; Pashto matched after normalization); optional `domain` and `region` filters; same card fields as the list |
+| GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded), with `firstVariant.audio` like the list |
 | GET | `/api/concepts/wanted?region=&q=` | — | Published concepts with no variant (any status) in the region; paginated, `meta.total` reflects the filters |
 | GET | `/api/concepts/:id` | — | Concept + its published variants, each with `audio` (published clips by slot, signed URL and speaker), `audioOpen` (slots under review) and `audioSlots` (recordable slots with text and time limit) and `alsoMeans` (other published concepts with the same written word, with their regions) |
 | POST | `/api/concepts` | Token | Submit new concept (optional `extra` values for custom fields; optional `semanticDomains`, up to 10 active domain keys) |

@@ -226,6 +226,15 @@ The dashboard is a work tool for scanning many items, so it keeps the tokens, gl
 - **Feedback**: success → toast (`useToast()`, bottom-right, fades after 4 s); a failed single action → dismissible red banner (`ActionError`) above the list; a failed bulk run → error toast plus the failure list.
 - **Loading**: the first load shows "Loading…"; later loads keep the list on screen at `opacity-60` so inputs never lose focus.
 
+## Word cards and concept pages
+
+- **`ConceptCard`** (`components/ConceptCard.jsx`) is the one word card, used by Home's Recent Words and the Browse grid: Pashto word (`pashto-bloom`), part-of-speech badge, gold italic gloss, Pashto example, a footer with the region count and a real `ListenButton` (hidden without a published clip). The whole card is a link via a stretched `after:absolute after:inset-0` on the gloss, so the footer button is not nested inside an `<a>`. Tilt comes from `hooks/useTilt.js`.
+- **Browse** (`/concepts`): standard shell, a filter card (search, region pills, domain pills; `meta-label` headings), a results line ("12 concepts in Kohat") with "Clear filters", staggered cards, dark `Pagination` only when there is more than one page.
+- **Concept page**: from `lg`, a sticky 22rem `ConceptPanel` on the left and word cards on the right. Word cards are `rounded-3xl` glass **without** `bento-card` (they hold recorders and forms). Reading content sits on the left; the **Contribute rail** sits on the right behind a thin divider (a wrapped row under the content on phones). Record is the single accented action (terracotta outline pill); the others are ghost pills. Panels open full width under the card, one at a time.
+- Pashto example sentences, on cards, word cards and in the Forms list, are always `dir="rtl" font-pashto`.
+- **Play buttons**: the playing state is terracotta, not mint.
+- **Stagger**: use `[animation-delay:…]` classes from a fixed list (Tailwind needs literal class names). `.bento-enter` and the waveform classes live in `@layer components` so these utilities can override their delay.
+
 ## Forms (Submit)
 
 A single-column form inside the standard shell: `max-w-xl mx-auto` within the `max-w-6xl` container. The form card uses the glass classes and `rounded-3xl` but **not** `bento-card`, so the form does not lift under the cursor while typing. Shared classes live in `components/submit/submitStyles.js`:
