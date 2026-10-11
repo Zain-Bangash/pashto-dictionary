@@ -6,28 +6,27 @@ import ModerationLog from '../models/ModerationLog';
 import { IVariant, IVariantSuggestion } from '../types/models';
 import { validateForms, applyForms, formSlot } from './variantForms';
 import { normalizePashto, normalizePhonetic } from './normalize';
-import { validateProposal, proposalToPlain, logSuggestion, PlainProposal } from './suggestions';
+import { validateProposal, proposalToPlain, logSuggestion, PlainProposal, TEXT_KEYS, canOverwrite, staleError } from './suggestions';
 
 type FieldError = { message: string; field?: string };
 export type ApplyResult =
   | { suggestion: IVariantSuggestion; variant: IVariant; error?: undefined }
   | { error: FieldError; status: number };
 
-type LeanVariant = Pick<IVariant, 'phonetic' | 'example' | 'forms' | 'extra' | 'concept' | 'updatedAt' | 'status' | 'isDeleted' | 'submittedBy'> & { _id: Types.ObjectId; extra?: Record<string, string> };
+type LeanVariant = Pick<IVariant, 'pashto' | 'region' | 'definition' | 'phonetic' | 'example' | 'forms' | 'extra' | 'concept' | 'updatedAt' | 'status' | 'isDeleted' | 'submittedBy'> & { _id: Types.ObjectId; extra?: Record<string, string> };
 
 function buildUpdate(variant: LeanVariant, proposed: PlainProposal, contributor: string, partOfSpeech?: string) {
   const set: Record<string, unknown> = {};
   const changes: Record<string, unknown> = {};
 
-  if (proposed.phonetic) {
-    set.phonetic = proposed.phonetic;
-    set.normalizedPhonetic = normalizePhonetic(proposed.phonetic);
-    changes.phonetic = { from: '', to: proposed.phonetic };
+  for (const key of TEXT_KEYS) {
+    const value = proposed[key];
+    if (!value) continue;
+    set[key] = value;
+    changes[key] = { from: variant[key] ?? '', to: value };
   }
-  if (proposed.example) {
-    set.example = proposed.example;
-    changes.example = { from: '', to: proposed.example };
-  }
+  if (proposed.pashto) set.normalizedPashto = normalizePashto(proposed.pashto);
+  if (proposed.phonetic) set.normalizedPhonetic = normalizePhonetic(proposed.phonetic);
   for (const [key, value] of Object.entries(proposed.extra ?? {})) {
     set[`extra.${key}`] = value;
     changes[`extra.${key}`] = { from: '', to: value };
@@ -72,7 +71,12 @@ export async function applySuggestion(id: string, adminId: string): Promise<Appl
 
     const concept = await Concept.findById(variant.concept, 'partOfSpeech').lean();
     const proposal = proposalToPlain(claimed.proposed);
-    const check = await validateProposal(proposal as Record<string, unknown>, variant, concept?.partOfSpeech);
+    const stale = staleError(claimed.proposed, claimed.baseline, variant);
+    if (stale) {
+      await revert(claimed._id as Types.ObjectId);
+      return { status: 409, error: { ...stale, message: `Cannot publish: ${stale.message}` } };
+    }
+    const check = await validateProposal(proposal as Record<string, unknown>, variant, concept?.partOfSpeech, canOverwrite(claimed.submittedBy, variant.submittedBy));
     if (check.error) {
       await revert(claimed._id as Types.ObjectId);
       return { status: 400, error: { ...check.error, message: `Cannot publish: ${check.error.message}. Edit or reject the suggestion.` } };

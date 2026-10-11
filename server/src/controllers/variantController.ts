@@ -422,7 +422,7 @@ type Doc = Record<string, unknown>;
 async function attachLatestSuggestions(variants: Doc[], owner: string): Promise<Doc[]> {
   const ids = variants.filter((v) => v.status === 'published').map((v) => v._id as Types.ObjectId);
   if (!ids.length) return variants.map((v) => ({ ...v, latestSuggestion: null }));
-  const suggestions = await VariantSuggestion.find({ variant: { $in: ids }, submittedBy: owner }, 'variant status moderatorNote proposed updatedAt')
+  const suggestions = await VariantSuggestion.find({ variant: { $in: ids }, submittedBy: owner }, 'variant status moderatorNote proposed baseline updatedAt')
     .sort({ updatedAt: -1 }).lean();
   const latest = new Map<string, unknown>();
   for (const s of suggestions) if (!latest.has(String(s.variant))) latest.set(String(s.variant), s);

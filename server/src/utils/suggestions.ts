@@ -1,21 +1,37 @@
 import { Types } from 'mongoose';
 import VariantSuggestion from '../models/VariantSuggestion';
 import ModerationLog from '../models/ModerationLog';
-import { IVariantForm, IVariantSuggestion, OPEN_SUGGESTION_STATUSES } from '../types/models';
+import Variant from '../models/Variant';
+import { IBaseline, IVariantForm, IVariantSuggestion, OPEN_SUGGESTION_STATUSES } from '../types/models';
 import { clean, validateExtra } from './extraFields';
 import { validateForms, applyForms, formSlot, FORM_MAX } from './variantForms';
 import { optionalExtraKeys } from './blankFields';
+import { normalizePashto } from './normalize';
 
 type FieldError = { message: string; field: string };
-export type PlainProposal = { phonetic?: string; example?: string; forms?: IVariantForm[]; extra?: Record<string, string> };
+export type PlainProposal = { pashto?: string; phonetic?: string; example?: string; definition?: string; forms?: IVariantForm[]; extra?: Record<string, string> };
 export type ProposalResult = { proposed: PlainProposal; error?: undefined } | { error: FieldError };
 
 // The parts of a variant a proposal is checked against
-export type VariantFields = { phonetic?: string; example?: string; forms?: IVariantForm[]; extra?: Map<string, string> | Record<string, string> };
+export type VariantFields = {
+  _id?: Types.ObjectId | string;
+  concept?: Types.ObjectId | string;
+  region?: string;
+  pashto?: string;
+  phonetic?: string;
+  example?: string;
+  definition?: string;
+  forms?: IVariantForm[];
+  extra?: Map<string, string> | Record<string, string>;
+};
 
-export const PROPOSAL_KEYS = ['phonetic', 'example', 'forms', 'extra'];
-export const PROPOSAL_MAX = { phonetic: FORM_MAX.phonetic, example: FORM_MAX.example };
-const TEXT_LABELS = { phonetic: 'Phonetic', example: 'Example' } as const;
+// The word's own text fields; the submitter may replace them, anyone else only fills blanks
+export const TEXT_KEYS = ['pashto', 'phonetic', 'example', 'definition'] as const;
+export const PROPOSAL_KEYS = [...TEXT_KEYS, 'forms', 'extra'];
+export const PROPOSAL_MAX = { pashto: FORM_MAX.pashto, phonetic: FORM_MAX.phonetic, example: FORM_MAX.example, definition: 500 };
+const TEXT_LABELS = { pashto: 'Pashto', phonetic: 'Phonetic', example: 'Example', definition: 'Definition' } as const;
+const REQUIRED_TEXT: readonly string[] = ['pashto', 'definition'];
+export const STALE_MESSAGE = 'The word changed since this was suggested. Edit or reject the suggestion.';
 
 const fail = (message: string, field: string): ProposalResult => ({ error: { message, field } });
 
@@ -38,32 +54,51 @@ function plainForm(form: IVariantForm): IVariantForm {
 
 export function proposalToPlain(proposed: IVariantSuggestion['proposed']): PlainProposal {
   const out: PlainProposal = {};
-  if (proposed.phonetic) out.phonetic = proposed.phonetic;
-  if (proposed.example) out.example = proposed.example;
+  for (const key of TEXT_KEYS) if (proposed[key]) out[key] = proposed[key];
   if (proposed.forms?.length) out.forms = proposed.forms.map((f) => plainForm(f));
   const extra = plainExtra(proposed.extra);
   if (Object.keys(extra).length) out.extra = extra;
   return out;
 }
 
-// Fill-only: every proposed value must go into a field that is blank on the live variant.
-// Used at submit, resubmit, staff edit and again at publish.
+export const canOverwrite = (submittedBy: string, wordOwner?: string): boolean => submittedBy === wordOwner;
+
+// Checks a proposal against the live word. The submitter (`overwrite`) may replace pashto, phonetic, example and
+// definition; everyone else, and every form and custom field, may only fill what is blank.
+// Used at submit, resubmit, staff edit, approve and again at publish.
 export async function validateProposal(
   input: Record<string, unknown>,
   variant: VariantFields,
-  partOfSpeech: string | undefined
+  partOfSpeech: string | undefined,
+  overwrite = false
 ): Promise<ProposalResult> {
   const proposed: PlainProposal = {};
 
-  for (const name of ['phonetic', 'example'] as const) {
+  for (const name of TEXT_KEYS) {
     const raw = input[name];
     if (raw === undefined || raw === null) continue;
     if (typeof raw !== 'string') return fail(`${TEXT_LABELS[name]} must be text`, name);
     const value = clean(raw, 'text');
     if (value.length > PROPOSAL_MAX[name]) return fail(`${TEXT_LABELS[name]} must be ${PROPOSAL_MAX[name]} characters or fewer`, name);
-    if (!value) continue;
-    if (variant[name]) return fail(`${TEXT_LABELS[name]} is already filled and cannot be changed`, name);
+    if (!value) {
+      if (REQUIRED_TEXT.includes(name)) return fail(`${TEXT_LABELS[name]} cannot be blank`, name);
+      continue;
+    }
+    const current = variant[name] ?? '';
+    if (value === current) continue;
+    if (current && !overwrite) return fail(`${TEXT_LABELS[name]} is already filled and cannot be changed`, name);
     proposed[name] = value;
+  }
+
+  if (proposed.pashto && variant._id) {
+    const duplicate = await Variant.exists({
+      concept: variant.concept,
+      region: variant.region,
+      normalizedPashto: normalizePashto(proposed.pashto),
+      isDeleted: { $ne: true },
+      _id: { $ne: variant._id },
+    });
+    if (duplicate) return fail('This word already exists for this concept and region', 'pashto');
   }
 
   if (input.forms !== undefined) {
@@ -88,8 +123,23 @@ export async function validateProposal(
     }
   }
 
-  if (!Object.keys(proposed).length) return fail('Suggest at least one missing detail', 'proposed');
+  if (!Object.keys(proposed).length) return fail('Suggest at least one change', 'proposed');
   return { proposed };
+}
+
+// The live values of the text fields a proposal replaces; stored with the suggestion so reviewers see what is being changed
+export function baselineFor(variant: VariantFields, proposed: PlainProposal): IBaseline {
+  const baseline: IBaseline = {};
+  for (const key of TEXT_KEYS) if (proposed[key] !== undefined) baseline[key] = variant[key] ?? '';
+  return baseline;
+}
+
+// A suggestion written against an older version of the word must not overwrite what changed since.
+// Suggestions saved before overwrites existed have no baseline and were fill-only, so their baseline is blank.
+export function staleError(proposed: IVariantSuggestion['proposed'], baseline: IBaseline | undefined, variant: VariantFields): FieldError | undefined {
+  const plain = proposalToPlain(proposed);
+  const field = TEXT_KEYS.find((k) => plain[k] && (baseline?.[k] ?? '') !== (variant[k] ?? ''));
+  return field ? { message: STALE_MESSAGE, field } : undefined;
 }
 
 // Each person may have one open suggestion per word
@@ -101,7 +151,7 @@ export async function findOpenSuggestion(variantId: Types.ObjectId | string, sub
 export function formsOnlyError(input: Record<string, unknown>, submittedBy: string, wordOwner?: string): FieldError | undefined {
   if (submittedBy === wordOwner) return undefined;
   const filled = (v: unknown) => v !== undefined && v !== null && v !== '';
-  const field = (['phonetic', 'example'] as const).find((k) => filled(input[k]))
+  const field = TEXT_KEYS.find((k) => filled(input[k]))
     ?? (input.extra && typeof input.extra === 'object' && Object.values(input.extra).some(filled) ? 'extra' : undefined);
   if (!field) return undefined;
   return { message: "Only the word's submitter can suggest this detail. You can suggest grammatical forms.", field };
@@ -113,7 +163,7 @@ export async function lockedFields(variantId: Types.ObjectId | string): Promise<
   const locked = new Set<string>();
   for (const s of open) {
     const plain = proposalToPlain(s.proposed);
-    (['phonetic', 'example'] as const).filter((k) => plain[k]).forEach((k) => locked.add(k));
+    TEXT_KEYS.filter((k) => plain[k]).forEach((k) => locked.add(k));
     (plain.forms ?? []).forEach((f) => locked.add(`forms.${formSlot(f)}`));
     Object.keys(plain.extra ?? {}).forEach((k) => locked.add(`extra.${k}`));
   }
@@ -137,7 +187,7 @@ export async function rejectOpenSuggestions(variantIds: (Types.ObjectId | string
   }));
 }
 
-const LOCK_LABELS: Record<string, string> = { phonetic: 'Phonetic', example: 'Example' };
+const LOCK_LABELS: Record<string, string> = TEXT_LABELS;
 
 // Returns an error when a staff edit would change a field that an open suggestion proposes
 export function lockClash(
@@ -149,7 +199,7 @@ export function lockClash(
 ): FieldError | undefined {
   if (!locked.size) return undefined;
   const changed = [
-    ...(['phonetic', 'example'] as const).filter((k) => body[k] !== undefined && String(body[k] ?? '') !== (variant[k] ?? '')),
+    ...TEXT_KEYS.filter((k) => body[k] !== undefined && String(body[k] ?? '') !== (variant[k] ?? '')),
     ...Object.keys(extraValues).map((k) => `extra.${k}`),
     ...Object.keys(applyForms({ forms: variant.forms }, forms)),
   ];
