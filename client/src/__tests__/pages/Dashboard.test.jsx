@@ -521,17 +521,11 @@ describe('DashboardConcepts page — all concepts with status filter', () => {
     renderEntries();
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
 
-    const select = screen.queryByRole('combobox', { name: /status/i }) ||
-      screen.queryByLabelText(/status/i);
-    if (select) {
-      await user.selectOptions(select, 'pending');
-      await waitFor(() => {
-        expect(api.get).toHaveBeenCalledTimes(2);
-        expect(api.get).toHaveBeenLastCalledWith(
-          expect.stringMatching(/status=pending/)
-        );
-      });
-    }
+    await user.click(screen.getByRole('button', { name: 'Pending' }));
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledTimes(2);
+      expect(api.get).toHaveBeenLastCalledWith(expect.stringMatching(/status=pending/));
+    });
   });
 
   it('displays the status badge for each entry', async () => {

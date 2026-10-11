@@ -25,9 +25,9 @@ export default function ManagedVariantRow({ variant, concept, openSuggestions = 
           <p className="text-sm font-ui text-muted">{variant.definition}</p>
           {variant.example && <p className="text-xs font-ui text-muted/60 italic">{variant.example}</p>}
           {openSuggestions.length > 0 && (
-            <p className="text-[11px] font-ui text-amber-300/90">
+            <p className="text-[11px] font-ui text-gold/90">
               {openSuggestions.length === 1 ? `Suggestion ${openSuggestions[0].status}` : `${openSuggestions.length} open suggestions`} — the fields they propose are locked here.{' '}
-              <Link to="/dashboard/queue?view=suggestions" className="underline hover:text-amber-200">Review it in Suggestions</Link>
+              <Link to="/dashboard/queue?view=suggestions" className="underline hover:text-gold">Review it in Suggestions</Link>
             </p>
           )}
           {variant.submittedBy?.username && (

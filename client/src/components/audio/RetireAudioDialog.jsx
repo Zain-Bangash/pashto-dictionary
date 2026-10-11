@@ -10,7 +10,7 @@ export default function RetireAudioDialog({ retiring, onConfirm, onCancel }) {
         </p>
         <ul className="mb-4 space-y-1">
           {retiring.map((clip) => (
-            <li key={clip._id} className="text-sm font-ui text-amber-300/90">
+            <li key={clip._id} className="text-sm font-ui text-gold/90">
               {audioSlotLabel(clip.slot)}
               {clip.speaker && <span className="text-muted"> — recorded by {clip.speaker}</span>}
               {clip.status !== 'published' && <span className="text-muted/60"> (under review)</span>}

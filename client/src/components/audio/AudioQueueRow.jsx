@@ -2,6 +2,8 @@ import useLookups from '../../hooks/useLookups';
 import AudioPlayButton from './AudioPlayButton';
 import { audioSlotLabel, speakerCredit } from '../../utils/audio';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN } from '../moderation/queueButtons';
+import SelectBox from '../moderation/SelectBox';
+import SubmitterName from '../moderation/SubmitterName';
 
 function ClipPanel({ title, clip, tone }) {
   const { labelFor } = useLookups();
@@ -23,7 +25,7 @@ function ClipPanel({ title, clip, tone }) {
   );
 }
 
-export default function AudioQueueRow({ clip, isAdmin, userId, onApprove, onReject, onPublish }) {
+export default function AudioQueueRow({ clip, isAdmin, userId, selected = false, onSelect, onFilterUser, onApprove, onReject, onPublish }) {
   const { labelFor } = useLookups();
   const { variant, slotInfo, status } = clip;
   const own = Boolean(userId) && String(clip.submittedBy?._id) === String(userId);
@@ -32,22 +34,26 @@ export default function AudioQueueRow({ clip, isAdmin, userId, onApprove, onReje
   return (
     <li className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5 space-y-3">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          {variant ? (
-            <>
-              <p className="text-warm font-display text-lg font-semibold">{variant.concept?.englishGloss}</p>
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span dir="rtl" className="font-pashto text-warm text-2xl">{variant.pashto}</span>
-                <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
-                  {labelFor('region', variant.region)}
-                </span>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm font-ui text-muted italic">The word is no longer available</p>
-          )}
+        <div className="flex items-start gap-3 min-w-0">
+            {onSelect && !blockedOwn && <SelectBox checked={selected} onChange={onSelect} label={`Select recording of ${variant?.pashto ?? 'removed word'}`} />}
+            <div className="min-w-0">
+            {variant ? (
+              <>
+                <p className="text-warm font-display text-lg font-semibold">{variant.concept?.englishGloss}</p>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span dir="rtl" className="font-pashto text-warm text-2xl">{variant.pashto}</span>
+                  <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
+                    {labelFor('region', variant.region)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm font-ui text-muted italic">The word is no longer available</p>
+            )}
+            {onFilterUser && <SubmitterName submitter={clip.submittedBy} prefix="Recorded by" onFilter={onFilterUser} />}
+            </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {status === 'pending' && (
             <>
               <button onClick={() => onApprove(clip._id)} disabled={blockedOwn} className={APPROVE_BTN}>Approve</button>
@@ -74,7 +80,7 @@ export default function AudioQueueRow({ clip, isAdmin, userId, onApprove, onReje
 
       <div className="flex gap-3 flex-wrap">
         {clip.current && <ClipPanel title="Current" clip={clip.current} tone="border-white/[0.08] bg-white/[0.02]" />}
-        <ClipPanel title={clip.current ? 'Replacement' : 'New'} clip={clip} tone="border-mint/25 bg-mint/[0.04]" />
+        <ClipPanel title={clip.current ? 'Replacement' : 'New'} clip={clip} tone="border-gold/25 bg-gold/[0.04]" />
       </div>
       {blockedOwn && <p className="text-[11px] font-ui text-muted/60">You recorded this, so another moderator must review it.</p>}
     </li>

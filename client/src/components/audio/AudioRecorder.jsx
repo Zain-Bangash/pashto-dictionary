@@ -72,7 +72,7 @@ export default function AudioRecorder({ variantId, slots, initialSlot, onUploade
         <select
           value={slot}
           onChange={chooseSlot}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         >
           {slots.map((s) => (
             <option key={s.slot} value={s.slot} disabled={s.open}>

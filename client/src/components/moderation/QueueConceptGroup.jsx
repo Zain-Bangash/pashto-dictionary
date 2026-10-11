@@ -5,13 +5,17 @@ import QueueVariantRow from './QueueVariantRow';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN, EDIT_BTN } from './queueButtons';
 import useLookups from '../../hooks/useLookups';
 import ExtraFieldsDisplay from '../fields/ExtraFieldsDisplay';
+import StatusBadge from '../submissions/StatusBadge';
+import SubmitterName from './SubmitterName';
+import SelectBox from './SelectBox';
 
-export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, showSimilar, onAction, onReject, onConceptSave, onVariantSave, onMergeRequest }) {
+export default function QueueConceptGroup({ group, isAdmin, queueStatus, crossConceptMap, showSimilar, selection, onFilterUser, onAction, onReject, onConceptSave, onVariantSave, onMergeRequest }) {
   const { labelFor } = useLookups();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing]   = useState(false);
 
-  const { variants = [], ...concept } = group;
+  const { variants = [], matched, ...concept } = group;
+  const selectable = Boolean(selection) && matched !== false && concept.status === queueStatus;
   const conceptRef = { _id: concept._id, englishGloss: concept.englishGloss, status: concept.status, partOfSpeech: concept.partOfSpeech };
   const count = variants.length;
   const panelId = `variants-${concept._id}`;
@@ -20,25 +24,27 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
     <li className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5">
       <div
         onClick={count > 0 ? () => setExpanded((x) => !x) : undefined}
-        className={`flex items-start justify-between gap-4 ${count > 0 ? 'cursor-pointer' : ''}`}
+        className={`flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 ${count > 0 ? 'cursor-pointer' : ''}`}
       >
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <p className="text-warm font-display text-lg font-semibold">{concept.englishGloss}</p>
-            <span className="font-ui text-[10px] px-1.5 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/80">
-              {concept.status}
-            </span>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {selectable && (
+            <SelectBox
+              checked={selection.has(concept._id)}
+              onChange={() => selection.toggle({ id: concept._id, prefix: 'concepts', label: concept.englishGloss })}
+              label={`Select ${concept.englishGloss}`}
+            />
+          )}
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-warm font-display text-lg font-semibold">{concept.englishGloss}</p>
+              <StatusBadge status={concept.status} />
+            </div>
+            <p className="text-sm font-ui text-muted">{labelFor('partOfSpeech', concept.partOfSpeech)}</p>
+            <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
+            <SubmitterName submitter={concept.submittedBy} onFilter={onFilterUser} />
           </div>
-          <p className="text-sm font-ui text-muted">{labelFor('partOfSpeech', concept.partOfSpeech)}</p>
-          <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
-          <p className="text-xs font-ui text-muted/60">
-            by {concept.submittedBy?.username}
-            {(concept.submittedBy?.village || concept.submittedBy?.region) && (
-              <span className="ml-1">({[concept.submittedBy.village, labelFor('region', concept.submittedBy.region)].filter(Boolean).join(', ')})</span>
-            )}
-          </p>
         </div>
-        <div onClick={(e) => e.stopPropagation()} className="flex gap-2 shrink-0">
+        <div onClick={(e) => e.stopPropagation()} className="flex flex-wrap gap-2 shrink-0">
           {concept.status === 'pending' && (
             <>
               <button onClick={() => onAction('concepts', concept._id, 'approved')} className={APPROVE_BTN}>Approve</button>
@@ -90,6 +96,8 @@ export default function QueueConceptGroup({ group, isAdmin, crossConceptMap, sho
                 variant={v}
                 concept={conceptRef}
                 isAdmin={isAdmin}
+                selection={selection}
+                onFilterUser={onFilterUser}
                 conflicts={crossConceptMap[v._id]}
                 onAction={onAction}
                 onReject={onReject}

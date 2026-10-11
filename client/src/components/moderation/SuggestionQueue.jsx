@@ -1,45 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getSuggestionQueue, transitionSuggestion } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Pagination from '../Pagination';
 import RejectModal from './RejectModal';
 import SuggestionGroup from './SuggestionGroup';
+import QueueToolbar from './QueueToolbar';
+import BulkBar from './BulkBar';
+import ActionError from './ActionError';
+import useQueueParams, { activeFilters } from '../../hooks/useQueueParams';
+import useQueueData from '../../hooks/useQueueData';
+import useBulkActions from '../../hooks/useBulkActions';
+import useSharedStats from '../../hooks/useSharedStats';
+import useToast from '../../hooks/useToast';
 
-const FILTERS = ['pending', 'approved'];
-const EMPTY_META = { total: 0, limit: 20, pendingCount: 0, approvedCount: 0 };
+const VERBS = { approved: 'Suggestion approved', published: 'Suggestion published', rejected: 'Suggestion rejected' };
+
+const itemOf = (s, variant) => ({ id: s._id, label: `${variant?.pashto ?? 'Removed word'} — by ${s.submittedBy?.username ?? 'unknown'}` });
 
 export default function SuggestionQueue() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const toast = useToast();
+  const stats = useSharedStats();
+  const { status, page, filters, filtering, update } = useQueueParams(isAdmin);
 
-  const [status, setStatus]           = useState('pending');
-  const [page, setPage]               = useState(1);
-  const [refreshKey, setRefreshKey]   = useState(0);
-  const [result, setResult]           = useState({ key: null, items: [], meta: EMPTY_META, error: null });
+  const key = JSON.stringify([status, page, filters]);
+  const { items, meta, loaded, loading, error, refresh } =
+    useQueueData(() => getSuggestionQueue({ status, page, ...activeFilters(filters) }), key, 'Failed to load suggestions');
   const [actionError, setActionError] = useState(null);
   const [rejectId, setRejectId]       = useState(null);
 
-  // loading is derived: the stored result belongs to an older request until its key matches
-  const key = `${status}|${page}|${refreshKey}`;
-  useEffect(() => {
-    let cancelled = false;
-    getSuggestionQueue({ status, page })
-      .then((res) => { if (!cancelled) setResult({ key, items: res.data.data || [], meta: { ...EMPTY_META, ...res.data.meta }, error: null }); })
-      .catch(() => { if (!cancelled) setResult((r) => ({ ...r, key, error: 'Failed to load suggestions' })); });
-    return () => { cancelled = true; };
-  }, [key, status, page]);
-
-  const { items, meta } = result;
-  const loading = result.key !== key;
-  const error = loading ? null : result.error;
-
-  const refresh = () => setRefreshKey((k) => k + 1);
+  const afterChange = () => { refresh(); stats?.refresh?.(); };
+  const bulk = useBulkActions({
+    resetKey: key,
+    perform: (item, next, note) => transitionSuggestion(item.id, { status: next, ...(note && { moderatorNote: note }) }),
+    onDone: afterChange,
+  });
 
   const act = async (id, body) => {
     setActionError(null);
     try {
       await transitionSuggestion(id, body);
-      refresh();
+      toast(VERBS[body.status]);
+      afterChange();
     } catch (err) {
       setActionError(err?.response?.data?.error?.message || 'Action failed');
     }
@@ -52,52 +55,71 @@ export default function SuggestionQueue() {
   };
 
   const totalPages = Math.max(1, Math.ceil((meta.total || 0) / (meta.limit || 20)));
+  const selectable = items.flatMap((g) => g.suggestions.filter((s) => s.status === status).map((s) => itemOf(s, g.variant)));
 
   return (
     <div>
-      {isAdmin && (
-        <div className="flex gap-2 mb-5">
-          {FILTERS.map((s) => (
-            <button
-              key={s}
-              onClick={() => { setStatus(s); setPage(1); }}
-              aria-pressed={status === s}
-              className={`font-ui text-xs px-3 py-1.5 rounded-full capitalize transition-all border ${
-                status === s ? 'bg-violet/10 border-violet/35 text-violet' : 'bg-white/[0.04] border-white/[0.08] text-muted'
-              }`}
-            >
-              {s} ({meta[`${s}Count`] ?? 0})
-            </button>
-          ))}
-        </div>
-      )}
+      <QueueToolbar
+        isAdmin={isAdmin}
+        status={status}
+        meta={meta}
+        filters={filters}
+        filtering={filtering}
+        onChange={update}
+        searchLabel="Search gloss or Pashto word"
+        selectable={selectable}
+        selection={bulk.selection}
+      />
 
-      {actionError && <div role="alert" className="mb-4 text-red-400 text-sm font-ui">{actionError}</div>}
+      <ActionError message={actionError} onDismiss={() => setActionError(null)} />
 
-      {loading ? (
+      {!loaded && loading ? (
         <p className="text-muted font-ui text-sm animate-pulse">Loading…</p>
       ) : error ? (
         <p className="text-red-400 font-ui text-sm">{error}</p>
       ) : items.length === 0 ? (
-        <p className="text-muted font-ui text-sm">No suggestions waiting.</p>
+        <p className="text-muted font-ui text-sm">{filtering ? 'Nothing matches these filters.' : 'No suggestions waiting.'}</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
           {items.map((group) => (
             <SuggestionGroup
               key={group.variant?._id ?? group.suggestions[0]?._id}
               group={group}
               isAdmin={isAdmin}
+              selection={bulk.selection}
+              itemOf={itemOf}
+              onFilterUser={(username) => update({ user: username })}
               onApprove={(id) => act(id, { status: 'approved' })}
               onPublish={(id) => act(id, { status: 'published' })}
               onReject={setRejectId}
-              onSaved={refresh}
+              onSaved={() => { toast('Suggestion saved'); refresh(); }}
             />
           ))}
         </ul>
       )}
 
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
+      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={(p) => update({ page: p })} />}
+
+      <BulkBar
+        count={bulk.selection.count}
+        status={status}
+        isAdmin={isAdmin}
+        busy={bulk.busy}
+        failures={bulk.failures}
+        onApprove={() => bulk.run('approved')}
+        onPublish={() => bulk.run('published')}
+        onReject={bulk.askReject}
+        onClear={bulk.selection.clear}
+      />
+
       {rejectId && <RejectModal onConfirm={handleRejectConfirm} onCancel={() => setRejectId(null)} />}
+      {bulk.rejecting && (
+        <RejectModal
+          warning={`This note goes to every selected suggestion (${bulk.selection.count}).`}
+          onConfirm={(note) => bulk.run('rejected', note)}
+          onCancel={bulk.cancelReject}
+        />
+      )}
     </div>
   );
 }

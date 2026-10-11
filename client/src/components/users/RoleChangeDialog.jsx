@@ -25,7 +25,7 @@ export default function RoleChangeDialog({ target, nextRole, saving, error, onCo
           onChange={(e) => setNote(e.target.value)}
           maxLength={500}
           rows={3}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-2 text-warm text-sm font-ui outline-none focus:border-mint/50 resize-none"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-2 text-warm text-sm font-ui outline-none focus:border-terracotta/60 resize-none"
         />
         {error && <p role="alert" className="mt-2 text-xs font-ui text-red-400">{error}</p>}
         <div className="flex gap-2 mt-4 justify-end">
@@ -38,7 +38,7 @@ export default function RoleChangeDialog({ target, nextRole, saving, error, onCo
           <button
             onClick={() => onConfirm(note.trim())}
             disabled={saving}
-            className="px-4 py-2 bg-mint/10 border border-mint/30 text-mint text-xs font-ui font-semibold rounded-[8px] hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-terracotta text-warm text-xs font-ui font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(196,119,90,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving…' : 'Confirm'}
           </button>

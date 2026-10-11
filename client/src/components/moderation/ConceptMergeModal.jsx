@@ -51,7 +51,7 @@ export default function ConceptMergeModal({ sourceConcept, onConfirm, onCancel }
             placeholder="Search concept"
             value={query}
             onChange={handleSearch}
-            className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+            className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
           />
           {suggestions.length > 0 && (
             <ul className="absolute z-20 w-full bg-charcoal border border-white/[0.12] rounded-[10px] mt-1 max-h-48 overflow-y-auto">
@@ -78,7 +78,7 @@ export default function ConceptMergeModal({ sourceConcept, onConfirm, onCancel }
             placeholder="Note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+            className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
           />
         </div>
 
@@ -92,7 +92,7 @@ export default function ConceptMergeModal({ sourceConcept, onConfirm, onCancel }
           <button
             onClick={handleConfirm}
             disabled={!targetConcept}
-            className="px-4 py-2 bg-mint/10 border border-mint/30 text-mint text-xs font-ui font-semibold rounded-[8px] hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-terracotta text-warm text-xs font-ui font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(196,119,90,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Confirm
           </button>
