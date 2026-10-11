@@ -58,7 +58,7 @@ As a user, if I enter an incorrect email or password on the Login page, I stay o
 
 As a user I should be able to view all the same pages a guest can.
 
-As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, phonetic, region, definition, and example.
+As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, an optional recording of it, phonetic, region, definition, and example.
 
 As a user, when I create a new concept on the Submit form I can pick up to 10 domains (optional) from the admin-maintained list. When I edit and resubmit a rejected concept I can change them too. After that, only an admin can change a concept's domains.
 
@@ -79,6 +79,8 @@ As a user, "Add your [Region] word" on Wanted Words opens the Submit page at Ste
 As a user I should not be able to submit a concept whose English gloss already exists — the autocomplete and server both prevent duplicates.
 
 As a user I should not be able to submit a variant with the same Pashto word and region under the same concept — the server rejects it with a clear message. However, the same Pashto word from a different region is allowed.
+
+As a user, in Step 2 of the Submit form, once I have typed the Pashto word I can optionally record how it is said (or upload a recording), with the same time limit, preview and discard as on a concept page. It is sent for review together with my word and appears under Recordings in My Submissions. If I change the word after recording, I am told the recording may no longer match. If the recording fails to upload, my word is still submitted and I can try again, record again, or continue without it. Only the word itself can be recorded here; the example sentence and forms can be recorded once the word is published.
 
 As a user, in Step 2 of the Submit form, I can optionally add a note to the moderators — such as a book reference, page number, or link — to help them verify the word. This note is visible to moderators and admins in the moderation queue but is not shown on the public concept detail page.
 
@@ -164,6 +166,8 @@ As a moderator, the Moderation Queue has Entries and Suggestions views. Entries 
 
 As a moderator, the Moderation Queue also has an Audio view listing pending recordings. Each row shows the word, its region and concept, the slot and the Pashto text the speaker should be saying, the recording's length and who recorded it. When a recording would replace a published one, the current and the replacement recordings are shown side by side and both can be played. I can approve one, or reject it with a note; I cannot review a recording I made myself (the buttons are disabled and the server returns 403).
 
+As a moderator, a recording sent with a new word appears in the Audio queue straight away, marked "Word pending" (or "Word approved"), and I can approve or reject it before the word is reviewed. If the word or its concept is rejected, the recording is rejected too.
+
 As a moderator, when I reject a concept, all of that concept's pending, approved, or published variants are automatically rejected and removed from the variant queue. Each variant's submitter sees "Concept "X" was rejected: <reason>" in My Submissions and can resubmit. This prevents orphaned variants from accumulating in the queue after their parent concept is discarded.
 
 As a moderator I cannot reject a published concept or variant — only admins can. The server rejects the attempt with a 403.
@@ -196,7 +200,7 @@ As an admin, a published word with open suggestions shows "Suggestion pending" (
 
 As an admin, when I reject or delete a published word, any open suggestion on it is rejected automatically with a note naming the cause.
 
-As an admin, the Audio view has its own Pending / Approved filter with counts. Publishing an approved recording makes it live on the concept page; if it replaces a published recording, the old one is retired and its audio deleted. I can reject an approved recording with a note. Moderators cannot publish.
+As an admin, the Audio view has its own Pending / Approved filter with counts. Publishing an approved recording makes it live on the concept page; if it replaces a published recording, the old one is retired and its audio deleted. A recording sent with a new word cannot be published until its word is published: its Publish button is disabled with "Publish the word first", and the server refuses it with that message. I can reject an approved recording with a note. Moderators cannot publish.
 
 As an admin, a published word in the Concepts panel lists its live recordings with play buttons and a Remove button; removing one needs a note and takes it off the site.
 

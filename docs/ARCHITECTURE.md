@@ -548,7 +548,7 @@ Create and resubmit share a rate limiter (30 requests per 15 minutes) built the 
 
 ## Pronunciation audio
 
-Logged-in users record or upload a short clip of a published word. Clips are moderated like everything else, and nothing unreviewed is ever served to the public.
+Logged-in users record or upload a short clip of a published word, and a submitter can send a headword clip with their own new word from the Submit page. Clips are moderated like everything else, and nothing unreviewed is ever served to the public.
 
 ```
 AudioClip { variant, slot, storageKey, mimeType, sizeBytes, durationMs, status, lane?,
@@ -584,6 +584,12 @@ published → retired    (system: replaced, or its text changed)
 `rejected`, `retired` and `withdrawn` are final. Audio cannot be edited, so instead of a resubmit flow the speaker records again, which creates a new clip.
 
 A derived `lane` field is `live` for `published`, `open` for `pending`/`approved`, and unset otherwise. One unique partial index on `{ variant, slot, lane }` therefore enforces both rules at once: at most one live clip and at most one open clip per slot. This avoids two partial indexes on the same key pattern, which older MongoDB versions refuse. A replacement waits in the `open` lane beside the live clip, and anyone can record one. The moderation queue plays the two side by side.
+
+### Recordings sent with a new word
+
+A word still under review has no public page, so normally nobody can record it. The one exception is the word's **own submitter**, who may upload a `headword` clip while the variant is `pending` or `approved` and neither it nor its concept is rejected or deleted. The Submit page uses this: it creates the concept and the variant, then uploads the clip held in the browser. If that upload fails, the word stays submitted and the page offers a retry.
+
+The clip runs its normal state machine from the start, so it shows in the Audio queue at once and a moderator may approve it before the word is reviewed. **Publishing waits for the word:** `PATCH /api/audio/:id/status` with `published` returns 400 "Publish the word first" until both the variant and its concept are published, which mirrors "publish the concept before its variants". Rejecting the word, or cascade-rejecting its concept, rejects the open clip through `rejectOpenClips`, the same path a published word already uses. Other slots (example, forms) stay closed until the word is published, because their text is not final while it is under review.
 
 ### Storage: Cloudflare R2, through Lambda
 

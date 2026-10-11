@@ -1,435 +1,88 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import api, { suggestConcepts, createConcept, createVariant, checkCrossConceptPashto } from '../services/api';
-import useLookups from '../hooks/useLookups';
-import LookupSelect from '../components/LookupSelect';
-import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
-import DomainPicker from '../components/DomainPicker';
-import useFieldDefinitions from '../hooks/useFieldDefinitions';
-import { missingRequired } from '../context/fieldsValue';
-import FormsEditor from '../components/forms/FormsEditor';
-import { formKindFor, formsPayload } from '../utils/forms';
-
-const inputClass = 'w-full bg-black/40 border border-white/[0.08] rounded-[12px] px-3.5 py-2.5 text-warm text-sm font-ui outline-none focus:border-gold/50 transition-all';
-const labelClass = 'block text-xs font-ui font-medium text-muted mb-1.5 uppercase tracking-wider';
-
-function useDebounce(fn, delay) {
-  const timer = useRef(null);
-  return useCallback((...args) => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => fn(...args), delay);
-  }, [fn, delay]);
-}
+import useSubmitForm from '../hooks/useSubmitForm';
+import AmbientBackground from '../components/AmbientBackground';
+import StepIndicator from '../components/submit/StepIndicator';
+import ConceptStep from '../components/submit/ConceptStep';
+import ConceptSummary from '../components/submit/ConceptSummary';
+import NewConceptFields from '../components/submit/NewConceptFields';
+import PashtoWordInput from '../components/submit/PashtoWordInput';
+import SubmitAudio from '../components/submit/SubmitAudio';
+import VariantFields from '../components/submit/VariantFields';
+import AudioRetryPanel from '../components/submit/AudioRetryPanel';
+import { PRIMARY_CTA } from '../components/submit/submitStyles';
+import { headwordMaxSeconds } from '../utils/audio';
 
 export default function Submit() {
-  const { labelFor } = useLookups();
-  const { forType } = useFieldDefinitions();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  // Step 1 — concept selection / creation
-  const [step, setStep]                   = useState(1);
-  const [glossQuery, setGlossQuery]       = useState('');
-  const [suggestions, setSuggestions]     = useState([]);
-  const [selectedConcept, setSelectedConcept] = useState(null);
-  const [newGloss, setNewGloss]           = useState('');
-  const [newPos, setNewPos]               = useState('');
-  const [creatingNew, setCreatingNew]     = useState(false);
-
-  // Step 2 — variant details
-  const [pashto, setPashto]               = useState('');
-  const [phonetic, setPhonetic]           = useState('');
-  const [region, setRegion]               = useState('');
-  const [definition, setDefinition]       = useState('');
-  const [example, setExample]             = useState('');
-  const [submissionNote, setSubmissionNote] = useState('');
-  const [conceptExtra, setConceptExtra]   = useState({});
-  const [domains, setDomains]             = useState([]);
-  const [variantExtra, setVariantExtra]   = useState({});
-  const [forms, setForms]                 = useState([]);
-
-  const [crossConceptWarnings, setCrossConceptWarnings] = useState([]);
-
-  const [errors, setErrors]     = useState({});
-  const [apiError, setApiError] = useState('');
-  const [loading, setLoading]   = useState(false);
-
-  const fetchSuggestions = useCallback(async (q) => {
-    if (!q.trim()) { setSuggestions([]); return; }
-    try {
-      const res = await suggestConcepts(q);
-      setSuggestions(res.data.data || []);
-    } catch {
-      setSuggestions([]);
-    }
-  }, []);
-
-  const debouncedFetch = useDebounce(fetchSuggestions, 300);
-
-  // Forms of the other kind stay in state but are hidden and not sent if the part of speech changes
-  const formKind = formKindFor(creatingNew ? newPos : selectedConcept?.partOfSpeech);
-  const activeForms = forms.filter((f) => f.kind === formKind);
-
-  useEffect(() => {
-    const conceptId   = searchParams.get('conceptId');
-    const pashtoParam = searchParams.get('pashto');
-    const phoneticParam = searchParams.get('phonetic');
-    const regionParam = searchParams.get('region');
-    // From a concept page (conceptId + pashto) or from Wanted Words (conceptId + region)
-    if (conceptId && (pashtoParam || regionParam)) {
-      api.get(`/api/concepts/${conceptId}`)
-        .then((res) => {
-          setSelectedConcept(res.data.data);
-          setGlossQuery(res.data.data.englishGloss);
-          if (pashtoParam) setPashto(pashtoParam);
-          if (phoneticParam) setPhonetic(phoneticParam);
-          if (regionParam) setRegion(regionParam);
-          setStep(2);
-        })
-        .catch(() => {});
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleGlossChange(e) {
-    const val = e.target.value;
-    setGlossQuery(val);
-    setSelectedConcept(null);
-    setCreatingNew(false);
-    debouncedFetch(val);
-  }
-
-  function handleSelectConcept(concept) {
-    setSelectedConcept(concept);
-    setGlossQuery(concept.englishGloss);
-    setSuggestions([]);
-    setCreatingNew(false);
-    setCrossConceptWarnings([]);
-    setStep(2);
-  }
-
-  function handleCreateNew() {
-    setCreatingNew(true);
-    setNewGloss(glossQuery);
-    setSelectedConcept(null);
-    setSuggestions([]);
-    setStep(2);
-  }
-
-  async function handlePashtoBlur() {
-    if (!pashto.trim() || !selectedConcept?._id) {
-      setCrossConceptWarnings([]);
-      return;
-    }
-    try {
-      const res = await checkCrossConceptPashto(pashto, selectedConcept._id);
-      setCrossConceptWarnings(res.data.data.conflicts);
-    } catch {
-      setCrossConceptWarnings([]);
-    }
-  }
-
-  function validateStep2() {
-    const errs = {};
-    if (!pashto.trim()) errs.pashto = 'Pashto word is required';
-    if (!region) errs.region = 'Region is required';
-    if (!definition.trim()) errs.definition = 'Definition is required';
-    if (activeForms.some((f) => !f.pashto.trim())) errs.forms = 'Each form needs its Pashto text';
-    if (creatingNew && !newPos) errs.partOfSpeech = 'Part of speech is required';
-    const conceptMissing = creatingNew ? missingRequired(forType('concept'), conceptExtra) : {};
-    const variantMissing = missingRequired(forType('variant'), variantExtra);
-    if (Object.keys(conceptMissing).length) errs.conceptExtra = conceptMissing;
-    if (Object.keys(variantMissing).length) errs.variantExtra = variantMissing;
-    return errs;
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const errs = validateStep2();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setErrors({});
-    setApiError('');
-    setLoading(true);
-
-    try {
-      let conceptId = selectedConcept?._id;
-
-      if (creatingNew) {
-        const res = await createConcept({
-          englishGloss: newGloss, partOfSpeech: newPos, extra: conceptExtra,
-          ...(domains.length > 0 && { semanticDomains: domains }),
-        });
-        conceptId = res.data.data._id;
-      }
-
-      await createVariant({
-        conceptId, pashto, phonetic, region, definition, example, submissionNote, extra: variantExtra,
-        ...(activeForms.length > 0 && { forms: formsPayload(activeForms) }),
-      });
-      navigate('/my-submissions');
-    } catch (err) {
-      const message = err?.response?.data?.error?.message ?? 'Submission failed';
-      setApiError(message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const form = useSubmitForm();
+  const { step, values, capture, errors, apiError, loading } = form;
 
   return (
     <div className="min-h-screen bg-charcoal">
-      <div className="max-w-lg mx-auto px-5 py-10">
-        <h1 className="text-2xl font-display text-warm mb-8">Submit a New Word</h1>
+      <AmbientBackground />
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <div className="max-w-xl mx-auto flex flex-col gap-5">
+          <header className="bento-enter">
+            <p className="meta-label mb-2">Contribute</p>
+            <h1 className="text-3xl font-display text-warm">Submit a New Word</h1>
+          </header>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-ui font-bold ${step >= 1 ? 'bg-gold text-charcoal' : 'bg-white/10 text-muted'}`}>1</div>
-          <div className="flex-1 h-px bg-white/10" />
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-ui font-bold ${step >= 2 ? 'bg-gold text-charcoal' : 'bg-white/10 text-muted'}`}>2</div>
-        </div>
+          <div className="bento-enter [animation-delay:0.08s]">
+            <StepIndicator step={step} />
+          </div>
 
-        <div className="bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-8 space-y-5">
-          {apiError && <p className="text-red-400 text-sm font-ui">{apiError}</p>}
+          <div className="bento-enter [animation-delay:0.16s] bg-white/[0.035] backdrop-blur-[32px] border border-white/[0.08] rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-5 sm:p-8 space-y-5">
+            {apiError && (
+              <p role="alert" className="rounded-[12px] border border-red-400/30 bg-red-400/[0.08] px-3 py-2 text-sm font-ui text-red-400">{apiError}</p>
+            )}
 
-          {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="glossQuery" className={labelClass}>English Meaning</label>
-                <input
-                  id="glossQuery"
-                  type="text"
-                  value={glossQuery}
-                  onChange={handleGlossChange}
-                  className={inputClass}
-                  placeholder="e.g. sun, water, house…"
-                  autoComplete="off"
-                />
-                <p className="text-muted font-ui text-xs mt-1.5">Type to search for an existing concept or create a new one.</p>
-              </div>
-
-              {suggestions.length > 0 && (
-                <ul className="bg-black/60 border border-white/[0.08] rounded-[12px] overflow-hidden divide-y divide-white/[0.05]">
-                  {suggestions.map((c) => (
-                    <li key={c._id}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectConcept(c)}
-                        className="w-full text-left px-4 py-2.5 hover:bg-white/[0.05] transition-colors"
-                      >
-                        <span className="text-warm text-sm font-ui">{c.englishGloss}</span>
-                        <span className="ml-2 text-muted text-xs font-ui">{labelFor('partOfSpeech', c.partOfSpeech)}</span>
-                      </button>
-                    </li>
-                  ))}
-                  <li>
-                    <button
-                      type="button"
-                      onClick={handleCreateNew}
-                      className="w-full text-left px-4 py-2.5 hover:bg-white/[0.05] transition-colors text-gold text-sm font-ui"
-                    >
-                      + Create new concept "{glossQuery}"
-                    </button>
-                  </li>
-                </ul>
-              )}
-
-              {glossQuery && suggestions.length === 0 && (
-                <button
-                  type="button"
-                  onClick={handleCreateNew}
-                  className="w-full text-left px-4 py-2.5 bg-black/40 border border-white/[0.08] rounded-[12px] text-gold text-sm font-ui hover:bg-white/[0.04] transition-colors"
-                >
-                  + Create new concept "{glossQuery}"
-                </button>
-              )}
-            </div>
-          )}
-
-          {step === 2 && (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Concept summary */}
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-ui text-muted uppercase tracking-wider mb-0.5">Concept</p>
-                  <p className="text-warm text-sm font-ui">{selectedConcept ? selectedConcept.englishGloss : newGloss}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setStep(1); setErrors({}); }}
-                  className="text-muted text-xs font-ui hover:text-warm transition-colors"
-                >
-                  Change
-                </button>
-              </div>
-
-              {creatingNew && (
-                <div>
-                  <label htmlFor="partOfSpeech" className={labelClass}>Part of Speech</label>
-                  <LookupSelect
-                    type="partOfSpeech"
-                    id="partOfSpeech"
-                    value={newPos}
-                    onChange={(e) => setNewPos(e.target.value)}
-                    placeholder="Select…"
-                    className={`${inputClass} appearance-none`}
-                    optionClassName="bg-charcoal"
-                  />
-                  {errors.partOfSpeech && <p className="text-red-400 text-xs font-ui mt-1">{errors.partOfSpeech}</p>}
-                </div>
-              )}
-
-              {creatingNew && (
-                <DomainPicker
-                  value={domains}
-                  onChange={setDomains}
-                  label="Domains (optional)"
-                  hint="What is this word about? Pick any that fit."
-                  labelClassName={labelClass}
-                />
-              )}
-
-              {creatingNew && (
-                <ExtraFieldsInputs
-                  appliesTo="concept"
-                  values={conceptExtra}
-                  onChange={(key, value) => setConceptExtra((v) => ({ ...v, [key]: value }))}
-                  errors={errors.conceptExtra}
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                  optionClassName="bg-charcoal"
-                />
-              )}
-
-              <div>
-                <label htmlFor="pashto" className={labelClass}>Pashto Word</label>
-                <input
-                  id="pashto"
-                  type="text"
-                  dir="rtl"
-                  value={pashto}
-                  onChange={(e) => setPashto(e.target.value)}
-                  onBlur={handlePashtoBlur}
-                  className={`${inputClass} font-pashto text-lg`}
-                  placeholder="پښتو…"
-                />
-                {pashto && (
-                  <div
-                    dir="rtl"
-                    className="mt-2 text-gold font-pashto text-3xl"
-                    style={{ lineHeight: 1.7 }}
-                  >
-                    {pashto}
-                  </div>
-                )}
-                {crossConceptWarnings.length > 0 && (
-                  <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
-                    <span className="font-medium">Note:</span> This word already appears under{' '}
-                    {crossConceptWarnings.map((c, i) => (
-                      <span key={c.conceptId}>
-                        {i > 0 && ', '}
-                        <span className="font-medium">{c.englishGloss}</span>{' '}
-                        <span className="text-amber-600">({c.status})</span>
-                      </span>
-                    ))}
-                    . If it shares that meaning, consider selecting that concept in Step 1 instead.
-                  </div>
-                )}
-                {errors.pashto && <p className="text-red-400 text-xs font-ui mt-1">{errors.pashto}</p>}
-              </div>
-
-              <div>
-                <label htmlFor="phonetic" className={labelClass}>Phonetic (optional)</label>
-                <input
-                  id="phonetic"
-                  type="text"
-                  value={phonetic}
-                  onChange={(e) => setPhonetic(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="region" className={labelClass}>Region</label>
-                <LookupSelect
-                  type="region"
-                  id="region"
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  placeholder="Select…"
-                  className={`${inputClass} appearance-none`}
-                  optionClassName="bg-charcoal"
-                />
-                {errors.region && <p className="text-red-400 text-xs font-ui mt-1">{errors.region}</p>}
-              </div>
-
-              <div>
-                <label htmlFor="definition" className={labelClass}>Definition</label>
-                <input
-                  id="definition"
-                  type="text"
-                  value={definition}
-                  onChange={(e) => setDefinition(e.target.value)}
-                  className={inputClass}
-                  placeholder="Meaning in English…"
-                />
-                {errors.definition && <p className="text-red-400 text-xs font-ui mt-1">{errors.definition}</p>}
-              </div>
-
-              <div>
-                <label htmlFor="example" className={labelClass}>Example sentence (optional)</label>
-                <input
-                  id="example"
-                  type="text"
-                  value={example}
-                  onChange={(e) => setExample(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <FormsEditor
-                  kind={formKind}
-                  forms={activeForms}
-                  onChange={(next) => setForms([...forms.filter((f) => f.kind !== formKind), ...next])}
-                  idPrefix="submit-form"
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                />
-                {errors.forms && <p className="text-red-400 text-xs font-ui mt-1">{errors.forms}</p>}
-              </div>
-
-              <ExtraFieldsInputs
-                appliesTo="variant"
-                values={variantExtra}
-                onChange={(key, value) => setVariantExtra((v) => ({ ...v, [key]: value }))}
-                errors={errors.variantExtra}
-                inputClassName={inputClass}
-                labelClassName={labelClass}
-                optionClassName="bg-charcoal"
+            {step === 1 && (
+              <ConceptStep
+                glossQuery={form.glossQuery}
+                onChange={form.changeGloss}
+                onSelect={form.selectConcept}
+                onCreateNew={form.createNew}
               />
+            )}
 
-              <div>
-                <label htmlFor="submissionNote" className={labelClass}>Note to moderators (optional)</label>
-                <textarea
-                  id="submissionNote"
-                  value={submissionNote}
-                  onChange={(e) => setSubmissionNote(e.target.value)}
-                  className={`${inputClass} resize-none`}
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Add a reference, source, or link that supports this word…"
+            {step === 2 && form.savedVariantId && (
+              <AudioRetryPanel
+                capture={capture}
+                maxSeconds={headwordMaxSeconds(values.pashto)}
+                error={form.audioError}
+                loading={loading}
+                onRetry={form.retryClip}
+                onSkip={form.skipClip}
+              />
+            )}
+
+            {step === 2 && !form.savedVariantId && (
+              <form onSubmit={form.submit} className="space-y-5">
+                <ConceptSummary
+                  gloss={form.selectedConcept ? form.selectedConcept.englishGloss : form.glossQuery}
+                  partOfSpeech={form.selectedConcept?.partOfSpeech}
+                  isNew={form.creatingNew}
+                  onChange={form.backToStep1}
                 />
-                <p className="text-muted font-ui text-xs mt-1">{submissionNote.length}/500</p>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-terracotta text-warm py-2.5 rounded-[12px] text-sm font-ui font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity"
-                style={{ boxShadow: '0 4px 20px rgba(196,119,90,0.35)' }}
-              >
-                {loading ? 'Submitting…' : 'Submit Word'}
-              </button>
-            </form>
-          )}
+                {form.creatingNew && <NewConceptFields form={form} />}
+
+                <PashtoWordInput
+                  value={values.pashto}
+                  onChange={(v) => form.setField('pashto', v)}
+                  onBlur={form.checkPashto}
+                  warnings={form.crossConceptWarnings}
+                  error={errors.pashto}
+                />
+
+                <SubmitAudio capture={capture} pashto={values.pashto} />
+
+                <VariantFields form={form} />
+
+                <button type="submit" disabled={loading} className={PRIMARY_CTA}>
+                  {loading ? 'Submitting…' : 'Submit Word'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>

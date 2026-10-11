@@ -417,3 +417,91 @@ describe('queue and my recordings', () => {
     expect(byId[kept.body.data._id].slotText).toBe(variant.pashto);
   });
 });
+
+describe('recording sent with a new word', () => {
+  const unpublished = () => setup({ status: 'pending' }, { status: 'pending' });
+
+  test('the submitter can record the headword of their own pending word', async () => {
+    const { variant } = await unpublished();
+    const res = await upload(variant, 'headword', owner.token);
+    expect(res.status).toBe(201);
+    expect(res.body.data.status).toBe('pending');
+    expect(await ModerationLog.countDocuments({ targetModel: 'AudioClip', action: 'submitted' })).toBe(1);
+  });
+
+  test('the submitter can still record while the word is approved', async () => {
+    const { variant } = await setup({ status: 'approved' }, { status: 'approved' });
+    expect((await upload(variant, 'headword', owner.token)).status).toBe(201);
+  });
+
+  test('nobody else can record an unpublished word', async () => {
+    const { variant } = await unpublished();
+    const res = await upload(variant, 'headword', speaker.token);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/Only published words/);
+    expect(storage.files.size).toBe(0);
+  });
+
+  test('only the headword can be recorded before the word is published', async () => {
+    const { variant } = await unpublished();
+    expect((await upload(variant, 'example', owner.token)).status).toBe(400);
+    expect((await upload(variant, 'form:masculine.plural.direct', owner.token)).status).toBe(400);
+  });
+
+  test('a rejected or deleted word of the submitter accepts no clip', async () => {
+    const { variant: rejected } = await setup({ status: 'rejected', isDeleted: true });
+    expect((await upload(rejected, 'headword', owner.token)).status).toBe(400);
+    const { variant: noConcept } = await setup({ status: 'pending' }, { status: 'pending', isDeleted: true });
+    expect((await upload(noConcept, 'headword', owner.token)).status).toBe(400);
+  });
+
+  test('a moderator can approve the clip before the word is reviewed', async () => {
+    const { variant } = await unpublished();
+    const clip = await upload(variant, 'headword', owner.token);
+    const res = await transition(clip.body.data._id, 'approved', mod.token);
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+
+  test('the clip cannot be published until the word and its concept are published', async () => {
+    const { concept, variant } = await unpublished();
+    const clip = await upload(variant, 'headword', owner.token);
+    await transition(clip.body.data._id, 'approved', mod.token);
+
+    const early = await transition(clip.body.data._id, 'published', admin.token);
+    expect(early.status).toBe(400);
+    expect(early.body.error.message).toBe('Publish the word first');
+
+    await send('patch', `/api/concepts/${concept._id}/status`, mod.token, { status: 'approved' });
+    await send('patch', `/api/concepts/${concept._id}/status`, admin.token, { status: 'published' });
+    await send('patch', `/api/variants/${variant._id}/status`, mod.token, { status: 'approved' });
+    expect((await transition(clip.body.data._id, 'published', admin.token)).status).toBe(400);
+
+    await send('patch', `/api/variants/${variant._id}/status`, admin.token, { status: 'published' });
+    const res = await transition(clip.body.data._id, 'published', admin.token);
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('published');
+  });
+
+  test('rejecting the pending word rejects its clip', async () => {
+    const { variant } = await unpublished();
+    const clip = await upload(variant, 'headword', owner.token);
+    await send('patch', `/api/variants/${variant._id}/status`, mod.token, { status: 'rejected', moderatorNote: 'Wrong region' });
+    expect((await AudioClip.findById(clip.body.data._id).lean()).status).toBe('rejected');
+  });
+
+  test('rejecting the pending concept rejects the clip of its word', async () => {
+    const { concept, variant } = await unpublished();
+    const clip = await upload(variant, 'headword', owner.token);
+    await send('patch', `/api/concepts/${concept._id}/status`, mod.token, { status: 'rejected', moderatorNote: 'Duplicate' });
+    expect((await AudioClip.findById(clip.body.data._id).lean()).status).toBe('rejected');
+  });
+
+  test('a clip on a rejected word cannot be approved', async () => {
+    const { variant } = await unpublished();
+    const clip = await upload(variant, 'headword', owner.token);
+    await Variant.updateOne({ _id: variant._id }, { $set: { status: 'rejected', isDeleted: true } });
+    const res = await transition(clip.body.data._id, 'approved', mod.token);
+    expect(res.status).toBe(400);
+  });
+});
