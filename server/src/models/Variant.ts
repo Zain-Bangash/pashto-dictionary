@@ -45,6 +45,7 @@ variantSchema.index({ status: 1 });
 variantSchema.index({ concept: 1 });
 variantSchema.index({ region: 1, concept: 1 });
 variantSchema.index({ phonetic: 1 });
+variantSchema.index({ normalizedPashto: 1 });
 variantSchema.index({ pashto: 'text' });
 variantSchema.index(
   { concept: 1, normalizedPashto: 1, region: 1 },

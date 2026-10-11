@@ -17,7 +17,7 @@ import {
   mergeConcepts,
   updateConcept,
 } from '../controllers/conceptController';
-import { activeLookup, lookupFormat, isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
+import { activeLookup, lookupFormat, isAllowedLookup, invalidLookupMessage, domainsFormat } from '../utils/lookups';
 import { rejectInvalid } from '../utils/sendValidationError';
 import { statusFilter, searchFilter, pageFilters } from '../utils/mySubmissions';
 
@@ -28,6 +28,7 @@ const extraFormat = body('extra').optional().isObject().withMessage('extra must 
 const createValidators = [
   body('englishGloss').trim().notEmpty().withMessage('englishGloss is required'),
   activeLookup('partOfSpeech', 'partOfSpeech'),
+  ...domainsFormat(),
   extraFormat,
 ];
 
@@ -40,12 +41,14 @@ const statusValidators = [
 const updateValidators = [
   body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
   lookupFormat('partOfSpeech', true),
+  ...domainsFormat(),
   extraFormat,
 ];
 
 const editValidators = [
   body('englishGloss').optional().trim().notEmpty().withMessage('englishGloss cannot be empty'),
   lookupFormat('partOfSpeech', true),
+  ...domainsFormat(),
   extraFormat,
 ];
 
@@ -61,6 +64,8 @@ const wantedValidators = [
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 ];
 
+const domainFilter = [query('domain').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid domain')];
+
 const myConceptsValidators = [
   statusFilter(),
   searchFilter(),
@@ -72,9 +77,9 @@ const myConceptsValidators = [
 router.get('/wotd',           getWotd);
 router.get('/wanted',         wantedValidators, rejectInvalid, getWanted);
 router.get('/suggest',        suggestConcepts);
-router.get('/search',         searchConcepts);
+router.get('/search',         domainFilter, rejectInvalid, searchConcepts);
 router.get('/my-submissions', verifyToken, myConceptsValidators, rejectInvalid, getMyConceptSubmissions);
-router.get('/',               optionalVerifyToken, listConcepts);
+router.get('/',               optionalVerifyToken, domainFilter, rejectInvalid, listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id', verifyToken, updateValidators, updateConcept);

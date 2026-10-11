@@ -6,6 +6,7 @@ const conceptSchema = new Schema<IConcept>(
     englishGloss: { type: String, required: true, trim: true },
     normalizedGloss: { type: String },
     partOfSpeech: { type: String, required: true, trim: true, maxlength: 50 },
+    semanticDomains: { type: [String], default: undefined },
     extra: { type: Map, of: String },
     status: {
       type: String,
@@ -27,6 +28,7 @@ conceptSchema.pre('save', function () {
 });
 
 conceptSchema.index({ status: 1 });
+conceptSchema.index({ semanticDomains: 1 });
 conceptSchema.index(
   { normalizedGloss: 1 },
   { unique: true, partialFilterExpression: { isDeleted: false } }

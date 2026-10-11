@@ -10,7 +10,9 @@
     "test": "jest --runInBand --forceExit",
     "seed:lookups": "ts-node src/scripts/seedLookups.ts",
     "audio:clean": "ts-node src/scripts/cleanOrphanAudio.ts",
-    "migrate:suggestion-index": "ts-node src/scripts/migrateSuggestionIndex.ts"
+    "migrate:suggestion-index": "ts-node src/scripts/migrateSuggestionIndex.ts",
+    "migrate:normalize-pashto": "ts-node src/scripts/renormalizePashto.ts",
+    "seed:domains": "ts-node src/scripts/seedSemanticDomains.ts"
   },
   "keywords": [],
   "author": "",
