@@ -6,7 +6,7 @@ import Concept from '../models/Concept';
 import ModerationLog from '../models/ModerationLog';
 import { IAudioClip, AudioClipStatus } from '../types/models';
 import { probeAudio, AudioFormat } from '../utils/audioProbe';
-import { findSlot, MIN_DURATION_MS, DURATION_TOLERANCE_MS } from '../utils/audioSlots';
+import { findSlot, HEADWORD, MIN_DURATION_MS, DURATION_TOLERANCE_MS } from '../utils/audioSlots';
 import { putObject, removeObject } from '../utils/storage';
 import { logClip, closeClip, deleteClipFile, withUrl } from '../utils/audioClips';
 import { enrichActors } from '../utils/enrichActors';
@@ -41,12 +41,22 @@ const VALID_TRANSITIONS: Record<AudioClipStatus, AudioClipStatus[]> = {
 const fail = (res: Response, status: number, message: string, field?: string) =>
   res.status(status).json({ success: false, error: { message, ...(field && { field }) } });
 
-async function liveVariant(id: Types.ObjectId | string) {
+const IN_REVIEW = ['pending', 'approved'];
+
+// A word that is published, or still under review (not rejected or deleted)
+async function activeVariant(id: Types.ObjectId | string) {
   const variant = await Variant.findById(id);
-  if (!variant || variant.isDeleted || variant.status !== 'published') return null;
+  if (!variant || variant.isDeleted || variant.status === 'rejected') return null;
   const concept = await Concept.findById(variant.concept, 'englishGloss partOfSpeech status isDeleted').lean();
-  if (!concept || concept.isDeleted || concept.status !== 'published') return null;
-  return { variant, concept };
+  if (!concept || concept.isDeleted || concept.status === 'rejected') return null;
+  const live = variant.status === 'published' && concept.status === 'published';
+  return { variant, concept, live };
+}
+
+// The submitter may record the headword of their own word while it is under review
+function canRecord(found: NonNullable<Awaited<ReturnType<typeof activeVariant>>>, userId: string, slot: string): boolean {
+  if (found.live) return true;
+  return found.variant.submittedBy === userId && IN_REVIEW.includes(found.variant.status) && slot === HEADWORD;
 }
 
 function clipFields(clip: Doc): Doc {
@@ -55,12 +65,12 @@ function clipFields(clip: Doc): Doc {
 }
 
 async function uploadClip(req: Request, res: Response): Promise<void> {
-  const live = await liveVariant(req.params.id as string);
-  if (!live) {
+  const found = await activeVariant(req.params.id as string);
+  if (!found || !canRecord(found, req.user!.id, req.query.slot as string)) {
     fail(res, 400, NOT_LIVE);
     return;
   }
-  const { variant, concept } = live;
+  const { variant, concept } = found;
 
   const slot = findSlot(variant, concept.partOfSpeech, req.query.slot as string);
   if (!slot) {
@@ -228,17 +238,21 @@ async function transitionClip(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const live = await liveVariant(clip.variant);
-  if (!live) {
-    fail(res, 400, 'The word is no longer published');
+  const found = await activeVariant(clip.variant);
+  if (!found) {
+    fail(res, 400, 'The word is no longer available');
     return;
   }
-  if (!findSlot(live.variant, live.concept.partOfSpeech, clip.slot)) {
+  if (!findSlot(found.variant, found.concept.partOfSpeech, clip.slot)) {
     fail(res, 400, 'This recording no longer matches a slot on the word. Reject it instead.');
     return;
   }
 
   if (status === 'published') {
+    if (!found.live) {
+      fail(res, 400, 'Publish the word first');
+      return;
+    }
     await publishClip(clip, req.user!.id, res);
     return;
   }
