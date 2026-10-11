@@ -6,14 +6,21 @@ import FormsDisplay from '../forms/FormsDisplay';
 import { formKindFor, formSlot, formsPayload } from '../../utils/forms';
 import { inputCls, labelCls, PRIMARY_BTN, CANCEL_BTN } from './styles';
 
-// Offers inputs only for the word's blank fields (`fillableFields` from the server); the live word is untouched until published
+const TEXT_FIELDS = [
+  { key: 'pashto', label: 'Pashto', max: 100, rtl: true },
+  { key: 'phonetic', label: 'Phonetic', max: 100 },
+  { key: 'definition', label: 'Definition', max: 500 },
+  { key: 'example', label: 'Example sentence', max: 500 },
+];
+
+// The word's submitter proposes changes: the four text fields start from the live word, and only the ones they change are sent.
+// Custom fields and forms can only fill blanks (`fillableFields` from the server). The live word is untouched until published.
 export default function SuggestionForm({ variant, suggestion, onDone, onCancel }) {
   const fillable = variant.fillableFields ?? [];
   const prior = suggestion?.proposed ?? {};
   const extraKeys = fillable.filter((f) => f.startsWith('extra.')).map((f) => f.slice(6));
 
-  const [phonetic, setPhonetic] = useState(prior.phonetic ?? '');
-  const [example, setExample]   = useState(prior.example ?? '');
+  const [text, setText]   = useState(() => Object.fromEntries(TEXT_FIELDS.map(({ key }) => [key, prior[key] ?? variant[key] ?? ''])));
   const [forms, setForms]       = useState(prior.forms ?? []);
   const [extra, setExtra]       = useState(prior.extra ?? {});
   const [saving, setSaving]     = useState(false);
@@ -21,8 +28,9 @@ export default function SuggestionForm({ variant, suggestion, onDone, onCancel }
 
   function payload() {
     const body = {};
-    if (fillable.includes('phonetic') && phonetic.trim()) body.phonetic = phonetic;
-    if (fillable.includes('example') && example.trim()) body.example = example;
+    for (const { key } of TEXT_FIELDS) {
+      if (text[key].trim() && text[key].trim() !== (variant[key] ?? '')) body[key] = text[key];
+    }
     if (fillable.includes('forms') && forms.length) body.forms = formsPayload(forms);
     const filled = Object.fromEntries(extraKeys.filter((k) => extra[k]?.trim()).map((k) => [k, extra[k]]));
     if (Object.keys(filled).length) body.extra = filled;
@@ -33,7 +41,7 @@ export default function SuggestionForm({ variant, suggestion, onDone, onCancel }
     e.preventDefault();
     const body = payload();
     if (!Object.keys(body).length) {
-      setError('Fill in at least one missing detail');
+      setError('Change at least one detail');
       return;
     }
     setSaving(true);
@@ -52,22 +60,26 @@ export default function SuggestionForm({ variant, suggestion, onDone, onCancel }
   const id = (name) => `suggest-${variant._id}-${name}`;
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Suggest missing details" className="mt-4 space-y-3 border-t border-white/[0.08] pt-4">
+    <form onSubmit={handleSubmit} aria-label="Suggest changes" className="mt-4 space-y-3 border-t border-white/[0.08] pt-4">
       <p className="text-[11px] font-ui text-muted/70">
-        Your word stays live as it is. These details are added once a moderator reviews them and an admin publishes them.
+        Your word stays live as it is. Your changes apply once a moderator reviews them and an admin publishes them.
       </p>
-      {fillable.includes('phonetic') && (
-        <div>
-          <label htmlFor={id('phonetic')} className={labelCls}>Phonetic</label>
-          <input id={id('phonetic')} maxLength={100} className={inputCls} value={phonetic} onChange={(e) => setPhonetic(e.target.value)} />
+      {TEXT_FIELDS.map(({ key, label, max, rtl }) => (
+        <div key={key}>
+          <label htmlFor={id(key)} className={labelCls}>{label}</label>
+          <input
+            id={id(key)}
+            dir={rtl ? 'rtl' : undefined}
+            maxLength={max}
+            className={`${inputCls} ${rtl ? 'font-pashto' : ''}`}
+            value={text[key]}
+            onChange={(e) => setText((t) => ({ ...t, [key]: e.target.value }))}
+          />
+          {variant[key] && text[key].trim() !== variant[key] && (
+            <p className="mt-1 text-[11px] font-ui text-muted/60">Current: <span dir={rtl ? 'rtl' : 'auto'}>{variant[key]}</span></p>
+          )}
         </div>
-      )}
-      {fillable.includes('example') && (
-        <div>
-          <label htmlFor={id('example')} className={labelCls}>Example sentence</label>
-          <input id={id('example')} maxLength={500} className={inputCls} value={example} onChange={(e) => setExample(e.target.value)} />
-        </div>
-      )}
+      ))}
       {extraKeys.length > 0 && (
         <ExtraFieldsInputs
           appliesTo="variant"

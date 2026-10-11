@@ -10,6 +10,7 @@ import { applySuggestion } from '../utils/applySuggestion';
 import { isDuplicateKey } from '../utils/duplicateKey';
 import {
   validateProposal, proposalToPlain, findOpenSuggestion, formsOnlyError, logSuggestion, PlainProposal, PROPOSAL_KEYS,
+  TEXT_KEYS, canOverwrite, baselineFor, staleError,
 } from '../utils/suggestions';
 
 type Doc = Record<string, unknown>;
@@ -39,8 +40,10 @@ async function partOfSpeechOf(variant: IVariant): Promise<string | undefined> {
 
 function setProposal(suggestion: IVariantSuggestion, proposed: PlainProposal): void {
   suggestion.set('proposed', {
+    pashto: proposed.pashto,
     phonetic: proposed.phonetic,
     example: proposed.example,
+    definition: proposed.definition,
     forms: proposed.forms,
     extra: proposed.extra,
   });
@@ -48,7 +51,7 @@ function setProposal(suggestion: IVariantSuggestion, proposed: PlainProposal): v
 
 function proposalDiff(before: PlainProposal, after: PlainProposal): Record<string, unknown> {
   const changes: Record<string, unknown> = {};
-  for (const key of ['phonetic', 'example'] as const) {
+  for (const key of TEXT_KEYS) {
     if ((before[key] ?? '') !== (after[key] ?? '')) changes[key] = { from: before[key] ?? '', to: after[key] ?? '' };
   }
   const keys = new Set([...Object.keys(before.extra ?? {}), ...Object.keys(after.extra ?? {})]);
@@ -81,7 +84,7 @@ async function createSuggestion(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant));
+  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant), canOverwrite(req.user!.id, variant.submittedBy));
   if (result.error) {
     res.status(400).json({ success: false, error: result.error });
     return;
@@ -92,6 +95,7 @@ async function createSuggestion(req: Request, res: Response): Promise<void> {
     suggestion = await new VariantSuggestion({
       variant: variant._id,
       proposed: result.proposed,
+      baseline: baselineFor(variant, result.proposed),
       submittedBy: req.user!.id,
       status: 'pending',
     }).save();
@@ -128,13 +132,14 @@ async function resubmitSuggestion(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant));
+  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant), canOverwrite(suggestion.submittedBy, variant.submittedBy));
   if (result.error) {
     res.status(400).json({ success: false, error: result.error });
     return;
   }
 
   setProposal(suggestion, result.proposed);
+  suggestion.set('baseline', baselineFor(variant, result.proposed));
   suggestion.status = 'pending';
   suggestion.moderatorNote = undefined;
   suggestion.reviewedBy = undefined;
@@ -181,7 +186,7 @@ async function editSuggestion(req: Request, res: Response): Promise<void> {
     res.status(400).json({ success: false, error: formsOnly });
     return;
   }
-  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant));
+  const result = await validateProposal(proposalInput(req.body), variant, await partOfSpeechOf(variant), canOverwrite(suggestion.submittedBy, variant.submittedBy));
   if (result.error) {
     res.status(400).json({ success: false, error: result.error });
     return;
@@ -189,6 +194,7 @@ async function editSuggestion(req: Request, res: Response): Promise<void> {
 
   const changes = proposalDiff(proposalToPlain(suggestion.proposed), result.proposed);
   setProposal(suggestion, result.proposed);
+  suggestion.set('baseline', baselineFor(variant, result.proposed));
   await suggestion.save();
   await logSuggestion(suggestion._id as Types.ObjectId, 'edited', req.user!.id, req.body.note as string, changes);
   res.status(200).json({ success: true, data: suggestion });
@@ -233,7 +239,12 @@ async function transitionSuggestion(req: Request, res: Response): Promise<void> 
       res.status(400).json({ success: false, error: { message: 'The word is no longer published' } });
       return;
     }
-    const check = await validateProposal(proposalToPlain(suggestion.proposed), variant, await partOfSpeechOf(variant));
+    const stale = staleError(suggestion.proposed, suggestion.baseline, variant);
+    if (stale) {
+      res.status(400).json({ success: false, error: stale });
+      return;
+    }
+    const check = await validateProposal(proposalToPlain(suggestion.proposed), variant, await partOfSpeechOf(variant), canOverwrite(suggestion.submittedBy, variant.submittedBy));
     if (check.error) {
       res.status(400).json({ success: false, error: check.error });
       return;
@@ -321,7 +332,7 @@ async function getMySuggestions(req: Request, res: Response): Promise<void> {
       $lookup: {
         from: 'variants', localField: 'variant', foreignField: '_id', as: 'variant',
         pipeline: [
-          { $project: { pashto: 1, region: 1, status: 1, forms: 1, submittedBy: 1, concept: 1, isDeleted: 1 } },
+          { $project: { pashto: 1, phonetic: 1, definition: 1, example: 1, region: 1, status: 1, forms: 1, submittedBy: 1, concept: 1, isDeleted: 1 } },
           { $lookup: { from: 'concepts', localField: 'concept', foreignField: '_id', as: 'concept', pipeline: [{ $project: { englishGloss: 1, partOfSpeech: 1 } }] } },
           { $unwind: { path: '$concept', preserveNullAndEmptyArrays: true } },
         ],

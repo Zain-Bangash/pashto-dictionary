@@ -129,9 +129,9 @@ describe('POST /api/variants/:id/suggestions — create', () => {
     expect(await ModerationLog.countDocuments({ targetModel: 'VariantSuggestion', action: 'submitted' })).toBe(1);
   });
 
-  test('a filled field cannot be overwritten — 400 naming the field', async () => {
+  test('a filled field is overwritable only by the submitter — everyone else is refused', async () => {
     const { variant } = await setup({ phonetic: 'lmar' });
-    const res = await propose(variant, { phonetic: 'nmar' });
+    const res = await propose(variant, { phonetic: 'nmar' }, other.token);
     expect(res.status).toBe(400);
     expect(res.body.error.field).toBe('phonetic');
   });
@@ -160,11 +160,11 @@ describe('POST /api/variants/:id/suggestions — create', () => {
     expect(required.body.error.field).toBe('extra.source');
   });
 
-  test('core fields cannot be changed by a suggestion', async () => {
+  test('region and concept cannot be changed by a suggestion', async () => {
     const { variant } = await setup();
-    const res = await propose(variant, { phonetic: 'lmar', definition: 'star' });
+    const res = await propose(variant, { phonetic: 'lmar', region: 'Swat' });
     expect(res.status).toBe(400);
-    expect(res.body.error.field).toBe('definition');
+    expect(res.body.error.field).toBe('region');
   });
 
   test('an empty proposal is rejected', async () => {
@@ -312,7 +312,7 @@ describe('publish-time re-check', () => {
     await Variant.updateOne({ _id: variant._id }, { phonetic: 'lmər' });
 
     const res = await transition(id, 'published', admin.token);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(res.body.error.field).toBe('phonetic');
     expect((await VariantSuggestion.findById(id).lean()).status).toBe('approved');
     expect((await Variant.findById(variant._id).lean()).example).toBeUndefined();
@@ -382,13 +382,13 @@ describe('PATCH /api/suggestions/:id/edit — admin edit inside the review', () 
     expect(log.changes).toEqual({ example: { from: 'tpyo', to: 'typo' } });
   });
 
-  test('note is required; edits are still fill-only', async () => {
-    const { variant } = await setup({ example: 'set' });
+  test('note is required; filled form slots stay fill-only', async () => {
+    const { variant } = await setup({ forms: [singular] });
     const { body } = await propose(variant, { phonetic: 'lmar' });
     expect((await send('patch', `/api/suggestions/${body.data._id}/edit`, admin.token, { phonetic: 'x' })).status).toBe(400);
-    const filled = await send('patch', `/api/suggestions/${body.data._id}/edit`, admin.token, { example: 'other', note: 'n' });
+    const filled = await send('patch', `/api/suggestions/${body.data._id}/edit`, admin.token, { forms: [{ ...singular, pashto: 'نمر' }], note: 'n' });
     expect(filled.status).toBe(400);
-    expect(filled.body.error.field).toBe('example');
+    expect(filled.body.error.field).toBe('forms.masculine.singular.direct');
   });
 
   test('moderators and plain users cannot edit pending or approved suggestions', async () => {
@@ -725,5 +725,144 @@ describe("My Submissions shows only the owner's own suggestion on each word", ()
     const res = await send('get', '/api/variants/my-submissions', owner.token);
     const row = res.body.data.find((v) => String(v._id) === String(variant._id));
     expect(row.latestSuggestion).toBeNull();
+  });
+});
+
+// Overwrites: the word's submitter may propose new pashto, phonetic, example and definition for their published word
+describe('edit suggestions — the submitter overwrites existing details', () => {
+  const edit = { pashto: 'سپوږمۍ', phonetic: 'new', example: 'نوی مثال', definition: 'moon' };
+  const filled = { phonetic: 'old', example: 'زوړ مثال' };
+
+  test('creates a pending suggestion that stores the replaced values as its baseline; the live word is untouched', async () => {
+    const { variant } = await setup(filled);
+    const res = await propose(variant, edit);
+    expect(res.status).toBe(201);
+    expect(res.body.data.proposed).toEqual(expect.objectContaining(edit));
+    expect(res.body.data.baseline).toEqual({ pashto: variant.pashto, phonetic: 'old', example: 'زوړ مثال', definition: 'sun' });
+    const live = await Variant.findById(variant._id).lean();
+    expect(live).toEqual(expect.objectContaining({ pashto: variant.pashto, phonetic: 'old', definition: 'sun' }));
+  });
+
+  test('values equal to the current ones are dropped; nothing left to change is a 400', async () => {
+    const { variant } = await setup(filled);
+    const res = await propose(variant, { phonetic: 'old', definition: 'moon' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.proposed.phonetic).toBeUndefined();
+    expect(res.body.data.baseline).toEqual({ definition: 'sun' });
+    const none = await propose((await setup(filled)).variant, { phonetic: 'old', definition: 'sun' });
+    expect(none.status).toBe(400);
+    expect(none.body.error.field).toBe('proposed');
+  });
+
+  test('pashto and definition cannot be blanked', async () => {
+    const { variant } = await setup();
+    for (const field of ['pashto', 'definition']) {
+      const res = await propose(variant, { [field]: '  ' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.field).toBe(field);
+    }
+  });
+
+  test('a non-submitter cannot propose pashto or definition', async () => {
+    const { variant } = await setup();
+    for (const body of [{ pashto: 'نمر' }, { definition: 'star' }]) {
+      const res = await propose(variant, body, other.token);
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/only the word's submitter/i);
+    }
+  });
+
+  test('a pashto that duplicates another word in the same concept and region is refused', async () => {
+    const { concept, variant } = await setup();
+    const sibling = await makeVariant(concept, other);
+    const res = await propose(variant, { pashto: sibling.pashto });
+    expect(res.status).toBe(400);
+    expect(res.body.error.field).toBe('pashto');
+    const otherRegion = await makeVariant(concept, other, { region: 'Swat' });
+    expect((await propose(variant, { pashto: otherRegion.pashto })).status).toBe(201);
+  });
+
+  test('publishing applies the overwrite, normalises, and logs from/to for each field', async () => {
+    const { variant } = await setup(filled);
+    const id = await approved(variant, edit);
+    const res = await transition(id, 'published', admin.token);
+    expect(res.status).toBe(200);
+    const live = await Variant.findById(variant._id).lean();
+    expect(live).toEqual(expect.objectContaining({ pashto: edit.pashto, normalizedPashto: edit.pashto, phonetic: 'new', normalizedPhonetic: 'new', example: edit.example, definition: 'moon' }));
+    const log = await ModerationLog.findOne({ targetModel: 'Variant', targetId: variant._id, action: 'suggestion_applied' }).lean();
+    expect(log.changes.definition).toEqual({ from: 'sun', to: 'moon' });
+    expect(log.changes.phonetic).toEqual({ from: 'old', to: 'new' });
+    expect(log.changes.pashto).toEqual({ from: variant.pashto, to: edit.pashto });
+  });
+
+  test('a word that changed after the suggestion was written is not overwritten — approve and publish both refuse', async () => {
+    const { variant } = await setup();
+    const { body } = await propose(variant, { definition: 'moon' });
+    await Variant.updateOne({ _id: variant._id }, { definition: 'sun, edited by an admin' });
+    const approve = await transition(body.data._id, 'approved', mod.token);
+    expect(approve.status).toBe(400);
+    expect(approve.body.error.message).toMatch(/changed since/i);
+
+    await VariantSuggestion.updateOne({ _id: body.data._id }, { status: 'approved' });
+    const publish = await transition(body.data._id, 'published', admin.token);
+    expect(publish.status).toBe(409);
+    expect(publish.body.error.message).toMatch(/changed since/i);
+    expect((await VariantSuggestion.findById(body.data._id).lean()).status).toBe('approved');
+    expect((await Variant.findById(variant._id).lean()).definition).toBe('sun, edited by an admin');
+  });
+
+  test('an admin edit of the suggestion takes a fresh baseline so a stale one can be fixed', async () => {
+    const { variant } = await setup();
+    const { body } = await propose(variant, { definition: 'moon' });
+    await Variant.updateOne({ _id: variant._id }, { definition: 'sun, edited by an admin' });
+    const fixed = await send('patch', `/api/suggestions/${body.data._id}/edit`, admin.token, { definition: 'moon', note: 'rebased' });
+    expect(fixed.status).toBe(200);
+    expect(fixed.body.data.baseline.definition).toBe('sun, edited by an admin');
+    expect((await transition(body.data._id, 'approved', mod.token)).status).toBe(200);
+    expect((await transition(body.data._id, 'published', admin.token)).status).toBe(200);
+  });
+
+  test('resubmitting a rejected edit takes a fresh baseline', async () => {
+    const { variant } = await setup();
+    const { body } = await propose(variant, { definition: 'moon' });
+    await transition(body.data._id, 'rejected', mod.token, 'not quite');
+    await Variant.updateOne({ _id: variant._id }, { definition: 'newer' });
+    const res = await send('patch', `/api/suggestions/${body.data._id}`, owner.token, { definition: 'moon' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.baseline.definition).toBe('newer');
+  });
+
+  test('a moderator cannot approve their own edit', async () => {
+    const concept = await makeConcept();
+    const variant = await makeVariant(concept, mod);
+    const { body } = await propose(variant, { definition: 'moon' }, mod.token);
+    expect((await transition(body.data._id, 'approved', mod.token)).status).toBe(403);
+  });
+
+  test('an open edit locks pashto and definition against direct admin edits', async () => {
+    const { variant } = await setup();
+    await propose(variant, { definition: 'moon' });
+    const res = await send('patch', `/api/variants/${variant._id}/edit`, admin.token, { definition: 'other', note: 'n' });
+    expect(res.status).toBe(409);
+    expect(res.body.error.field).toBe('definition');
+  });
+
+  test('the queue and My Suggestions return the baseline and the full word', async () => {
+    const { variant } = await setup(filled);
+    await propose(variant, { definition: 'moon' });
+    const queue = await send('get', '/api/moderation/suggestions', mod.token);
+    expect(queue.body.data[0].variant).toEqual(expect.objectContaining({ definition: 'sun', phonetic: 'old', example: 'زوړ مثال' }));
+    expect(queue.body.data[0].suggestions[0].baseline).toEqual({ definition: 'sun' });
+    const mine = await send('get', '/api/suggestions/mine', owner.token);
+    expect(mine.body.data[0].variant).toEqual(expect.objectContaining({ definition: 'sun', phonetic: 'old' }));
+    expect(mine.body.data[0].baseline).toEqual({ definition: 'sun' });
+  });
+
+  test('a suggestion saved before baselines existed is treated as fill-only', async () => {
+    const { variant } = await setup();
+    const legacy = await VariantSuggestion.create({ variant: variant._id, proposed: { phonetic: 'lmar' }, submittedBy: owner.id, status: 'approved' });
+    await Variant.updateOne({ _id: variant._id }, { phonetic: 'taken' });
+    const res = await transition(legacy._id, 'published', admin.token);
+    expect(res.status).toBe(409);
   });
 });

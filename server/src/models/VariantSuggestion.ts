@@ -1,13 +1,25 @@
 import { Schema, model } from 'mongoose';
-import { IVariantSuggestion, IProposal, OPEN_SUGGESTION_STATUSES } from '../types/models';
+import { IVariantSuggestion, IProposal, IBaseline, OPEN_SUGGESTION_STATUSES } from '../types/models';
 import { variantFormSchema } from './variantFormSchema';
 
 const proposalSchema = new Schema<IProposal>(
   {
+    pashto: { type: String, trim: true },
     phonetic: { type: String, trim: true },
     example: { type: String, trim: true },
+    definition: { type: String, trim: true },
     forms: { type: [variantFormSchema], default: undefined },
     extra: { type: Map, of: String },
+  },
+  { _id: false }
+);
+
+const baselineSchema = new Schema<IBaseline>(
+  {
+    pashto: { type: String },
+    phonetic: { type: String },
+    example: { type: String },
+    definition: { type: String },
   },
   { _id: false }
 );
@@ -16,6 +28,7 @@ const variantSuggestionSchema = new Schema<IVariantSuggestion>(
   {
     variant: { type: Schema.Types.ObjectId, ref: 'Variant', required: true },
     proposed: { type: proposalSchema, required: true },
+    baseline: { type: baselineSchema },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'published'],

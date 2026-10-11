@@ -109,15 +109,26 @@ export type SuggestionStatus = 'pending' | 'approved' | 'rejected' | 'published'
 export const OPEN_SUGGESTION_STATUSES: SuggestionStatus[] = ['pending', 'approved'];
 
 export interface IProposal {
+  pashto?: string;
   phonetic?: string;
   example?: string;
+  definition?: string;
   forms?: IVariantForm[];
   extra?: Map<string, string>;
+}
+
+// The live values of the text fields a proposal replaces, taken when it was written
+export interface IBaseline {
+  pashto?: string;
+  phonetic?: string;
+  example?: string;
+  definition?: string;
 }
 
 export interface IVariantSuggestion extends Document {
   variant: Types.ObjectId;
   proposed: IProposal;
+  baseline?: IBaseline;
   status: SuggestionStatus;
   submittedBy: string;
   reviewedBy?: string;
