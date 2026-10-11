@@ -79,6 +79,19 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /api/concepts', () => {
+  test('status=all lists every status for staff but only published for others', async () => {
+    await Concept.create([
+      { englishGloss: 'house', partOfSpeech: 'noun', status: 'published' },
+      { englishGloss: 'dog',   partOfSpeech: 'noun', status: 'pending' },
+    ]);
+    const mod = await makeToken({ role: 'moderator' });
+    const staff = await request.get('/api/concepts?status=all').set('Authorization', `Bearer ${mod}`);
+    expect(staff.body.data.map((c) => c.englishGloss).sort()).toEqual(['dog', 'house']);
+    expect(staff.body.meta.total).toBe(2);
+    const guest = await request.get('/api/concepts?status=all');
+    expect(guest.body.data.map((c) => c.englishGloss)).toEqual(['house']);
+  });
+
   test('returns 200 with empty data when no published concepts exist', async () => {
     const res = await request.get('/api/concepts');
     expect(res.status).toBe(200);

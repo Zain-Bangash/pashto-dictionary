@@ -10,6 +10,7 @@ import { findSlot, MIN_DURATION_MS, DURATION_TOLERANCE_MS } from '../utils/audio
 import { putObject, removeObject } from '../utils/storage';
 import { logClip, closeClip, deleteClipFile, withUrl } from '../utils/audioClips';
 import { enrichActors } from '../utils/enrichActors';
+import { readQueueFilters, variantIdsMatching } from '../utils/queueFilters';
 import { isDuplicateKey } from '../utils/duplicateKey';
 import logger from '../utils/logger';
 
@@ -301,11 +302,17 @@ async function getAudioQueue(req: Request, res: Response): Promise<void> {
   const isAdmin = req.user!.role === 'admin';
   const status = isAdmin && req.query.status === 'approved' ? 'approved' : 'pending';
 
+  const filters = await readQueueFilters(req);
+  const filtered: Record<string, unknown> = {};
+  if (filters.submitter) filtered.submittedBy = filters.submitter;
+  const variantIds = await variantIdsMatching(filters);
+  if (variantIds) filtered.variant = { $in: variantIds };
+
   const [clips, total, pendingCount, approvedCount] = await Promise.all([
-    AudioClip.find({ status }).sort({ createdAt: 1 }).skip(skip).limit(limit).lean(),
-    AudioClip.countDocuments({ status }),
-    AudioClip.countDocuments({ status: 'pending' }),
-    isAdmin ? AudioClip.countDocuments({ status: 'approved' }) : Promise.resolve(0),
+    AudioClip.find({ ...filtered, status }).sort({ createdAt: 1 }).skip(skip).limit(limit).lean(),
+    AudioClip.countDocuments({ ...filtered, status }),
+    AudioClip.countDocuments({ ...filtered, status: 'pending' }),
+    isAdmin ? AudioClip.countDocuments({ ...filtered, status: 'approved' }) : Promise.resolve(0),
   ]);
 
   const [variants, currents] = await Promise.all([

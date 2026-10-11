@@ -114,11 +114,11 @@ async function listConcepts(req: Request, res: Response): Promise<void> {
   const VALID_STATUSES = ['pending', 'approved', 'rejected', 'published'];
   const statusParam = req.query.status as string | undefined;
   const canFilterByStatus = req.user && ['moderator', 'admin'].includes(req.user.role);
-  const filter: Record<string, unknown> = {
-    status: canFilterByStatus && statusParam && VALID_STATUSES.includes(statusParam)
-      ? statusParam
-      : 'published',
-  };
+  // Staff may ask for one status or `all`; everyone else only ever sees published concepts
+  const filter: Record<string, unknown> = {};
+  if (!(canFilterByStatus && statusParam === 'all')) {
+    filter.status = canFilterByStatus && statusParam && VALID_STATUSES.includes(statusParam) ? statusParam : 'published';
+  }
 
   const q = ((req.query.q as string) || '').trim();
   if (q) {
