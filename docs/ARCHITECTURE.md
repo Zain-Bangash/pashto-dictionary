@@ -652,6 +652,16 @@ Clip transitions log under `targetModel: 'AudioClip'`, with the usual actions pl
 
 ---
 
+## Queue filters and bulk moderation
+
+**Filters.** All three queue endpoints accept `q`, `region` and `user` (`utils/queueFilters.ts`). `user` is a username, resolved case-insensitively to a Cognito sub; an unknown name matches nothing rather than everything. `q` and `region` are conditions on the variant: suggestions and recordings are filtered through the ids of matching variants. In the grouped entries queue, a concept is listed when it matches on its own (status, submitter, gloss; never with a region filter, since regions belong to variants) or when one of its variants matches. Each group carries `matched` so the client can tell the two apart. The Pending/Approved counts follow the filters.
+
+**Bulk actions are client-side loops, not a bulk endpoint.** Each selected item is one ordinary `PATCH …/status`, sent one after another. That keeps every rule in one place: the state machine, the self-review ban, "publish the concept first", cascades and one ModerationLog entry per item. A partial failure is normal and is reported per item rather than rolled back. Order matters: concepts go before their variants (so approving both works), and when a concept is rejected in the same run its variants are skipped because the cascade already rejected them. A concept that is listed only for its variants (`matched: false`) cannot be selected, so filtering by a spammer and selecting everything never rejects someone else's concept, which would cascade to all its words. The cost is N requests for N items, which is fine at a page of 20.
+
+**Shared counts.** `DashboardLayout` loads `GET /api/moderation/stats` once and shares it through context. The Queue badge, the queue tab counts and the Overview read it, and every queue action refreshes it. A dashboard page rendered on its own (tests) falls back to its own request; the queues never fetch stats themselves.
+
+---
+
 ## API Design
 
 All API responses use a consistent envelope regardless of success or failure:

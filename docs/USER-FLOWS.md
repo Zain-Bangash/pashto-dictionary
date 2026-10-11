@@ -118,6 +118,16 @@ As a user, when I edit and resubmit my rejected word, if my change alters text t
 
 As a moderator I should be able to log in and access the Dashboard. Refreshing the page or opening the Dashboard in a new tab should not log me out.
 
+As a moderator, the Dashboard Overview is my to-do list: "Entries to review", "Suggestions to review" and "Recordings to review", each with the number waiting and a link to that queue. When nothing is waiting it says "All caught up". Below it are the totals of concepts and words by status. The Queue item in the dashboard menu shows a gold badge with the number of items waiting for me, and each queue tab shows its own count; both update after every action.
+
+As a moderator, on a phone the dashboard menu is a scrolling row of tabs above the page instead of a sidebar, and queue action buttons sit under each item.
+
+As a moderator, every queue tab (Entries, Suggestions, Audio) has a search box (English gloss, Pashto word or phonetic), a region dropdown and a submitter username box. Spellings that differ only by vowel marks or keyboard letters still match. The filters are kept in the page address, so refreshing or sharing the link keeps them, and switching tab keeps them too. Clicking a submitter's name on any item filters the queue to that person. "Clear filters" resets them. With filters set and no results I see "Nothing matches these filters."
+
+As a moderator, each queue item has a checkbox and the toolbar has "Select all on this page". With items selected, a bar at the bottom offers "Approve selected", "Reject selected…" and "Clear". Each item is sent separately, concepts before their words, so every one is checked by the state machine and logged. Items that fail (for example my own submission, or a word whose concept is still pending) stay selected and are listed with the reason; the rest go through. Bulk reject asks for one note that is sent with every item; words under a concept rejected in the same run are not sent again, because rejecting the concept already rejects them. A concept listed only because of its words (it is not itself waiting, or does not match the filters) has no checkbox, so selecting one person's spam never touches someone else's concept. My own recordings have no checkbox.
+
+As a moderator, after approving, rejecting, publishing, editing or merging I see a short message at the bottom of the screen ("Approved “house”", "Approved 5 items; 1 failed"). A failed single action shows a red message above the list that I can dismiss.
+
 As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking anywhere on the concept row, or on the toggle, expands or collapses a dropdown listing that concept's variants awaiting review. Clicking the row's Approve, Reject, Publish, or Edit buttons does not toggle it.
 
 As a moderator I should not be able to approve a variant while its concept is still pending. The variant's Approve button is disabled with the hint "Approve the concept first", and the server rejects the attempt with a 400. Once the concept is approved, its variants can be approved.
@@ -166,7 +176,9 @@ As a moderator or admin, after I approve, reject, or publish an item, the modera
 
 As an admin I should be able to do everything a moderator can do.
 
-As an admin I should see a Pending / Approved filter toggle above the moderation queue list. Moderators do not see this toggle. Each filter button shows a count of concepts plus variants, so I know how many items are waiting at each stage.
+As an admin I should see Pending / Approved filter chips above each queue. Moderators do not see them. Each chip shows the count for the current filters, so I know how many items are waiting at each stage. The Overview also lists "Entries / Suggestions / Recordings to publish" linking to the Approved view, and the Queue badge counts approved items too. Under Approved, the bulk bar offers "Publish selected" and "Reject selected…".
+
+As an admin, the dashboard Concepts page filters by status with chips (All, Pending, Approved, Published, Rejected); All really lists every status. Search waits until I pause typing and keeps the list (and my cursor) on screen while it loads, and the list is paginated.
 
 As an admin, the Pending / Approved filter applies to concepts and their variants together. Under Approved, I see every concept that is approved or has approved variants, with only the approved variants in its dropdown. A variant's Publish button stays disabled with the hint "Publish the concept first" until its concept is published.
 

@@ -113,7 +113,7 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | POST | `/api/auth/refresh` | Cookie | New access token + user from the refresh cookie. `401` when the session is missing, expired or revoked; `403` without `X-Requested-With` or from an unknown origin |
 | POST | `/api/auth/logout` | Cookie | Revokes the refresh token and clears the cookie. Always `200` |
 | GET | `/api/auth/me` | Token | Current user |
-| GET | `/api/concepts?domain=` | — | List published concepts (paginated); `domain` filters by semantic domain key |
+| GET | `/api/concepts?domain=&status=` | — | List published concepts (paginated); `domain` filters by semantic domain key. Moderators and admins may pass `status` (one status, or `all`) |
 | GET | `/api/concepts/search?q=&domain=` | — | Ranked search (gloss, phonetic, Pashto headword and grammatical forms; Pashto matched after normalization); optional `domain` filter |
 | GET | `/api/concepts/wotd` | — | Word of the Day (deterministic, date-seeded) |
 | GET | `/api/concepts/wanted?region=&q=` | — | Published concepts with no variant (any status) in the region; paginated, `meta.total` reflects the filters |
@@ -133,11 +133,12 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | DELETE | `/api/audio/:id` | Token (speaker) | Withdraw my pending clip (its file is deleted) |
 | GET | `/api/audio/mine?status=&slot=` | Token | My clips with status, note, word and a signed URL while pending/approved/published (paginated); `slot` is `headword`, `example` or `form` |
 | PATCH | `/api/audio/:id/status` | Moderator+ | Approve / reject (note) / publish (admin). Publishing a replacement retires the old clip; rejecting an approved or published clip is admin-only; moderators cannot review their own |
-| GET | `/api/moderation/audio?status=` | Moderator+ | Clips under review with the word, the slot text and limit, signed URLs, and the current live clip for side-by-side review (admins may pass `status=approved`) |
+| GET | `/api/moderation/audio?status=&q=&region=&user=` | Moderator+ | Clips under review with the word, the slot text and limit, signed URLs, and the current live clip for side-by-side review (admins may pass `status=approved`) |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |
-| GET | `/api/moderation/queue?status=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`) |
-| GET | `/api/moderation/suggestions?status=&concept=` | Moderator+ | Suggestions grouped by word: `data: [{ variant, suggestions[] }]`, paginated by word, oldest first (admins may pass `status=approved`; `concept=` lists open suggestions on one concept) |
+| GET | `/api/moderation/stats` | Moderator+ | Concept + variant totals by status, plus `queue: { entries, suggestions, audio }` each with `pending` and `approved` counts (Overview to-do and Queue badge) |
+| GET | `/api/moderation/queue?status=&q=&region=&user=` | Moderator+ | Queue grouped by concept, with each concept's waiting variants nested (admins may pass `status=approved`). `q` matches gloss, Pashto (normalized) or phonetic; `region` the word's region; `user` the submitter's username (case-insensitive). Each concept has `matched` (whether it passes the filters itself); counts follow the filters |
+| GET | `/api/moderation/suggestions?status=&concept=&q=&region=&user=` | Moderator+ | Suggestions grouped by word: `data: [{ variant, suggestions[] }]`, paginated by word, oldest first (admins may pass `status=approved`; `concept=` lists open suggestions on one concept) |
 | PATCH | `/api/concepts/:id/status` | Moderator+ | Approve / reject / publish. Rejecting an approved or published concept is admin-only. Rejecting a concept also rejects its pending, approved and published variants, each with a note naming the concept |
 | PATCH | `/api/variants/:id/status` | Moderator+ | Approve / reject / publish. Approve needs an approved or published concept; publish needs a published concept; rejecting an approved or published variant is admin-only. Rejecting a variant also rejects its open suggestion |
 | PATCH | `/api/concepts/:id/edit` | Admin | Edit in place (note required) at pending, approved or published; rejected returns `400` |

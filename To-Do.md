@@ -17,9 +17,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 6. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
-9. Add proper filters everywhere (my submissions, queue etc)
 11. Have a wanted audio page
-12. approve/publish all, and  select which ones to approve/publish and then press button to send them through
 13. Only submitting variants for the region you account has 
 
 ## Backlog
@@ -86,6 +84,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 - Stronger Pashto normalization `[D3]`: `normalizePashto` folds Arabic/Urdu/Persian look-alikes (ك ګ ى ہ ھ ە) and drops optional vowel marks, tatweel and zero-width/bidi characters, keeping Pashto-distinct letters (ي/ی, ۀ/ه, ښ/ش) apart; every duplicate check and search uses it; `npm run migrate:normalize-pashto`
 - Semantic domains `[S6]`: `semanticDomain` Lookup type (nothing built in, `npm run seed:domains` starter list), `Concept.semanticDomains` (up to 10, optional on submit/resubmit, admin edit, merge unions), chips on the concept page, browse/search filter
 - "Also means" `[S7]`: `alsoMeans` on each variant of `GET /api/concepts/:id`, derived from published variants with the same `normalizedPashto` under other concepts
+- Dashboard QoL: queue filters (search, region, submitter; in the URL, clickable submitter names) on Entries/Suggestions/Audio; bulk approve/publish/reject with per-item failures; toasts; Overview to-do linking to filtered queues; Queue badge and tab counts; phone layout; Concepts page chips, pagination and search focus fix (`status=all` now real); terracotta action buttons and Tailwind-only status badges per DESIGN-SYSTEM
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)
