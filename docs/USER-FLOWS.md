@@ -14,6 +14,12 @@ As a guest I should be able to browse all published concepts from the Concepts p
 
 As a guest I should be able to click a concept card to go to its detail page, where I see the concept's English gloss and part of speech, and all published variants grouped by Pashto word. Variants that share the same Pashto word are shown as one card with a region tab strip — clicking a region tab shows that region's phonetic, definition, and example.
 
+As a guest, a concept's detail page shows its domains (for example "Food & cooking") as chips under the heading. Clicking one takes me to the Concepts page filtered to that domain.
+
+As a guest, the Concepts page shows the active domains as pills under the search bar. Picking one narrows the list (and search results) to concepts in that domain; picking it again clears the filter. The choice stays in the URL, so a filtered page can be shared. With no domains defined, the pills are hidden.
+
+As a guest, a word on a concept page shows "Also means: fence (Hangu, Tirah) · side (Kohat)" when the same written word is published under other concepts, each linking to that concept, with the regions that use it that way. Spellings that differ only by vowel marks or by Arabic/Urdu keyboard letters (ك for ک, ہ for ه) count as the same word. Words under review are not listed.
+
 As a guest, a concept's detail page also shows any extra field values admins have defined: concept fields under the concept heading, and variant fields in each region's panel. Fields an admin has deactivated are not shown.
 
 As a guest, under each regional variant on a concept page I can expand a "Forms" list showing the word's grammatical forms (for example masculine plural direct, or past tense), each with its Pashto text, phonetic and example sentence. Searching for any form's Pashto text, such as a plural, finds the word.
@@ -53,6 +59,10 @@ As a user, if I enter an incorrect email or password on the Login page, I stay o
 As a user I should be able to view all the same pages a guest can.
 
 As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, phonetic, region, definition, and example.
+
+As a user, when I create a new concept on the Submit form I can pick up to 10 domains (optional) from the admin-maintained list. When I edit and resubmit a rejected concept I can change them too. After that, only an admin can change a concept's domains.
+
+As a user, a Pashto word I submit counts as a duplicate of an existing word for the same concept and region even if it differs only by vowel marks, zero-width characters or Arabic/Urdu keyboard letters, and searching with any of those spellings finds the word.
 
 As a user, the Submit form also shows any extra fields admins have added: concept fields when I create a new concept, and variant fields in Step 2. Fields not marked optional are required, and I cannot submit until they are filled. These fields are not required when I resubmit an existing entry.
 
@@ -206,7 +216,9 @@ As an admin I can reject a published concept from that panel. The Reject modal r
 
 As an admin I can reject a single published variant from that panel with a required reason. It disappears from the panel and the public concept page, and its submitter sees the reason in My Submissions.
 
-As an admin I can open Lists in the dashboard to manage the region and part-of-speech lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log.
+As an admin, the concept Edit form has the domain pills, so I can add or remove domains on any pending, approved or published concept; the change appears in the edit's Moderation Log diff as "domains". When I merge a concept, the target gains the source's domains and the merge log entry lists them. Moderators cannot change domains.
+
+As an admin I can open Lists in the dashboard to manage the region, part-of-speech and domain lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log. No domain is built in: I can rename, reorder or deactivate every one. A deactivated domain disappears from forms and the browse filter but stays on the concepts that already have it.
 
 As an admin I can deactivate a value I added. It disappears from the Submit, Register, and edit dropdowns, but existing entries that use it still show it, and they can still be edited as long as that value is not changed. I can reactivate it later. Built-in values (the original five regions and six parts of speech) cannot be deactivated, and no value can ever be deleted.
 
