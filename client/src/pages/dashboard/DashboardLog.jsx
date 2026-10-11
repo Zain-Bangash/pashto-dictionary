@@ -8,22 +8,22 @@ import LogChanges from '../../components/log/LogChanges';
 import { audioSlotLabel } from '../../utils/audio';
 
 const ACTION_STYLES = {
-  submitted:       { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
-  approved:        { color: '#00f5b4', bg: 'rgba(0,245,180,0.08)',   border: 'rgba(0,245,180,0.3)'   },
-  rejected:        { color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.3)' },
-  published:       { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.3)' },
-  resubmitted:     { color: '#e8c547', bg: 'rgba(232,197,71,0.08)',  border: 'rgba(232,197,71,0.3)'  },
-  deleted:         { color: '#f97316', bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.3)'  },
-  edited:          { color: '#38bdf8', bg: 'rgba(56,189,248,0.08)',  border: 'rgba(56,189,248,0.3)'  },
-  merged:          { color: '#c084fc', bg: 'rgba(192,132,252,0.08)', border: 'rgba(192,132,252,0.3)' },
-  profile_updated: { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.25)' },
-  lookup_changed:  { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)',  border: 'rgba(45,212,191,0.3)'  },
-  field_changed:   { color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(244,114,182,0.3)' },
-  suggestion_applied: { color: '#a3e635', bg: 'rgba(163,230,53,0.08)', border: 'rgba(163,230,53,0.3)' },
-  audio_published: { color: '#22d3ee', bg: 'rgba(34,211,238,0.08)', border: 'rgba(34,211,238,0.3)' },
-  retired:         { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
-  withdrawn:       { color: '#a8a29e', bg: 'rgba(168,162,158,0.08)', border: 'rgba(168,162,158,0.3)' },
-  role_changed:    { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.3)'  },
+  submitted:          'text-slate-400 border-slate-400/25 bg-slate-400/[0.08]',
+  approved:           'text-mint border-mint/30 bg-mint/[0.08]',
+  rejected:           'text-red-400 border-red-400/30 bg-red-400/[0.08]',
+  published:          'text-mint border-mint/30 bg-mint/[0.08]',
+  resubmitted:        'text-gold border-gold/30 bg-gold/[0.08]',
+  deleted:            'text-orange-400 border-orange-400/30 bg-orange-400/[0.08]',
+  edited:             'text-sky-400 border-sky-400/30 bg-sky-400/[0.08]',
+  merged:             'text-purple-400 border-purple-400/30 bg-purple-400/[0.08]',
+  profile_updated:    'text-slate-400 border-slate-400/25 bg-slate-400/[0.08]',
+  lookup_changed:     'text-teal-400 border-teal-400/30 bg-teal-400/[0.08]',
+  field_changed:      'text-pink-400 border-pink-400/30 bg-pink-400/[0.08]',
+  suggestion_applied: 'text-lime-400 border-lime-400/30 bg-lime-400/[0.08]',
+  audio_published:    'text-mint border-mint/30 bg-mint/[0.08]',
+  retired:            'text-stone-400 border-stone-400/30 bg-stone-400/[0.08]',
+  withdrawn:          'text-stone-400 border-stone-400/30 bg-stone-400/[0.08]',
+  role_changed:       'text-violet border-violet/30 bg-violet/[0.08]',
 };
 
 const ALL_ACTIONS = [
@@ -34,7 +34,7 @@ const ALL_ACTIONS = [
 
 const MODEL_NAMES = { VariantSuggestion: 'Suggestion', AudioClip: 'Recording' };
 
-const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
+const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech', semanticDomain: 'Domain' };
 const FIELD_OWNER_NAMES = { concept: 'Concept field', variant: 'Variant field' };
 
 function formatDate(ts) {
@@ -62,7 +62,7 @@ function TargetLabel({ log }) {
   } else if (['Variant', 'VariantSuggestion', 'AudioClip'].includes(model) && t?.pashto) {
     label = (
       <>
-        <span dir="rtl" className="font-pashto text-warm/80" style={{ fontSize: 17, lineHeight: 1.5 }}>{t.pashto}</span>
+        <span dir="rtl" className="font-pashto text-warm/80 text-[17px]">{t.pashto}</span>
         {t.region && <span className="text-muted/60"> · {labelFor('region', t.region)}</span>}
         {t.slot && <span className="text-muted/60"> · {audioSlotLabel(t.slot)}</span>}
       </>
@@ -147,9 +147,9 @@ export default function DashboardLog() {
             value={filterAction}
             onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
           >
-            <option value=""        style={{ background: '#1c1c15', color: '#fffef8' }}>All actions</option>
+            <option value="" className="bg-charcoal text-warm">All actions</option>
             {ALL_ACTIONS.map(a => (
-              <option key={a} value={a} style={{ background: '#1c1c15', color: '#fffef8' }}>{a}</option>
+              <option key={a} value={a} className="bg-charcoal text-warm">{a}</option>
             ))}
           </select>
           <select
@@ -157,14 +157,14 @@ export default function DashboardLog() {
             value={filterModel}
             onChange={(e) => { setFilterModel(e.target.value); setPage(1); }}
           >
-            <option value=""          style={{ background: '#1c1c15', color: '#fffef8' }}>All types</option>
-            <option value="Concept"   style={{ background: '#1c1c15', color: '#fffef8' }}>Concept</option>
-            <option value="Variant"   style={{ background: '#1c1c15', color: '#fffef8' }}>Variant</option>
-            <option value="User"      style={{ background: '#1c1c15', color: '#fffef8' }}>User</option>
-            <option value="Lookup"    style={{ background: '#1c1c15', color: '#fffef8' }}>List value</option>
-            <option value="FieldDefinition" style={{ background: '#1c1c15', color: '#fffef8' }}>Custom field</option>
-            <option value="VariantSuggestion" style={{ background: '#1c1c15', color: '#fffef8' }}>Suggestion</option>
-            <option value="AudioClip" style={{ background: '#1c1c15', color: '#fffef8' }}>Recording</option>
+            <option value="" className="bg-charcoal text-warm">All types</option>
+            <option value="Concept"   className="bg-charcoal text-warm">Concept</option>
+            <option value="Variant"   className="bg-charcoal text-warm">Variant</option>
+            <option value="User"      className="bg-charcoal text-warm">User</option>
+            <option value="Lookup"    className="bg-charcoal text-warm">List value</option>
+            <option value="FieldDefinition" className="bg-charcoal text-warm">Custom field</option>
+            <option value="VariantSuggestion" className="bg-charcoal text-warm">Suggestion</option>
+            <option value="AudioClip" className="bg-charcoal text-warm">Recording</option>
           </select>
         </div>
       </div>
@@ -193,10 +193,7 @@ export default function DashboardLog() {
                       </p>
                       <LogChanges log={log} />
                     </div>
-                    <span
-                      className="shrink-0 text-[10px] font-ui font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"
-                      style={{ color: a.color, background: a.bg, border: `1px solid ${a.border}` }}
-                    >
+                    <span className={`shrink-0 text-[10px] font-ui font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider border ${a}`}>
                       {log.action}
                     </span>
                   </div>

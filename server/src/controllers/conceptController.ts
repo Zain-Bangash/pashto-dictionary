@@ -7,12 +7,14 @@ import { IConcept } from '../types/models';
 import Variant from '../models/Variant';
 import ModerationLog from '../models/ModerationLog';
 import { enrichActors, enrichFormCredits } from '../utils/enrichActors';
-import { isAllowedLookup, invalidLookupMessage } from '../utils/lookups';
+import { isAllowedLookup, invalidLookupMessage, checkDomains } from '../utils/lookups';
 import { validateExtra, applyExtra, initialExtra } from '../utils/extraFields';
 import { isDuplicateKey } from '../utils/duplicateKey';
 import { rejectOpenSuggestions } from '../utils/suggestions';
 import { attachAudio, rejectOpenClips, staleClips, retireClips, needsRetireConfirm, slotSnapshot } from '../utils/audioClips';
 import { IAudioClip } from '../types/models';
+import { normalizePashto } from '../utils/normalize';
+import { alsoMeansFor } from '../utils/alsoMeans';
 
 type Doc = Record<string, unknown>;
 
@@ -31,6 +33,16 @@ function notFound(res: Response) {
   return res.status(404).json({ success: false, error: { message: 'Concept not found' } });
 }
 
+// undefined when the body leaves domains untouched
+async function domainsFromBody(req: Request, current: string[] = []) {
+  if (req.body.semanticDomains === undefined) return { values: undefined };
+  return checkDomains(req.body.semanticDomains as string[], current);
+}
+
+function sameDomains(a: string[] = [], b: string[] = []): boolean {
+  return a.length === b.length && a.every((d) => b.includes(d));
+}
+
 async function createConcept(req: Request, res: Response): Promise<void> {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -44,6 +56,12 @@ async function createConcept(req: Request, res: Response): Promise<void> {
   const extra = await validateExtra('concept', req.body.extra, 'create');
   if (extra.error) {
     res.status(400).json({ success: false, error: extra.error });
+    return;
+  }
+
+  const domains = await domainsFromBody(req);
+  if ('error' in domains) {
+    res.status(400).json({ success: false, error: domains.error });
     return;
   }
 
@@ -62,6 +80,7 @@ async function createConcept(req: Request, res: Response): Promise<void> {
     concept = await new Concept({
       englishGloss,
       partOfSpeech,
+      semanticDomains: domains.values?.length ? domains.values : undefined,
       extra: initialExtra(extra.values),
       submittedBy: req.user!.id,
       status: 'pending',
@@ -95,11 +114,11 @@ async function listConcepts(req: Request, res: Response): Promise<void> {
   const VALID_STATUSES = ['pending', 'approved', 'rejected', 'published'];
   const statusParam = req.query.status as string | undefined;
   const canFilterByStatus = req.user && ['moderator', 'admin'].includes(req.user.role);
-  const filter: Record<string, unknown> = {
-    status: canFilterByStatus && statusParam && VALID_STATUSES.includes(statusParam)
-      ? statusParam
-      : 'published',
-  };
+  // Staff may ask for one status or `all`; everyone else only ever sees published concepts
+  const filter: Record<string, unknown> = {};
+  if (!(canFilterByStatus && statusParam === 'all')) {
+    filter.status = canFilterByStatus && statusParam && VALID_STATUSES.includes(statusParam) ? statusParam : 'published';
+  }
 
   const q = ((req.query.q as string) || '').trim();
   if (q) {
@@ -107,6 +126,7 @@ async function listConcepts(req: Request, res: Response): Promise<void> {
   }
 
   filter.isDeleted = { $ne: true };
+  if (req.query.domain) filter.semanticDomains = req.query.domain;
 
   const [concepts, total] = await Promise.all([
     Concept.find(filter).skip(skip).limit(limit).lean(),
@@ -147,7 +167,9 @@ async function getConcept(req: Request, res: Response): Promise<void> {
 
   const [enrichedConcept] = await enrichActors([found as unknown as Doc], 'submittedBy');
   const enrichedVariants = await enrichFormCredits(await enrichActors(rawVariants as unknown as Doc[], 'submittedBy'));
-  const variants = await attachAudio(enrichedVariants as Parameters<typeof attachAudio>[0], found.partOfSpeech);
+  const withAudio = await attachAudio(enrichedVariants as Parameters<typeof attachAudio>[0], found.partOfSpeech);
+  const alsoMeans = await alsoMeansFor(id, rawVariants.map((v) => v.normalizedPashto ?? ''));
+  const variants = withAudio.map((v) => ({ ...v, alsoMeans: alsoMeans.get((v as { normalizedPashto?: string }).normalizedPashto ?? '') ?? [] }));
 
   res.status(200).json({ success: true, data: { ...enrichedConcept, variants } });
 }
@@ -185,8 +207,9 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
 
   const ql    = q.toLowerCase();
   const regex = new RegExp(escapeRegex(q), 'i');
-  const pashtoQ     = q.normalize('NFC');
-  const pashtoRegex = new RegExp(escapeRegex(pashtoQ));
+  const pashtoQ     = normalizePashto(q);
+  // A query made only of vowel marks normalizes to '' and must not match every word
+  const pashtoRegex = pashtoQ ? new RegExp(escapeRegex(pashtoQ)) : /(?!)/;
 
   function scoreText(text: string | undefined, query = ql): number {
     const t = (text || '').toLowerCase();
@@ -236,7 +259,12 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
   }
 
   const unionIds = Array.from(scoreMap.keys());
-  const concepts = await Concept.find({ _id: { $in: unionIds }, status: 'published', isDeleted: { $ne: true } }).lean();
+  const concepts = await Concept.find({
+    _id: { $in: unionIds },
+    status: 'published',
+    isDeleted: { $ne: true },
+    ...(req.query.domain ? { semanticDomains: req.query.domain as string } : {}),
+  }).lean();
 
   const enriched = await Promise.all(
     concepts.map(async (c) => {
@@ -498,6 +526,12 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const domains = await domainsFromBody(req, concept.semanticDomains);
+  if ('error' in domains) {
+    res.status(400).json({ success: false, error: domains.error });
+    return;
+  }
+
   const editableFields: (keyof IConcept)[] = ['englishGloss', 'partOfSpeech'];
   const before: Record<string, unknown> = {};
   for (const field of editableFields) {
@@ -510,6 +544,8 @@ async function editConcept(req: Request, res: Response): Promise<void> {
   if (req.body.englishGloss !== undefined) concept.englishGloss = req.body.englishGloss as string;
   if (req.body.partOfSpeech !== undefined) concept.partOfSpeech = req.body.partOfSpeech as string;
   const extraChanges = applyExtra(concept, extra.values);
+  const domainsBefore = concept.semanticDomains ?? [];
+  if (domains.values) concept.semanticDomains = domains.values.length ? domains.values : undefined;
 
   await concept.save();
   await retireClips(stale, req.user!.id, 'The part of speech changed');
@@ -519,6 +555,9 @@ async function editConcept(req: Request, res: Response): Promise<void> {
     if (concept[field] !== before[field as string]) {
       changes[field as string] = { from: before[field as string], to: concept[field] };
     }
+  }
+  if (domains.values && !sameDomains(domainsBefore, domains.values)) {
+    changes.semanticDomains = { from: domainsBefore.join(', '), to: domains.values.join(', ') };
   }
 
   await new ModerationLog({
@@ -620,6 +659,13 @@ async function mergeConcepts(req: Request, res: Response): Promise<void> {
   }
   await retireClips(stale, req.user!.id, 'The word moved to a concept with a different part of speech');
 
+  const targetDomains = targetConcept.semanticDomains ?? [];
+  const domainsAdded = (sourceConcept.semanticDomains ?? []).filter((d) => !targetDomains.includes(d));
+  if (domainsAdded.length) {
+    targetConcept.semanticDomains = [...targetDomains, ...domainsAdded];
+    await targetConcept.save();
+  }
+
   sourceConcept.isDeleted = true;
   sourceConcept.deletedAt = new Date();
   sourceConcept.deletedBy = req.user!.id;
@@ -635,6 +681,7 @@ async function mergeConcepts(req: Request, res: Response): Promise<void> {
       mergedInto: targetConceptId,
       variantsMoved: movedIds,
       variantsSkipped: skippedItems.map((s) => s.id),
+      ...(domainsAdded.length ? { domainsAdded } : {}),
     },
   }).save();
 
@@ -687,12 +734,19 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const domains = await domainsFromBody(req, concept.semanticDomains);
+  if ('error' in domains) {
+    res.status(400).json({ success: false, error: domains.error });
+    return;
+  }
+
   const stale = await clipsStaleAfterPosChange(concept._id as mongoose.Types.ObjectId, concept.partOfSpeech, partOfSpeech);
   if (await needsRetireConfirm(req, res, stale)) return;
 
   if (englishGloss !== undefined) concept.englishGloss = englishGloss;
   if (partOfSpeech !== undefined) concept.partOfSpeech = partOfSpeech;
   applyExtra(concept, extra.values);
+  if (domains.values) concept.semanticDomains = domains.values.length ? domains.values : undefined;
   concept.status = 'pending';
   concept.moderatorNote = undefined;
   await concept.save();

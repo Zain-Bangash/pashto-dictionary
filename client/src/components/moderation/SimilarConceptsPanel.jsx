@@ -23,13 +23,13 @@ export default function SimilarConceptsPanel({ item, onMergeRequest }) {
   return (
     <div className="mt-3 space-y-2">
       {similar.map((s) => (
-        <div key={s._id} className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-400/[0.06] border border-amber-400/20 rounded-[10px]">
-          <p className="text-xs font-ui text-amber-300">
+        <div key={s._id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gold/[0.06] border border-gold/20 rounded-[10px]">
+          <p className="text-xs font-ui text-gold">
             Similar concept: &ldquo;{s.englishGloss}&rdquo;
           </p>
           {onMergeRequest && <button
             onClick={() => onMergeRequest(item, s)}
-            className="px-2.5 py-1 bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-ui font-semibold rounded-[8px] hover:bg-amber-400/20 transition-colors whitespace-nowrap"
+            className="px-2.5 py-1 bg-gold/10 border border-gold/30 text-gold text-xs font-ui font-semibold rounded-[8px] hover:bg-gold/20 transition-colors whitespace-nowrap"
           >
             Merge into this
           </button>}

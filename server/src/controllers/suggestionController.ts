@@ -5,6 +5,7 @@ import Variant from '../models/Variant';
 import VariantSuggestion from '../models/VariantSuggestion';
 import { IVariant, IVariantSuggestion, SuggestionStatus, OPEN_SUGGESTION_STATUSES } from '../types/models';
 import { enrichActors } from '../utils/enrichActors';
+import { readQueueFilters, variantIdsMatching } from '../utils/queueFilters';
 import { applyForms } from '../utils/variantForms';
 import { applySuggestion } from '../utils/applySuggestion';
 import { isDuplicateKey } from '../utils/duplicateKey';
@@ -274,9 +275,16 @@ async function getSuggestionQueue(req: Request, res: Response): Promise<void> {
   const status: SuggestionStatus = isAdmin && req.query.status === 'approved' ? 'approved' : 'pending';
 
   // ?concept= lists the open suggestions on one concept's variants (admin Concepts panel)
-  const match: Record<string, unknown> = { status };
+  const filters = await readQueueFilters(req);
+  const filtered: Record<string, unknown> = {};
+  if (filters.submitter) filtered.submittedBy = filters.submitter;
+  const variantIds = await variantIdsMatching(filters);
+  if (variantIds) filtered.variant = { $in: variantIds };
+
+  const match: Record<string, unknown> = { ...filtered, status };
   if (req.query.concept) {
-    match.variant = { $in: await Variant.distinct('_id', { concept: req.query.concept as string }) };
+    const conceptVariants = await Variant.distinct('_id', { concept: req.query.concept as string });
+    match.variant = { $in: variantIds ? conceptVariants.filter((id) => variantIds.some((v) => v.equals(id))) : conceptVariants };
     match.status = { $in: isAdmin ? OPEN_SUGGESTION_STATUSES : ['pending'] };
   }
 
@@ -288,8 +296,8 @@ async function getSuggestionQueue(req: Request, res: Response): Promise<void> {
       { $sort: { oldest: 1, _id: 1 } },
       { $facet: { total: [{ $count: 'n' }], groups: [{ $skip: skip }, { $limit: limit }] } },
     ]),
-    VariantSuggestion.countDocuments({ status: 'pending' }),
-    isAdmin ? VariantSuggestion.countDocuments({ status: 'approved' }) : Promise.resolve(0),
+    VariantSuggestion.countDocuments({ ...filtered, status: 'pending' }),
+    isAdmin ? VariantSuggestion.countDocuments({ ...filtered, status: 'approved' }) : Promise.resolve(0),
   ]);
   const groups = facet.groups as Group[];
 

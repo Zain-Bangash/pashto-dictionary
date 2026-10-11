@@ -4,6 +4,7 @@ import api, { suggestConcepts, createConcept, createVariant, checkCrossConceptPa
 import useLookups from '../hooks/useLookups';
 import LookupSelect from '../components/LookupSelect';
 import ExtraFieldsInputs from '../components/fields/ExtraFieldsInputs';
+import DomainPicker from '../components/DomainPicker';
 import useFieldDefinitions from '../hooks/useFieldDefinitions';
 import { missingRequired } from '../context/fieldsValue';
 import FormsEditor from '../components/forms/FormsEditor';
@@ -43,6 +44,7 @@ export default function Submit() {
   const [example, setExample]             = useState('');
   const [submissionNote, setSubmissionNote] = useState('');
   const [conceptExtra, setConceptExtra]   = useState({});
+  const [domains, setDomains]             = useState([]);
   const [variantExtra, setVariantExtra]   = useState({});
   const [forms, setForms]                 = useState([]);
 
@@ -152,7 +154,10 @@ export default function Submit() {
       let conceptId = selectedConcept?._id;
 
       if (creatingNew) {
-        const res = await createConcept({ englishGloss: newGloss, partOfSpeech: newPos, extra: conceptExtra });
+        const res = await createConcept({
+          englishGloss: newGloss, partOfSpeech: newPos, extra: conceptExtra,
+          ...(domains.length > 0 && { semanticDomains: domains }),
+        });
         conceptId = res.data.data._id;
       }
 
@@ -269,6 +274,16 @@ export default function Submit() {
                   />
                   {errors.partOfSpeech && <p className="text-red-400 text-xs font-ui mt-1">{errors.partOfSpeech}</p>}
                 </div>
+              )}
+
+              {creatingNew && (
+                <DomainPicker
+                  value={domains}
+                  onChange={setDomains}
+                  label="Domains (optional)"
+                  hint="What is this word about? Pick any that fit."
+                  labelClassName={labelClass}
+                />
               )}
 
               {creatingNew && (

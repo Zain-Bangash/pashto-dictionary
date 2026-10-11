@@ -71,6 +71,7 @@ export default function LogChanges({ log }) {
   const displayName = (field) => {
     if (field.startsWith('extra.')) return fieldLabel(OWNER[log.targetModel], field.slice(6));
     if (field.startsWith('forms.')) return `form (${slotLabel(field.slice(6))})`;
+    if (field === 'semanticDomains') return 'domains';
     return field;
   };
 
@@ -100,6 +101,7 @@ export default function LogChanges({ log }) {
       <p className="text-[11px] font-ui text-muted/70 mt-1.5">
         {moved} variant{moved !== 1 ? 's' : ''} moved
         {skipped > 0 && <>, {skipped} skipped (duplicate)</>}
+        {Array.isArray(changes.domainsAdded) && changes.domainsAdded.length > 0 && <>; domains added: {changes.domainsAdded.join(', ')}</>}
         {note && <> · <span className="italic">{note}</span></>}
       </p>
     );

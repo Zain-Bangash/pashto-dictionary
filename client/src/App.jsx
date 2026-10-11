@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LookupsProvider } from './context/LookupsContext';
+import { ToastProvider } from './context/ToastContext';
 import { FieldsProvider } from './context/FieldsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
@@ -117,7 +118,9 @@ export default function App() {
       <AuthProvider>
         <LookupsProvider>
           <FieldsProvider>
-            <AppRoutes />
+            <ToastProvider>
+              <AppRoutes />
+            </ToastProvider>
           </FieldsProvider>
         </LookupsProvider>
       </AuthProvider>

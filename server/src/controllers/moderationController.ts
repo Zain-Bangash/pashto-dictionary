@@ -8,6 +8,7 @@ import AudioClip from '../models/AudioClip';
 import User from '../models/User';
 import { enrichActors } from '../utils/enrichActors';
 import { getGroupedQueuePage, countQueueItems, QueueStatus } from '../utils/groupedQueue';
+import { readQueueFilters } from '../utils/queueFilters';
 
 type Doc = Record<string, unknown>;
 
@@ -61,19 +62,22 @@ async function getGroupedQueue(req: Request, res: Response): Promise<void> {
   const isAdmin = req.user!.role === 'admin';
   const status: QueueStatus = isAdmin && req.query.status === 'approved' ? 'approved' : 'pending';
 
+  const filters = await readQueueFilters(req);
   const [{ data, total }, pendingCount, approvedCount] = await Promise.all([
-    getGroupedQueuePage(status, skip, limit),
-    countQueueItems('pending'),
-    isAdmin ? countQueueItems('approved') : Promise.resolve(0),
+    getGroupedQueuePage(status, skip, limit, filters),
+    countQueueItems('pending', filters),
+    isAdmin ? countQueueItems('approved', filters) : Promise.resolve(0),
   ]);
 
   res.status(200).json({ success: true, data, meta: { page, limit, total, pendingCount, approvedCount } });
 }
 
+// Totals by status, plus what is waiting in each queue for the Overview to-do list
 async function getStats(_req: Request, res: Response): Promise<void> {
   const [
     pendingConcepts,  approvedConcepts,  rejectedConcepts,  publishedConcepts,
     pendingVariants,  approvedVariants,  rejectedVariants,  publishedVariants,
+    pendingSuggestions, approvedSuggestions, pendingAudio, approvedAudio,
   ] = await Promise.all([
     Concept.countDocuments({ status: 'pending',   isDeleted: { $ne: true } }),
     Concept.countDocuments({ status: 'approved',  isDeleted: { $ne: true } }),
@@ -83,6 +87,10 @@ async function getStats(_req: Request, res: Response): Promise<void> {
     Variant.countDocuments({ status: 'approved',  isDeleted: { $ne: true } }),
     Variant.countDocuments({ status: 'rejected',  isDeleted: { $ne: true } }),
     Variant.countDocuments({ status: 'published', isDeleted: { $ne: true } }),
+    VariantSuggestion.countDocuments({ status: 'pending' }),
+    VariantSuggestion.countDocuments({ status: 'approved' }),
+    AudioClip.countDocuments({ status: 'pending' }),
+    AudioClip.countDocuments({ status: 'approved' }),
   ]);
 
   res.status(200).json({
@@ -92,6 +100,11 @@ async function getStats(_req: Request, res: Response): Promise<void> {
       approved:  approvedConcepts + approvedVariants,
       rejected:  rejectedConcepts + rejectedVariants,
       published: publishedConcepts + publishedVariants,
+      queue: {
+        entries:     { pending: pendingConcepts + pendingVariants, approved: approvedConcepts + approvedVariants },
+        suggestions: { pending: pendingSuggestions, approved: approvedSuggestions },
+        audio:       { pending: pendingAudio, approved: approvedAudio },
+      },
     },
   });
 }

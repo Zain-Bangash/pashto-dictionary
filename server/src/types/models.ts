@@ -15,6 +15,7 @@ export interface IConcept extends Document {
   englishGloss: string;
   normalizedGloss?: string;
   partOfSpeech: string;
+  semanticDomains?: string[];
   extra?: Map<string, string>;
   status: 'pending' | 'approved' | 'rejected' | 'published';
   submittedBy?: string;
@@ -69,7 +70,7 @@ export interface IVariant extends Document {
   updatedAt: Date;
 }
 
-export type LookupType = 'region' | 'partOfSpeech';
+export type LookupType = 'region' | 'partOfSpeech' | 'semanticDomain';
 
 export interface ILookup extends Document {
   type: LookupType;

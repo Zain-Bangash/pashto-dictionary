@@ -32,7 +32,7 @@ export default function SlotComparison({ variant, suggestions }) {
               <span className="block">{slotLabel(slot)}</span>
               {filled.has(slot) && <span className={`${BADGE} mt-1 inline-block text-red-300 bg-red-400/10 border border-red-400/30`}>Already filled</span>}
               {!filled.has(slot) && proposals.length > 1 && (
-                <span className={`${BADGE} mt-1 inline-block text-amber-300 bg-amber-400/10 border border-amber-400/30`}>Conflict</span>
+                <span className={`${BADGE} mt-1 inline-block text-gold bg-gold/10 border border-gold/30`}>Conflict</span>
               )}
             </th>
             <td className="px-3 py-2">

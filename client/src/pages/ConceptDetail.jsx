@@ -4,6 +4,7 @@ import api from '../services/api';
 import useLookups from '../hooks/useLookups';
 import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
 import VariantCard from '../components/concept/VariantCard';
+import DomainChips from '../components/DomainChips';
 import useMyOpenSuggestions from '../hooks/useMyOpenSuggestions';
 import { useAuth } from '../context/AuthContext';
 
@@ -59,6 +60,7 @@ export default function ConceptDetail() {
                   </span>
                 )}
               </div>
+              <DomainChips domains={concept.semanticDomains} />
               <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
               {concept.submittedBy?.username && (
                 <p className="text-[11px] font-ui text-muted/50">

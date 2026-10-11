@@ -212,11 +212,20 @@ To address the first problem, three normalized fields are derived automatically 
 | Field | Source | Transformation |
 |---|---|---|
 | `Concept.normalizedGloss` | `englishGloss` | `.toLowerCase().trim()` |
-| `Variant.normalizedPashto` | `pashto` | `.trim().normalize('NFC')` |
+| `Variant.normalizedPashto` | `pashto` | `normalizePashto()` (below) |
 | `Variant.normalizedPhonetic` | `phonetic` | `.toLowerCase().trim()` |
-| `Variant.forms[].normalizedPashto` | `forms[].pashto` | `.trim().normalize('NFC')` (search only, never part of the duplicate check) |
+| `Variant.forms[].normalizedPashto` | `forms[].pashto` | `normalizePashto()` (search only, never part of the duplicate check) |
 
 The NFC normalization on `normalizedPashto` deserves specific attention. Arabic-script keyboards — particularly on Android and iOS — can produce different Unicode byte sequences for the same visual character. One keyboard may output a precomposed code point; another may output a base character with a combining diacritical mark. Both render identically on screen but are not equal as strings. Without NFC normalization, two users submitting the same Pashto word from different phones would both pass the duplicate check. `.normalize('NFC')` collapses all representations to their canonical composed form, making the comparison encoding-independent. It requires no external library — it is a native JavaScript method.
+
+NFC alone is not enough. Contributors type on Arabic, Urdu and Persian keyboards, which produce *different letters* that look the same, and some add optional vowel marks. `normalizePashto()` in `utils/normalize.ts` therefore also:
+
+- **Folds keyboard look-alikes** to the Pashto letter: ك → ک, گ → ګ, ى → ی, and the Urdu ہ / ھ / ە → ه.
+- **Drops what does not change the word**: the optional vowel marks (zabar, zer, pesh, tanwin, shadda, sukun, superscript alef), tatweel, zero-width joiners and bidi controls. Whitespace runs collapse to one space.
+
+It deliberately does **not** merge letters that are distinct in Pashto: ي / ی (سړی "man" vs سړي "men"), ې, ۍ, ئ, ۀ / ه, and ښ / ش. Merging those would collapse real words, and the ښ/ش split is itself dialect data. Hamza and madda marks are kept for the same reason.
+
+Every path goes through the one function: the pre-save hook, the duplicate pre-checks in `variantController` and `suggestions.ts`, the cross-concept check, search, and the audio "has the text changed" check (so a vowel-mark-only edit no longer retires a recording). The stored `pashto` is never altered; only the comparison key is. After changing the rules, `npm run migrate:normalize-pashto -- --dry-run` recomputes `normalizedPashto` on existing variants and forms. Variants that would now collide on the unique index are skipped and listed for an admin to merge.
 
 All duplicate checks use the normalized fields, not the raw input fields.
 
@@ -282,7 +291,7 @@ const [glossMatches, phoneticVariants, pashtoVariants] = await Promise.all([
 ]);
 ```
 
-The Pashto query is NFC-normalized the same way as stored text, so it matches the headword and every grammatical form (searching لمرونه finds *sun* through its plural). The results are unified by concept ID into a score map, where each concept gets the highest of its scores:
+The Pashto query goes through `normalizePashto()` like stored text (a query of only vowel marks normalizes to nothing and matches no word), so it matches the headword and every grammatical form (searching لمرونه finds *sun* through its plural). The results are unified by concept ID into a score map, where each concept gets the highest of its scores:
 
 | Condition | Score |
 |---|---|
@@ -320,10 +329,10 @@ Any given date maps to a stable index into the published concepts list. Adding n
 
 ## Admin-editable lists
 
-Regions and parts of speech used to be hardcoded in about a dozen places: Mongoose enums, route validators, and client dropdowns. Adding a region meant a code change and a redeploy. They now live in one `Lookup` collection that admins edit from **Dashboard → Lists**.
+Regions and parts of speech used to be hardcoded in about a dozen places: Mongoose enums, route validators, and client dropdowns. Adding a region meant a code change and a redeploy. They now live in one `Lookup` collection that admins edit from **Dashboard → Lists**. Semantic domains use the same collection (see [Semantic domains](#semantic-domains)).
 
 ```
-Lookup { type: 'region' | 'partOfSpeech', key, label, order, active, isSystem }
+Lookup { type: 'region' | 'partOfSpeech' | 'semanticDomain', key, label, order, active, isSystem }
 ```
 
 ### Why key and label are separate
@@ -352,6 +361,27 @@ The check is deliberately not a schema validator. That would need a database rea
 ### Client
 
 `LookupsProvider` fetches `GET /api/lookups` once at the app root. That endpoint is public and returns inactive rows too, flagged `active: false`, so old entries can still show their label. `useLookups()` exposes `active(type)` for forms and `labelFor(type, key)` for display; `labelFor` falls back to the raw key. Every dropdown uses `LookupSelect`. It lists active values plus the entry's current value marked "(retired)" if that value is inactive. The Home card abbreviations (N., V., and so on) still use a fixed map for the six built-in parts of speech and show the full label for admin-added ones.
+
+---
+
+## Semantic domains
+
+`Concept.semanticDomains: string[]` tags a concept with what it is about (food, farming, kinship…), so readers can browse by topic and a later AI pass can fill or check tags against a fixed vocabulary instead of free text.
+
+- **A `Lookup` type, not a new collection.** Domains get the existing key/label split, deactivate-not-delete, ordering, the admin Lists page and `lookup_changed` audit entries for free.
+- **Nothing is built in.** `SYSTEM_LOOKUPS.semanticDomain` is empty, so every domain is an ordinary admin row that can be renamed or deactivated. `npm run seed:domains` inserts a 15-domain starting list (covering nouns, verbs and adjectives: *Movement & travel*, *Qualities & descriptions*…) only when no domain exists yet, so it never brings back one an admin changed.
+- **Several per concept, optional.** At most 10, duplicates dropped. The submitter can pick them when creating or resubmitting a concept; after that only admins change them, through the admin edit (`PATCH /api/concepts/:id/edit`, logged as an `edited` diff). Moderators have no concept edit path, so they cannot change them either.
+- **Validation** follows the list rule: a newly added domain must be active; one already on the concept stays valid after deactivation (`checkDomains()` in `utils/lookups.ts`).
+- **Merge** adds the source's domains to the target and records them as `domainsAdded` on the `merged` log entry.
+- **Filtering:** `GET /api/concepts?domain=` and `GET /api/concepts/search?domain=` (multikey index on `semanticDomains`). Domains are on the concept, not the variant, because they describe the meaning, which every regional word shares.
+
+---
+
+## Also means (same word, other meanings)
+
+A Pashto word can belong to several concepts (polysemy). The unique index already allows this; what was missing was showing it. `GET /api/concepts/:id` adds `alsoMeans` to each variant: the other **published** concepts with a **published** variant of the same `normalizedPashto`, each with the regions that use the word that way (`utils/alsoMeans.ts`, two queries for the whole page, served by an index on `normalizedPashto`). Nothing is stored, so there is nothing to moderate or keep in sync: the link appears once both entries are published and disappears when either is rejected or deleted. Only headwords are compared, not grammatical forms.
+
+This covers *same spelling, different meaning*. Linking *different* words as synonyms is a judgement, so it will need a stored, moderated relation (backlog S8).
 
 ---
 
@@ -619,6 +649,16 @@ Clip transitions log under `targetModel: 'AudioClip'`, with the usual actions pl
 - `components/audio/AudioRecorder.jsx` shows the text to say, a preview, and the file-upload fallback.
 - `AudioPlayButton` checks `canPlayType` and says "Can't play on this device" instead of failing silently. Old iPhones (before iOS 17.4) cannot play WebM/Opus.
 - The retire warning is one hook, `useAudioRetireConfirm`, shared by every form that can change recorded text.
+
+---
+
+## Queue filters and bulk moderation
+
+**Filters.** All three queue endpoints accept `q`, `region` and `user` (`utils/queueFilters.ts`). `user` is a username, resolved case-insensitively to a Cognito sub; an unknown name matches nothing rather than everything. `q` and `region` are conditions on the variant: suggestions and recordings are filtered through the ids of matching variants. In the grouped entries queue, a concept is listed when it matches on its own (status, submitter, gloss; never with a region filter, since regions belong to variants) or when one of its variants matches. Each group carries `matched` so the client can tell the two apart. The Pending/Approved counts follow the filters.
+
+**Bulk actions are client-side loops, not a bulk endpoint.** Each selected item is one ordinary `PATCH …/status`, sent one after another. That keeps every rule in one place: the state machine, the self-review ban, "publish the concept first", cascades and one ModerationLog entry per item. A partial failure is normal and is reported per item rather than rolled back. Order matters: concepts go before their variants (so approving both works), and when a concept is rejected in the same run its variants are skipped because the cascade already rejected them. A concept that is listed only for its variants (`matched: false`) cannot be selected, so filtering by a spammer and selecting everything never rejects someone else's concept, which would cascade to all its words. The cost is N requests for N items, which is fine at a page of 20.
+
+**Shared counts.** `DashboardLayout` loads `GET /api/moderation/stats` once and shares it through context. The Queue badge, the queue tab counts and the Overview read it, and every queue action refreshes it. A dashboard page rendered on its own (tests) falls back to its own request; the queues never fetch stats themselves.
 
 ---
 

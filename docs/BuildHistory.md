@@ -460,3 +460,22 @@ Logged-in users record or upload a short clip for any slot of a published word (
 8. Optional, recommended: once a month run `npm run audio:clean -- --dry-run` against production, then without `--dry-run` if it reports files.
 
 Swapping to Backblaze B2 (the fallback) is the same steps with a B2 bucket and application key: set `STORAGE_ENDPOINT` to the B2 S3 endpoint (for example `https://s3.us-west-004.backblazeb2.com`) and `STORAGE_REGION` to its region. No code changes.
+
+---
+
+## Data quality: normalization, domains, "also means" `[D3]` `[S6]` `[S7]`
+
+Done early, while there were about 70 published entries, because each gets more expensive as data grows. Why and trade-offs: ARCHITECTURE.md › *Normalized fields*, *Semantic domains*, *Also means*.
+
+- **Normalization:** `utils/normalize.ts` rewritten; the four inline `trim().normalize('NFC')` copies in `variantController.ts` and the search query now call `normalizePashto`. `scripts/renormalizePashto.ts` recomputes stored values and skips (and lists) any pair that would now collide.
+- **Domains:** `semanticDomain` added to the `Lookup` type enum; `Concept.semanticDomains` with a multikey index; `domainsFormat()` / `checkDomains()` in `utils/lookups.ts`; `scripts/seedSemanticDomains.ts`. Client: `DomainPicker` (Submit, resubmit, admin edit), `DomainChips` (concept page), `DomainFilter` (Concepts page), Domains section on Dashboard → Lists, log labels.
+- **Also means:** `utils/alsoMeans.ts`, index on `Variant.normalizedPashto`; client `components/concept/AlsoMeans.jsx` in `VariantCard`.
+- Tests: `normalize.test.ts`, `semantic-domains.test.ts`, `also-means.test.ts`, new cases in `entries.test.ts`; client `SemanticDomains.test.jsx`.
+
+### Manual step — production data
+
+Run against production (`MONGODB_URI` pointing at Atlas) after the deploy:
+
+1. `npm run migrate:normalize-pashto -- --dry-run`. If it lists clashes, merge or delete those words in the dashboard first, then run it again without `--dry-run`.
+2. Optional: `npm run seed:domains -- --dry-run`, then without the flag, to insert the 15 starter domains. Or add your own on Dashboard → Lists.
+3. The new indexes (`Concept.semanticDomains`, `Variant.normalizedPashto`) are built automatically by Mongoose on the first connection.

@@ -181,7 +181,7 @@ describe('Moderation queue — Suggestions view', () => {
       response: { data: { error: { message: 'Cannot publish: Phonetic is already filled and cannot be changed. Edit or reject the suggestion.' } } },
     });
     renderQueue();
-    await user.click(await screen.findByRole('button', { name: 'approved (1)' }));
+    await user.click(await screen.findByRole('button', { name: 'Approved (1)' }));
     await waitFor(() => expect(getSuggestionQueue).toHaveBeenLastCalledWith({ status: 'approved', page: 1 }));
 
     await user.click(await screen.findByRole('button', { name: 'Publish' }));

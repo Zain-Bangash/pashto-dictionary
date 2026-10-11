@@ -2,9 +2,10 @@ import { useState } from 'react';
 import useLookups from '../../hooks/useLookups';
 import SlotComparison from './SlotComparison';
 import SuggestionRow from './SuggestionRow';
+import SubmitterName from './SubmitterName';
 
 // One word with every suggestion waiting on it, so competing proposals are reviewed together
-export default function SuggestionGroup({ group, isAdmin, onApprove, onReject, onPublish, onSaved }) {
+export default function SuggestionGroup({ group, isAdmin, selection, itemOf, onFilterUser, onApprove, onReject, onPublish, onSaved }) {
   const { labelFor } = useLookups();
   const [open, setOpen] = useState(true);
   const { variant, suggestions } = group;
@@ -29,7 +30,7 @@ export default function SuggestionGroup({ group, isAdmin, onApprove, onReject, o
               </span>
             </div>
             <p className="text-sm font-ui text-muted">{variant.definition}</p>
-            {variant.submittedBy?.username && <p className="text-xs font-ui text-muted/60">Word by {variant.submittedBy.username}</p>}
+            <SubmitterName submitter={variant.submittedBy} prefix="Word by" />
           </div>
         ) : (
           <p className="text-sm font-ui text-muted italic">The word is no longer available</p>
@@ -47,6 +48,9 @@ export default function SuggestionGroup({ group, isAdmin, onApprove, onReject, o
                 suggestion={{ ...s, variant }}
                 compact
                 isAdmin={isAdmin}
+                selected={selection?.has(s._id)}
+                onSelect={selection ? () => selection.toggle(itemOf(s, variant)) : undefined}
+                onFilterUser={onFilterUser}
                 onApprove={onApprove}
                 onReject={onReject}
                 onPublish={onPublish}

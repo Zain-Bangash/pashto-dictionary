@@ -5,12 +5,14 @@ const editConcept = (id, data) => api.patch(`/api/concepts/${id}/edit`, data);
 
 import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
+import DomainPicker from '../DomainPicker';
 import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
 export default function ConceptEditForm({ item, onSave, onCancel }) {
   const [englishGloss, setEnglishGloss] = useState(item.englishGloss || '');
   const [partOfSpeech, setPartOfSpeech] = useState(item.partOfSpeech || '');
   const [extra, setExtra] = useState(item.extra || {});
+  const [domains, setDomains] = useState(item.semanticDomains || []);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
     setSaving(true);
     setError('');
     try {
-      const res = await send((confirm) => editConcept(item._id, { englishGloss, partOfSpeech, extra, note, ...confirm }));
+      const res = await send((confirm) => editConcept(item._id, { englishGloss, partOfSpeech, semanticDomains: domains, extra, note, ...confirm }));
       if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
@@ -39,7 +41,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
           aria-label="English Gloss"
           value={englishGloss}
           onChange={(e) => setEnglishGloss(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       <div>
@@ -49,15 +51,20 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
           aria-label="Part of Speech"
           value={partOfSpeech}
           onChange={(e) => setPartOfSpeech(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
+      <DomainPicker
+        value={domains}
+        onChange={setDomains}
+        labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"
+      />
       <ExtraFieldsInputs
         appliesTo="concept"
         idPrefix={`edit-${item._id}`}
         values={extra}
         onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
-        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"
       />
       <div>
@@ -68,7 +75,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
           placeholder="Note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       {error && <p role="alert" className="text-xs font-ui text-red-400">{error}</p>}
@@ -83,7 +90,7 @@ export default function ConceptEditForm({ item, onSave, onCancel }) {
         <button
           type="submit"
           disabled={!note.trim() || saving}
-          className="px-3 py-1.5 bg-mint/10 border border-mint/30 text-mint text-xs font-ui font-semibold rounded-[8px] hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-terracotta text-warm text-xs font-ui font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(196,119,90,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Save
         </button>

@@ -53,7 +53,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           value={pashto}
           onChange={(e) => setPashto(e.target.value)}
           dir="rtl"
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-pashto outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-pashto outline-none focus:border-terracotta/60"
         />
       </div>
       <div>
@@ -64,7 +64,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           title={locked('phonetic') ? 'Proposed in an open suggestion' : undefined}
           value={phonetic}
           onChange={(e) => setPhonetic(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       <div>
@@ -74,7 +74,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           aria-label="Region"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       <div>
@@ -83,7 +83,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           aria-label="Definition"
           value={definition}
           onChange={(e) => setDefinition(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       <div>
@@ -94,7 +94,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           title={locked('example') ? 'Proposed in an open suggestion' : undefined}
           value={example}
           onChange={(e) => setExample(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       <ExtraFieldsInputs
@@ -103,7 +103,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
         disabledKeys={lockedFields.filter((f) => f.startsWith('extra.')).map((f) => f.slice(6))}
         values={extra}
         onChange={(key, value) => setExtra((v) => ({ ...v, [key]: value }))}
-        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"
       />
       <FormsEditor
@@ -112,7 +112,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
         onChange={setForms}
         takenSlots={lockedSlots}
         idPrefix={`edit-form-${item._id}`}
-        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+        inputClassName="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         labelClassName="block text-xs font-ui text-muted uppercase tracking-wider mb-1"
       />
       <ConceptSearch
@@ -127,7 +127,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
           placeholder="Note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+          className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
         />
       </div>
       {error && <p role="alert" className="text-xs font-ui text-red-400">{error}</p>}
@@ -142,7 +142,7 @@ export default function VariantEditForm({ item, onSave, onCancel, lockedFields =
         <button
           type="submit"
           disabled={!note.trim() || saving}
-          className="px-3 py-1.5 bg-mint/10 border border-mint/30 text-mint text-xs font-ui font-semibold rounded-[8px] hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-terracotta text-warm text-xs font-ui font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(196,119,90,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Save
         </button>

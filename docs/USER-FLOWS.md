@@ -14,6 +14,12 @@ As a guest I should be able to browse all published concepts from the Concepts p
 
 As a guest I should be able to click a concept card to go to its detail page, where I see the concept's English gloss and part of speech, and all published variants grouped by Pashto word. Variants that share the same Pashto word are shown as one card with a region tab strip — clicking a region tab shows that region's phonetic, definition, and example.
 
+As a guest, a concept's detail page shows its domains (for example "Food & cooking") as chips under the heading. Clicking one takes me to the Concepts page filtered to that domain.
+
+As a guest, the Concepts page shows the active domains as pills under the search bar. Picking one narrows the list (and search results) to concepts in that domain; picking it again clears the filter. The choice stays in the URL, so a filtered page can be shared. With no domains defined, the pills are hidden.
+
+As a guest, a word on a concept page shows "Also means: fence (Hangu, Tirah) · side (Kohat)" when the same written word is published under other concepts, each linking to that concept, with the regions that use it that way. Spellings that differ only by vowel marks or by Arabic/Urdu keyboard letters (ك for ک, ہ for ه) count as the same word. Words under review are not listed.
+
 As a guest, a concept's detail page also shows any extra field values admins have defined: concept fields under the concept heading, and variant fields in each region's panel. Fields an admin has deactivated are not shown.
 
 As a guest, under each regional variant on a concept page I can expand a "Forms" list showing the word's grammatical forms (for example masculine plural direct, or past tense), each with its Pashto text, phonetic and example sentence. Searching for any form's Pashto text, such as a plural, finds the word.
@@ -53,6 +59,10 @@ As a user, if I enter an incorrect email or password on the Login page, I stay o
 As a user I should be able to view all the same pages a guest can.
 
 As a user I should be able to go to the Submit page to submit a new entry. The form has two steps: Step 1 asks for the English gloss with live autocomplete suggestions from existing concepts; Step 2 asks for the Pashto word, phonetic, region, definition, and example.
+
+As a user, when I create a new concept on the Submit form I can pick up to 10 domains (optional) from the admin-maintained list. When I edit and resubmit a rejected concept I can change them too. After that, only an admin can change a concept's domains.
+
+As a user, a Pashto word I submit counts as a duplicate of an existing word for the same concept and region even if it differs only by vowel marks, zero-width characters or Arabic/Urdu keyboard letters, and searching with any of those spellings finds the word.
 
 As a user, the Submit form also shows any extra fields admins have added: concept fields when I create a new concept, and variant fields in Step 2. Fields not marked optional are required, and I cannot submit until they are filled. These fields are not required when I resubmit an existing entry.
 
@@ -108,6 +118,16 @@ As a user, when I edit and resubmit my rejected word, if my change alters text t
 
 As a moderator I should be able to log in and access the Dashboard. Refreshing the page or opening the Dashboard in a new tab should not log me out.
 
+As a moderator, the Dashboard Overview is my to-do list: "Entries to review", "Suggestions to review" and "Recordings to review", each with the number waiting and a link to that queue. When nothing is waiting it says "All caught up". Below it are the totals of concepts and words by status. The Queue item in the dashboard menu shows a gold badge with the number of items waiting for me, and each queue tab shows its own count; both update after every action.
+
+As a moderator, on a phone the dashboard menu is a scrolling row of tabs above the page instead of a sidebar, and queue action buttons sit under each item.
+
+As a moderator, every queue tab (Entries, Suggestions, Audio) has a search box (English gloss, Pashto word or phonetic), a region dropdown and a submitter username box. Spellings that differ only by vowel marks or keyboard letters still match. The filters are kept in the page address, so refreshing or sharing the link keeps them, and switching tab keeps them too. Clicking a submitter's name on any item filters the queue to that person. "Clear filters" resets them. With filters set and no results I see "Nothing matches these filters."
+
+As a moderator, each queue item has a checkbox and the toolbar has "Select all on this page". With items selected, a bar at the bottom offers "Approve selected", "Reject selected…" and "Clear". Each item is sent separately, concepts before their words, so every one is checked by the state machine and logged. Items that fail (for example my own submission, or a word whose concept is still pending) stay selected and are listed with the reason; the rest go through. Bulk reject asks for one note that is sent with every item; words under a concept rejected in the same run are not sent again, because rejecting the concept already rejects them. A concept listed only because of its words (it is not itself waiting, or does not match the filters) has no checkbox, so selecting one person's spam never touches someone else's concept. My own recordings have no checkbox.
+
+As a moderator, after approving, rejecting, publishing, editing or merging I see a short message at the bottom of the screen ("Approved “house”", "Approved 5 items; 1 failed"). A failed single action shows a red message above the list that I can dismiss.
+
 As a moderator I should see the Moderation Queue as a single list of concepts. Each concept row shows its status and a "N variants waiting" toggle. Clicking anywhere on the concept row, or on the toggle, expands or collapses a dropdown listing that concept's variants awaiting review. Clicking the row's Approve, Reject, Publish, or Edit buttons does not toggle it.
 
 As a moderator I should not be able to approve a variant while its concept is still pending. The variant's Approve button is disabled with the hint "Approve the concept first", and the server rejects the attempt with a 400. Once the concept is approved, its variants can be approved.
@@ -156,7 +176,9 @@ As a moderator or admin, after I approve, reject, or publish an item, the modera
 
 As an admin I should be able to do everything a moderator can do.
 
-As an admin I should see a Pending / Approved filter toggle above the moderation queue list. Moderators do not see this toggle. Each filter button shows a count of concepts plus variants, so I know how many items are waiting at each stage.
+As an admin I should see Pending / Approved filter chips above each queue. Moderators do not see them. Each chip shows the count for the current filters, so I know how many items are waiting at each stage. The Overview also lists "Entries / Suggestions / Recordings to publish" linking to the Approved view, and the Queue badge counts approved items too. Under Approved, the bulk bar offers "Publish selected" and "Reject selected…".
+
+As an admin, the dashboard Concepts page filters by status with chips (All, Pending, Approved, Published, Rejected); All really lists every status. Search waits until I pause typing and keeps the list (and my cursor) on screen while it loads, and the list is paginated.
 
 As an admin, the Pending / Approved filter applies to concepts and their variants together. Under Approved, I see every concept that is approved or has approved variants, with only the approved variants in its dropdown. A variant's Publish button stays disabled with the hint "Publish the concept first" until its concept is published.
 
@@ -206,7 +228,9 @@ As an admin I can reject a published concept from that panel. The Reject modal r
 
 As an admin I can reject a single published variant from that panel with a required reason. It disappears from the panel and the public concept page, and its submitter sees the reason in My Submissions.
 
-As an admin I can open Lists in the dashboard to manage the region and part-of-speech lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log.
+As an admin, the concept Edit form has the domain pills, so I can add or remove domains on any pending, approved or published concept; the change appears in the edit's Moderation Log diff as "domains". When I merge a concept, the target gains the source's domains and the merge log entry lists them. Moderators cannot change domains.
+
+As an admin I can open Lists in the dashboard to manage the region, part-of-speech and domain lists. I can add a value, rename its label, and move it up or down. Renaming a label changes how it appears on every existing entry immediately. Each change writes a `lookup_changed` record to the Moderation Log. No domain is built in: I can rename, reorder or deactivate every one. A deactivated domain disappears from forms and the browse filter but stays on the concepts that already have it.
 
 As an admin I can deactivate a value I added. It disappears from the Submit, Register, and edit dropdowns, but existing entries that use it still show it, and they can still be edited as long as that value is not changed. I can reactivate it later. Built-in values (the original five regions and six parts of speech) cannot be deactivated, and no value can ever be deleted.
 

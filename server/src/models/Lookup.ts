@@ -3,7 +3,7 @@ import { ILookup } from '../types/models';
 
 const lookupSchema = new Schema<ILookup>(
   {
-    type: { type: String, enum: ['region', 'partOfSpeech'], required: true, immutable: true },
+    type: { type: String, enum: ['region', 'partOfSpeech', 'semanticDomain'], required: true, immutable: true },
     key: { type: String, required: true, trim: true, maxlength: 50, immutable: true },
     label: { type: String, required: true, trim: true, maxlength: 50 },
     order: { type: Number, default: 0 },

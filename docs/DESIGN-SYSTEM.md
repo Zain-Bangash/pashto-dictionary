@@ -19,6 +19,21 @@ Copy classes and patterns directly — do not invent new tokens.
 
 > **Rule**: mint is never used for decoration or CTAs. It signals approved/live/active state only.
 
+> **No inline styles**: every example below is a Tailwind class. Use arbitrary values (`bg-white/[0.035]`, `shadow-[0_4px_20px_rgba(196,119,90,0.35)]`) rather than `style={{}}`.
+
+### Status colours
+
+One mapping everywhere a status appears (badges, chips, counts, the Overview):
+
+| Status | Colour | Classes (`StatusBadge`) |
+|---|---|---|
+| pending (waiting) | gold | `text-gold border-gold/30 bg-gold/[0.08]` |
+| approved | mint | `text-mint border-mint/30 bg-mint/[0.08]` |
+| published (live) | mint | `text-mint border-mint/30 bg-mint/[0.08]` |
+| rejected | red | `text-red-400 border-red-400/30 bg-red-400/[0.08]` |
+
+Use `components/submissions/StatusBadge.jsx` for any status label. Warnings and hints ("Publish the concept first", similar-concept notices) use gold, not amber. Roles are not statuses: admin is violet, moderator gold, user muted.
+
 ---
 
 ## Typography
@@ -127,12 +142,24 @@ For internal stagger within a card (e.g., definition appears after phonetic):
 // Secondary / ghost
 <button className="font-ui text-warm/70 border border-white/[0.1] rounded-xl text-sm px-5 py-2.5 hover:border-white/20 hover:text-warm transition-all">
 
-// Filter pill (inactive / active)
+// Filter chip (StatusChips / DomainFilter / RegionPills); active = mint, the system "active" state
 // inactive:
-style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#666' }}
-// active (mint = system active state):
-style={{ background: 'rgba(0,245,180,0.15)', border: '1px solid rgba(0,245,180,0.4)', color: '#00f5b4' }}
+className="font-ui text-xs px-3 py-1.5 rounded-full border bg-white/[0.04] border-white/[0.08] text-muted hover:text-warm"
+// active:
+className="font-ui text-xs px-3 py-1.5 rounded-full border bg-mint/15 border-mint/40 text-mint"
 ```
+
+Status filters are always chips with counts, never a `<select>`. Text inputs focus to `focus:border-terracotta/60`.
+
+### Moderation action buttons (`components/moderation/queueButtons.js`)
+
+| Button | Class | Use |
+|---|---|---|
+| `PRIMARY_BTN` (= `APPROVE_BTN`, `PUBLISH_BTN`) | terracotta fill | The item's next step: Approve, Publish, Save, Confirm |
+| `REJECT_BTN` | red outline, no fill | Reject, destructive actions |
+| `EDIT_BTN` | white/12 outline | Edit, Manage, Merge, Clear, Cancel |
+
+All `rounded-xl`, `text-xs font-semibold`. Only one primary button per row is visible at a time.
 
 ---
 
@@ -189,6 +216,16 @@ All three are `fixed inset-0 pointer-events-none -z-10`.
 
 ---
 
+## Dashboard (calm tool look)
+
+The dashboard is a work tool for scanning many items, so it keeps the tokens, glass cards, fonts and chip styles but **skips** the ambient background, `bento-card` hover lift, 3D tilt and entrance animations.
+
+- **Layout**: `DashboardLayout` shows a sidebar from `md` up and a horizontally scrolling tab row on phones. The Queue item carries a gold count badge of what waits for the viewer (moderators: pending; admins: pending + approved).
+- **Queues**: toolbar = status chips (admins) → search, region, submitter → "Select all on this page". Filters live in the URL. Rows stack their action buttons under the content below `sm`.
+- **Bulk bar**: sticky at the bottom (`sticky bottom-4`), `bg-charcoal/95` glass, lists failures in red under the buttons.
+- **Feedback**: success → toast (`useToast()`, bottom-right, fades after 4 s); a failed single action → dismissible red banner (`ActionError`) above the list; a failed bulk run → error toast plus the failure list.
+- **Loading**: the first load shows "Loading…"; later loads keep the list on screen at `opacity-60` so inputs never lose focus.
+
 ## Applying to a New Page — Checklist
 
 - [ ] Wrap in `<div className="min-h-screen bg-charcoal">` with `<AmbientBackground />`
@@ -199,4 +236,5 @@ All three are `fixed inset-0 pointer-events-none -z-10`.
 - [ ] English text inside RTL parents has `dir="ltr"` explicitly
 - [ ] CTAs use `bg-terracotta text-warm`, not mint
 - [ ] Mint reserved for system status only (approved, published, active filter)
-- [ ] Section entrance wrapped in `bento-enter` with `animationDelay`
+- [ ] Section entrance wrapped in `bento-enter` with `animationDelay` (public pages; the dashboard skips it)
+- [ ] Statuses use `StatusBadge` and the status colour table; no `style={{}}`

@@ -35,7 +35,7 @@ export default function ConceptSearch({ initialGloss, onChange }) {
         placeholder="Search concept"
         value={query}
         onChange={handleType}
-        className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50"
+        className="w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60"
       />
       {suggestions.length > 0 && (
         <ul className="absolute z-20 w-full bg-charcoal border border-white/[0.12] rounded-[10px] mt-1 max-h-48 overflow-y-auto">

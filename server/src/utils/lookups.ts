@@ -2,16 +2,17 @@ import { body, ValidationChain } from 'express-validator';
 import Lookup from '../models/Lookup';
 import { LookupType } from '../types/models';
 
-export const LOOKUP_TYPES: LookupType[] = ['region', 'partOfSpeech'];
+export const LOOKUP_TYPES: LookupType[] = ['region', 'partOfSpeech', 'semanticDomain'];
 export const LABEL_MAX = 50;
 export const MAX_PER_TYPE = 100;
 
 export const SYSTEM_LOOKUPS: Record<LookupType, string[]> = {
   region: ['Kohat', 'Hangu', 'Tirah', 'Thal', 'Parachinar'],
   partOfSpeech: ['noun', 'verb', 'adjective', 'adverb', 'phrase', 'other'],
+  semanticDomain: [],
 };
 
-const FIELD_NAMES: Record<LookupType, string> = { region: 'region', partOfSpeech: 'part of speech' };
+const FIELD_NAMES: Record<LookupType, string> = { region: 'region', partOfSpeech: 'part of speech', semanticDomain: 'domain' };
 
 // Control characters and angle brackets are never valid in a label
 export const SAFE_LABEL = /^[^\u0000-\u001F\u007F<>]+$/;
@@ -85,4 +86,28 @@ export async function ensureSystemLookups({ dryRun = false } = {}): Promise<stri
   }
 
   return missing.map((o) => `${o.type}:${o.key}`);
+}
+
+export const MAX_DOMAINS = 10;
+
+export function domainsFormat(field = 'semanticDomains'): ValidationChain[] {
+  return [
+    body(field).optional().isArray({ max: MAX_DOMAINS }).withMessage(`${field} must be a list of at most ${MAX_DOMAINS} domains`),
+    body(`${field}.*`)
+      .isString().withMessage('Each domain must be a string')
+      .trim()
+      .notEmpty().withMessage('A domain cannot be empty')
+      .isLength({ max: LABEL_MAX }).withMessage('Invalid domain'),
+  ];
+}
+
+// Domains already on the concept stay valid after deactivation; newly added ones must be active
+export async function checkDomains(values: string[], current: string[] = []): Promise<{ values: string[] } | { error: { message: string; field: string } }> {
+  const unique = [...new Set(values)];
+  const added = unique.filter((v) => !current.includes(v));
+  const allowed = added.length ? await getActiveKeys('semanticDomain') : [];
+  if (added.some((v) => !allowed.includes(v))) {
+    return { error: { message: invalidLookupMessage('semanticDomain'), field: 'semanticDomains' } };
+  }
+  return { values: unique };
 }

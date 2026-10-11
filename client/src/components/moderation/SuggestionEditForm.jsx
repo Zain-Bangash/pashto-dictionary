@@ -4,7 +4,7 @@ import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import FormsEditor from '../forms/FormsEditor';
 import { formKindFor, formSlot, formsPayload } from '../../utils/forms';
 
-const INPUT = 'w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50';
+const INPUT = 'w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-terracotta/60';
 const LABEL = 'block text-xs font-ui text-muted uppercase tracking-wider mb-1';
 
 // Staff fix a suggestion in place (forms and custom fields stay fill-only on the server); a note is required and the diff is logged
@@ -105,7 +105,7 @@ export default function SuggestionEditForm({ suggestion, onSave, onCancel }) {
         <button
           type="submit"
           disabled={!note.trim() || saving}
-          className="px-3 py-1.5 bg-mint/10 border border-mint/30 text-mint text-xs font-ui font-semibold rounded-[8px] hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-terracotta text-warm text-xs font-ui font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(196,119,90,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Save
         </button>

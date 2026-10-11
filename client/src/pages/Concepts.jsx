@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import SearchBar from '../components/SearchBar';
+import DomainFilter from '../components/DomainFilter';
 import api from '../services/api';
 import useLookups from '../hooks/useLookups';
 
@@ -9,6 +10,7 @@ export default function Concepts() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const q    = searchParams.get('q') ?? '';
+  const domain = searchParams.get('domain') ?? '';
   const page = parseInt(searchParams.get('page') ?? '1', 10);
 
   const [concepts, setConcepts] = useState([]);
@@ -22,6 +24,7 @@ export default function Concepts() {
 
     const params = new URLSearchParams({ page });
     if (q) params.set('q', q);
+    if (domain) params.set('domain', domain);
     const url = q
       ? `/api/concepts/search?${params.toString()}`
       : `/api/concepts?${params.toString()}`;
@@ -33,19 +36,19 @@ export default function Concepts() {
       })
       .catch(() => setError('Failed to load concepts.'))
       .finally(() => setLoading(false));
-  }, [q, page]);
+  }, [q, domain, page]);
 
-  function handleSearch(newQ) {
-    if (newQ) navigate(`/concepts?q=${encodeURIComponent(newQ)}`);
-    else navigate('/concepts');
-  }
-
-  function handlePageChange(newPage) {
+  function go({ q: nextQ = q, domain: nextDomain = domain, page: nextPage } = {}) {
     const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    params.set('page', String(newPage));
-    navigate(`/concepts?${params.toString()}`);
+    if (nextQ) params.set('q', nextQ);
+    if (nextDomain) params.set('domain', nextDomain);
+    if (nextPage) params.set('page', String(nextPage));
+    const qs = params.toString();
+    navigate(qs ? `/concepts?${qs}` : '/concepts');
   }
+
+  const handleSearch = (newQ) => go({ q: newQ });
+  const handlePageChange = (newPage) => go({ page: newPage });
 
   const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
 
@@ -55,6 +58,9 @@ export default function Concepts() {
         <div className="mb-8">
           <h1 className="text-2xl font-display text-warm mb-6">Browse Entries</h1>
           <SearchBar initialValue={q} onSubmit={handleSearch} />
+          <div className="mt-4">
+            <DomainFilter value={domain} onChange={(d) => go({ domain: d })} />
+          </div>
         </div>
 
         {loading && <p className="text-muted font-ui text-sm text-center py-20">Loading…</p>}

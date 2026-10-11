@@ -17,9 +17,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 6. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
-9. Add proper filters everywhere (my submissions, queue etc)
 11. Have a wanted audio page
-12. approve/publish all, and  select which ones to approve/publish and then press button to send them through
 13. Only submitting variants for the region you account has 
 
 ## Backlog
@@ -41,6 +39,10 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 - [ ] Community page: top contributing users `[S1]`
 - [ ] Region filter on the Concepts browse page _(suggested)_ `[S2]`
 - [ ] Admin trash view — restore soft-deleted concepts/variants _(suggested)_ `[S3]`
+- [ ] Synonyms and AI data pass (later, once there are a few hundred entries) `[S8]`
+  - Variant-to-variant links (synonym / related) across concepts as a moderated `VariantRelation` collection: own state machine, ModerationLog entries, self-approval ban
+  - CSV export with `_id`s (builds on D2), run through Airtable or an LLM script to suggest domains for untagged concepts, likely duplicate concepts to merge, and synonym pairs
+  - Results come back through an import script as pending suggestions/relations under a dedicated system actor, never as direct writes
 - [ ] 
 - [ ] Admin 
 
@@ -79,6 +81,10 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 
 - Pronunciation audio `[S5]`: `AudioClip` collection (own state machine, one live + one open clip per slot, replacements reviewed side by side); any logged-in user records the headword, example or any form slot; Cloudflare R2 via S3 SDK behind `utils/storage.ts`, uploads through Lambda, 1-hour signed URLs; server reads real duration/format (WebM, MP4, Ogg, MP3); text edits retire clips after a confirm; Audio queue tab, My Recordings, admin takedown
 - My Submissions dashboard: collapsible Concepts / Variants / Recordings / Forms-you-suggested sections (closed by default, lists load on open), a status totals strip, per-section status chips with counts, search, region / part-of-speech / recording-type filters and pagination; `GET /api/submissions/summary`
+- Stronger Pashto normalization `[D3]`: `normalizePashto` folds Arabic/Urdu/Persian look-alikes (ك ګ ى ہ ھ ە) and drops optional vowel marks, tatweel and zero-width/bidi characters, keeping Pashto-distinct letters (ي/ی, ۀ/ه, ښ/ش) apart; every duplicate check and search uses it; `npm run migrate:normalize-pashto`
+- Semantic domains `[S6]`: `semanticDomain` Lookup type (nothing built in, `npm run seed:domains` starter list), `Concept.semanticDomains` (up to 10, optional on submit/resubmit, admin edit, merge unions), chips on the concept page, browse/search filter
+- "Also means" `[S7]`: `alsoMeans` on each variant of `GET /api/concepts/:id`, derived from published variants with the same `normalizedPashto` under other concepts
+- Dashboard QoL: queue filters (search, region, submitter; in the URL, clickable submitter names) on Entries/Suggestions/Audio; bulk approve/publish/reject with per-item failures; toasts; Overview to-do linking to filtered queues; Queue badge and tab counts; phone layout; Concepts page chips, pagination and search focus fix (`status=all` now real); terracotta action buttons and Tailwind-only status badges per DESIGN-SYSTEM
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)
