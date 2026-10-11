@@ -1,8 +1,7 @@
 import LookupSelect from '../LookupSelect';
 import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 
-const SELECT = 'bg-[#1c1c15] border border-white/[0.15] rounded-[8px] px-3 py-1.5 text-xs font-ui text-warm focus:outline-none focus:border-terracotta/50';
-const CHIP = 'font-ui text-xs px-3 py-1.5 rounded-full border transition-all';
+import { SELECT, CHIP } from './filterOptions';
 
 const CORE_OPTIONS = [
   ['', 'Any missing detail'],

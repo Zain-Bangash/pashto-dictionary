@@ -1,82 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useState, createElement } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import useLookups from '../hooks/useLookups';
-import useMyVariants from '../hooks/useMyVariants';
-import Pagination from '../components/Pagination';
-import StatusBadge from '../components/submissions/StatusBadge';
-import ConceptResubmitForm from '../components/submissions/ConceptResubmitForm';
-import CompletionFilters from '../components/submissions/CompletionFilters';
-import MyVariantRow from '../components/submissions/MyVariantRow';
+import useSubmissionSummary from '../hooks/useSubmissionSummary';
+import SubmissionSection from '../components/submissions/SubmissionSection';
+import SummaryStrip from '../components/submissions/SummaryStrip';
+import MyConceptsSection from '../components/submissions/MyConceptsSection';
+import MyVariantsSection from '../components/submissions/MyVariantsSection';
 import MySuggestions from '../components/submissions/MySuggestions';
 import MyRecordings from '../components/audio/MyRecordings';
 
-const CARD = 'bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5';
-const HEADING = 'text-xs font-ui font-semibold text-muted uppercase tracking-widest mb-3';
-
-// Called before useMyVariants so the concepts request goes first
-function useMyConcepts() {
-  const [concepts, setConcepts] = useState([]);
-  const [conceptsLoading, setConceptsLoading] = useState(true);
-  const [conceptsError, setConceptsError] = useState('');
-  useEffect(() => {
-    api.get('/api/concepts/my-submissions')
-      .then((res) => setConcepts(res.data.data || []))
-      .catch(() => setConceptsError('Failed to load submissions'))
-      .finally(() => setConceptsLoading(false));
-  }, []);
-  return { concepts, setConcepts, conceptsLoading, conceptsError };
-}
-
-function ConceptRow({ concept, onSaved }) {
-  const { labelFor } = useLookups();
-  const [editing, setEditing] = useState(false);
-  return (
-    <li className={CARD}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1 overflow-hidden">
-          <p className="text-warm font-display text-lg font-semibold">{concept.englishGloss}</p>
-          {concept.partOfSpeech && <span className="meta-label inline-block">{labelFor('partOfSpeech', concept.partOfSpeech)}</span>}
-          {concept.status === 'rejected' && concept.moderatorNote && (
-            <p className="text-xs font-ui text-red-400 mt-1">Note: {concept.moderatorNote}</p>
-          )}
-          {concept.status === 'rejected' && !editing && (
-            <button onClick={() => setEditing(true)} className="mt-2 self-start text-xs font-ui font-semibold text-terracotta hover:opacity-80 transition-opacity">
-              Edit &amp; Resubmit
-            </button>
-          )}
-          {editing && (
-            <ConceptResubmitForm concept={concept} onSave={(updated) => { setEditing(false); onSaved(updated); }} onCancel={() => setEditing(false)} />
-          )}
-        </div>
-        <StatusBadge status={concept.status} />
-      </div>
-    </li>
-  );
-}
+const SECTIONS = [
+  { id: 'concepts', title: 'Concepts', Body: MyConceptsSection },
+  { id: 'variants', title: 'Variants', Body: MyVariantsSection },
+  { id: 'audio', title: 'Recordings', Body: MyRecordings },
+  { id: 'suggestions', title: 'Forms you suggested', Body: MySuggestions },
+];
+const NO_STATUS = { concepts: '', variants: '', audio: '', suggestions: '' };
 
 export default function MySubmissions() {
   const { user } = useAuth();
-  const { concepts, setConcepts, conceptsLoading, conceptsError } = useMyConcepts();
-  const [filters, setFilters] = useState({ completion: false, missing: '', region: '', page: 1 });
-  const { variants, setVariants, meta, loading, loaded, error, reload } = useMyVariants(filters);
+  const { summary, refresh } = useSubmissionSummary();
+  const [open, setOpen] = useState({});
+  const [statuses, setStatuses] = useState(NO_STATUS);
 
-  if (conceptsLoading || (!loaded && loading)) return (
-    <div className="min-h-screen bg-charcoal flex items-center justify-center">
-      <p className="text-muted font-ui text-sm animate-pulse">Loading…</p>
-    </div>
-  );
-  if (conceptsError || error) return (
-    <div className="min-h-screen bg-charcoal flex items-center justify-center">
-      <p className="text-red-400 font-ui text-sm">{conceptsError || error}</p>
-    </div>
-  );
+  const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+  const setStatus = (id, status) => setStatuses((s) => ({ ...s, [id]: status }));
 
-  const filtering = filters.completion || filters.region;
-  const isEmpty = concepts.length === 0 && variants.length === 0 && !filtering;
-  const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
-  const changeFilters = (changes) => setFilters((f) => ({ ...f, page: 1, ...changes }));
+  // A summary tile opens every section that has submissions in that status, filtered to it
+  const pick = (status) => {
+    const hits = SECTIONS.filter(({ id }) => (summary?.[id]?.[status] ?? 0) > 0).map(({ id }) => id);
+    setOpen((o) => ({ ...o, ...Object.fromEntries(hits.map((id) => [id, true])) }));
+    setStatuses((s) => ({ ...s, ...Object.fromEntries(hits.map((id) => [id, status])) }));
+  };
+
+  const isEmpty = summary && SECTIONS.every(({ id }) => (summary[id]?.total ?? 0) === 0);
 
   return (
     <div className="min-h-screen bg-charcoal">
@@ -97,49 +54,29 @@ export default function MySubmissions() {
         {isEmpty ? (
           <p className="text-muted font-ui text-sm text-center py-20">No submissions yet.</p>
         ) : (
-          <div className="space-y-8">
-            {concepts.length > 0 && (
-              <section>
-                <h2 className={HEADING}>Concepts you submitted</h2>
-                <ul className="space-y-3">
-                  {concepts.map((c) => (
-                    <ConceptRow key={c._id} concept={c} onSaved={(u) => setConcepts((prev) => prev.map((x) => (x._id === u._id ? u : x)))} />
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <section>
-              <h2 className={HEADING}>Variants you submitted</h2>
-              <CompletionFilters count={meta.needsCompletionCount} {...filters} onChange={changeFilters} />
-              {variants.length === 0 ? (
-                <p className="text-muted font-ui text-sm py-6">{filters.completion ? 'Nothing needs completing.' : 'No words match these filters.'}</p>
-              ) : (
-                <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
-                  {variants.map((v) => (
-                    <MyVariantRow
-                      key={v._id}
-                      variant={v}
-                      onChanged={(u) => setVariants((prev) => prev.map((x) => (x._id === u._id ? { ...x, ...u, concept: x.concept } : x)))}
-                      onSuggested={reload}
-                    />
-                  ))}
-                </ul>
-              )}
-              {totalPages > 1 && (
-                <Pagination page={filters.page} totalPages={totalPages} onPageChange={(page) => setFilters((f) => ({ ...f, page }))} />
-              )}
-            </section>
-          </div>
+          <>
+            {summary && <SummaryStrip summary={summary} onPick={pick} />}
+            <div className="space-y-4">
+              {SECTIONS.map(({ id, title, Body }) => {
+                const counts = summary?.[id];
+                if (id === 'suggestions' && counts?.total === 0) return null;
+                return (
+                  <SubmissionSection
+                    key={id}
+                    id={id}
+                    title={title}
+                    total={counts?.total}
+                    attention={counts?.rejected}
+                    open={Boolean(open[id])}
+                    onToggle={() => toggle(id)}
+                  >
+                    {createElement(Body, { counts, status: statuses[id], onStatusChange: (s) => setStatus(id, s), onMutated: refresh })}
+                  </SubmissionSection>
+                );
+              })}
+            </div>
+          </>
         )}
-
-        <div className="mt-8">
-          <MySuggestions />
-        </div>
-
-        <div className="mt-8">
-          <MyRecordings />
-        </div>
       </div>
     </div>
   );

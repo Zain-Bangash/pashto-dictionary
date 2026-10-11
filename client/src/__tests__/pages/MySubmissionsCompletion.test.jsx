@@ -6,6 +6,7 @@ import MySubmissions from '../../pages/MySubmissions';
 import api, { createSuggestion, resubmitSuggestion } from '../../services/api';
 import { LookupsWrapper } from '../helpers/lookups';
 import { FieldsWrapper } from '../helpers/fields';
+import { mockSubmissionsApi, openSection } from '../helpers/mySubmissions';
 
 vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
@@ -32,22 +33,22 @@ const published = (overrides = {}) => ({
 });
 
 function mockLoad(variants, meta = {}) {
-  api.get.mockImplementation((url) => Promise.resolve({
-    data: url.startsWith('/api/concepts')
-      ? { data: [] }
-      : { data: variants, meta: { page: 1, limit: 20, total: variants.length, needsCompletionCount: 1, ...meta } },
-  }));
+  mockSubmissionsApi(api, { variants, variantsMeta: { needsCompletionCount: 1, ...meta } });
 }
 
-const renderPage = () => render(
-  <LookupsWrapper>
-    <FieldsWrapper>
-      <MemoryRouter>
-        <MySubmissions />
-      </MemoryRouter>
-    </FieldsWrapper>
-  </LookupsWrapper>
-);
+// Sections start closed, so open Variants to see the rows
+async function renderPage() {
+  render(
+    <LookupsWrapper>
+      <FieldsWrapper>
+        <MemoryRouter>
+          <MySubmissions />
+        </MemoryRouter>
+      </FieldsWrapper>
+    </LookupsWrapper>
+  );
+  await openSection(userEvent.setup(), 'Variants');
+}
 
 const variantCalls = () => api.get.mock.calls.filter(([url]) => url === '/api/variants/my-submissions');
 
@@ -59,19 +60,19 @@ describe('My Submissions — needs completion', () => {
   it('shows the chip with its count and filters with needs=completion', async () => {
     const user = userEvent.setup();
     mockLoad([published()], { needsCompletionCount: 3 });
-    renderPage();
+    await renderPage();
     const chip = await screen.findByRole('button', { name: 'Needs completion (3)' });
     await user.click(chip);
-    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { needs: 'completion' } }));
+    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { limit: 5, needs: 'completion' } }));
     expect(chip).toHaveAttribute('aria-pressed', 'true');
 
     await user.selectOptions(screen.getByLabelText('Missing detail'), 'extra.register');
-    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { needs: 'completion', missing: 'extra.register' } }));
+    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { limit: 5, needs: 'completion', missing: 'extra.register' } }));
   });
 
   it('hides the chip when nothing needs completing', async () => {
     mockLoad([published({ missingFields: [], fillableFields: [] })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
     await screen.findByText('لمر');
     expect(screen.queryByRole('button', { name: /needs completion/i })).not.toBeInTheDocument();
   });
@@ -79,17 +80,17 @@ describe('My Submissions — needs completion', () => {
   it('filters by region', async () => {
     const user = userEvent.setup();
     mockLoad([published()]);
-    renderPage();
+    await renderPage();
     await screen.findByText('لمر');
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'Hangu');
-    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { region: 'Hangu' } }));
+    await waitFor(() => expect(variantCalls().at(-1)[1]).toEqual({ params: { limit: 5, region: 'Hangu' } }));
   });
 
   it('lists what is missing and offers an Add chip; filled fields are prefilled and only changed ones are sent', async () => {
     const user = userEvent.setup();
     mockLoad([published({ phonetic: 'lmar', missingFields: ['example'], fillableFields: ['example'] })]);
     createSuggestion.mockResolvedValue({ data: { data: {} } });
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByRole('group', { name: 'Missing details' })).toHaveTextContent('Needs');
     await user.click(screen.getByRole('button', { name: 'Add Example' }));
@@ -105,7 +106,7 @@ describe('My Submissions — needs completion', () => {
   it('shows one gold chip per missing detail and a top-right Edit button; both open the form', async () => {
     const user = userEvent.setup();
     mockLoad([published({ missingFields: ['example', 'forms', 'extra.register'] })]);
-    renderPage();
+    await renderPage();
 
     const group = await screen.findByRole('group', { name: 'Missing details' });
     expect(within(group).getAllByRole('button').map((b) => b.getAttribute('aria-label')))
@@ -119,7 +120,7 @@ describe('My Submissions — needs completion', () => {
     const user = userEvent.setup();
     mockLoad([published({ phonetic: 'lmar', example: 'old', missingFields: [], fillableFields: [] })], { needsCompletionCount: 0 });
     createSuggestion.mockResolvedValue({ data: { data: {} } });
-    renderPage();
+    await renderPage();
 
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     const form = screen.getByRole('form', { name: /suggest changes/i });
@@ -135,7 +136,7 @@ describe('My Submissions — needs completion', () => {
   it('refuses to send when nothing changed', async () => {
     const user = userEvent.setup();
     mockLoad([published({ missingFields: [], fillableFields: [] })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: 'Send suggestion' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Change at least one detail');
@@ -147,7 +148,7 @@ describe('My Submissions — needs completion', () => {
       phonetic: 'lmar', missingFields: [], fillableFields: [],
       latestSuggestion: { _id: 's1', status: 'pending', proposed: { definition: 'the sun' }, baseline: { definition: 'sun' } },
     })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
 
     const changes = await screen.findByRole('region', { name: 'Proposed details' });
     expect(within(changes).getByText('sun').tagName).toBe('DEL');
@@ -165,7 +166,7 @@ describe('My Submissions — needs completion', () => {
       latestSuggestion: { _id: 's1', status: 'rejected', moderatorNote: 'Too vague', proposed: { definition: 'star' }, baseline: { definition: 'sun' } },
     })], { needsCompletionCount: 0 });
     resubmitSuggestion.mockResolvedValue({ data: { data: {} } });
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText('Suggestion rejected: Too vague')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Proposed details' })).getByText('star')).toBeInTheDocument();
@@ -182,7 +183,7 @@ describe('My Submissions — needs completion', () => {
       definition: 'sun, edited', missingFields: [], fillableFields: [],
       latestSuggestion: { _id: 's1', status: 'pending', proposed: { definition: 'the sun' }, baseline: { definition: 'sun' } },
     })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
     expect(await screen.findByRole('status')).toHaveTextContent(/changed since this was suggested/i);
   });
 
@@ -190,7 +191,7 @@ describe('My Submissions — needs completion', () => {
     const user = userEvent.setup();
     mockLoad([published({ missingFields: ['extra.register'], fillableFields: ['extra.register'] })]);
     createSuggestion.mockResolvedValue({ data: { data: {} } });
-    renderPage();
+    await renderPage();
     expect(await screen.findByRole('button', { name: 'Add Register' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add Register' }));
     await user.selectOptions(screen.getByLabelText(/register/i), 'Formal');
@@ -202,7 +203,7 @@ describe('My Submissions — needs completion', () => {
     const user = userEvent.setup();
     mockLoad([published({ missingFields: ['phonetic'], fillableFields: ['phonetic'] })]);
     createSuggestion.mockRejectedValue({ response: { data: { error: { message: 'Phonetic is already filled and cannot be changed' } } } });
-    renderPage();
+    await renderPage();
     await user.click(await screen.findByRole('button', { name: 'Add Phonetic' }));
     await user.type(screen.getByLabelText('Phonetic'), 'lmar');
     await user.click(screen.getByRole('button', { name: 'Send suggestion' }));
@@ -211,7 +212,7 @@ describe('My Submissions — needs completion', () => {
 
   it('shows an open suggestion status instead of the edit button and missing chips', async () => {
     mockLoad([published({ latestSuggestion: { _id: 's1', status: 'approved' } })]);
-    renderPage();
+    await renderPage();
     expect(await screen.findByText('Suggestion approved')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^edit|^add /i })).not.toBeInTheDocument();
   });
@@ -223,7 +224,7 @@ describe('My Submissions — needs completion', () => {
       latestSuggestion: { _id: 's1', status: 'rejected', moderatorNote: 'Spelling', proposed: { phonetic: 'lmr' } },
     })]);
     resubmitSuggestion.mockResolvedValue({ data: { data: {} } });
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText('Suggestion rejected: Spelling')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /edit & resubmit suggestion/i }));
@@ -238,7 +239,7 @@ describe('My Submissions — needs completion', () => {
   it('partly filled forms show quiet progress and an Edit button, without missing-detail chips', async () => {
     const form = { kind: 'noun', gender: 'masculine', number: 'singular', case: 'direct', pashto: 'لمر' };
     mockLoad([published({ forms: [form], missingFields: [], fillableFields: ['forms'], formsFilled: 1 })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
     expect(await screen.findByText('Forms 1/8')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Missing details' })).not.toBeInTheDocument();
@@ -248,7 +249,7 @@ describe('My Submissions — needs completion', () => {
     const user = userEvent.setup();
     const form = { kind: 'noun', gender: 'masculine', number: 'singular', case: 'direct', pashto: 'لمر' };
     mockLoad([published({ forms: [form], missingFields: [], fillableFields: ['forms'], formsFilled: 1 })], { needsCompletionCount: 0 });
-    renderPage();
+    await renderPage();
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
     await user.click(screen.getByRole('button', { name: '+ Add form' }));
     const options = within(screen.getByLabelText('Form')).getAllByRole('option').map((o) => o.value);
@@ -258,7 +259,7 @@ describe('My Submissions — needs completion', () => {
 
   it('does not offer completion on unpublished words', async () => {
     mockLoad([published({ status: 'pending', missingFields: [], fillableFields: [] })]);
-    renderPage();
+    await renderPage();
     await screen.findByText('لمر');
     expect(screen.queryByRole('button', { name: /^edit|^add /i })).not.toBeInTheDocument();
   });

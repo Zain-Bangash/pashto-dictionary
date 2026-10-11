@@ -177,8 +177,8 @@ describe('My suggestions on other people\'s words', () => {
     getMySuggestions.mockResolvedValue({ data: { data: [mine()], meta: { total: 1, limit: 20 } } });
     wrap(<MySuggestions />, '/my-submissions');
 
-    expect(await screen.findByText('Forms you suggested')).toBeInTheDocument();
-    expect(getMySuggestions).toHaveBeenCalledWith({ scope: 'others', page: 1 });
+    expect(await screen.findByText('House')).toBeInTheDocument();
+    expect(getMySuggestions).toHaveBeenCalledWith({ scope: 'others', page: 1, limit: 5 });
     expect(screen.getByText('House')).toBeInTheDocument();
     expect(screen.getByText('pending')).toBeInTheDocument();
     expect(screen.getByText('کورونه')).toBeInTheDocument();
@@ -201,10 +201,9 @@ describe('My suggestions on other people\'s words', () => {
     await waitFor(() => expect(getMySuggestions).toHaveBeenCalledTimes(2));
   });
 
-  it('renders nothing when there are none', async () => {
+  it('says so when there are none', async () => {
     getMySuggestions.mockResolvedValue({ data: { data: [], meta: { total: 0, limit: 20 } } });
-    const { container } = wrap(<MySuggestions />, '/my-submissions');
-    await waitFor(() => expect(getMySuggestions).toHaveBeenCalled());
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    wrap(<MySuggestions />, '/my-submissions');
+    expect(await screen.findByText('You have not suggested anything yet.')).toBeInTheDocument();
   });
 });

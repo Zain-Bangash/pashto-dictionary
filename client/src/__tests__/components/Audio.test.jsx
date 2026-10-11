@@ -275,8 +275,7 @@ describe('My recordings', () => {
     withdrawAudio.mockResolvedValue({ data: { data: {} } });
     render(<MemoryRouter><LookupsWrapper><MyRecordings /></LookupsWrapper></MemoryRouter>);
 
-    expect(await screen.findByText('Your recordings')).toBeInTheDocument();
-    expect(screen.getByText('Note: Too quiet')).toBeInTheDocument();
+    expect(await screen.findByText('Note: Too quiet')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Withdraw' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Play your recording' })).toHaveLength(1);
 
@@ -285,9 +284,9 @@ describe('My recordings', () => {
     await waitFor(() => expect(getMyAudio).toHaveBeenCalledTimes(2));
   });
 
-  it('shows nothing when I have no recordings', async () => {
+  it('says so when I have no recordings', async () => {
     getMyAudio.mockResolvedValue({ data: { data: [], meta: { total: 0 } } });
-    const { container } = render(<MemoryRouter><LookupsWrapper><MyRecordings /></LookupsWrapper></MemoryRouter>);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    render(<MemoryRouter><LookupsWrapper><MyRecordings /></LookupsWrapper></MemoryRouter>);
+    expect(await screen.findByText('You have not recorded anything yet.')).toBeInTheDocument();
   });
 });
