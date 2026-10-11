@@ -5,6 +5,7 @@ import { requireRole, requireModeratorOrAdmin, adminOnlyStatus } from '../middle
 import { loadOwnedSuggestion } from '../middleware/ownership';
 import { suggestionLimiter } from '../middleware/rateLimit';
 import { rejectInvalid } from '../utils/sendValidationError';
+import { REVIEW_STATUSES } from '../utils/mySubmissions';
 import { idParam, proposalValidators, noteValidator, suggestionStatusValidators } from '../utils/suggestionValidators';
 import { resubmitSuggestion, editSuggestion, transitionSuggestion, getMySuggestions } from '../controllers/suggestionController';
 
@@ -14,7 +15,7 @@ router.use(verifyToken);
 
 const mineValidators = [
   query('scope').optional().isIn(['others', 'all']).withMessage('scope must be others or all'),
-  query('status').optional().isIn(['open']).withMessage('status must be open'),
+  query('status').optional().isIn(['open', ...REVIEW_STATUSES]).withMessage('status must be open, pending, approved, published or rejected'),
   query('concept').optional().isMongoId().withMessage('Invalid concept id'),
   query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive number'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),

@@ -5,6 +5,8 @@ import { requireModeratorOrAdmin, adminOnlyStatus } from '../middleware/requireR
 import { loadOwnedClip } from '../middleware/ownership';
 import { rejectInvalid } from '../utils/sendValidationError';
 import { idParam } from '../utils/suggestionValidators';
+import { statusFilter } from '../utils/mySubmissions';
+import { AUDIO_STATUSES } from '../types/models';
 import { withdrawClip, transitionClip, getMyClips } from '../controllers/audioController';
 
 const router = Router();
@@ -16,13 +18,19 @@ const pageValidators = [
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 ];
 
+const mineValidators = [
+  statusFilter(AUDIO_STATUSES),
+  query('slot').optional().isIn(['headword', 'example', 'form']).withMessage('slot must be headword, example or form'),
+  ...pageValidators,
+];
+
 const statusValidators = [
   idParam,
   body('status').isIn(['approved', 'rejected', 'published']).withMessage('status must be approved, rejected, or published'),
   body('moderatorNote').optional().isString().trim().isLength({ max: 500 }).withMessage('moderatorNote must be 500 characters or fewer'),
 ];
 
-router.get('/mine', pageValidators, rejectInvalid, getMyClips);
+router.get('/mine', mineValidators, rejectInvalid, getMyClips);
 router.patch('/:id/status', requireModeratorOrAdmin, adminOnlyStatus('published'), statusValidators, rejectInvalid, transitionClip);
 router.delete('/:id', idParam, rejectInvalid, loadOwnedClip, withdrawClip);
 

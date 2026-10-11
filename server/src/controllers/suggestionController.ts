@@ -322,6 +322,7 @@ async function getMySuggestions(req: Request, res: Response): Promise<void> {
 
   const match: Record<string, unknown> = { submittedBy: me };
   if (req.query.status === 'open') match.status = { $in: OPEN_SUGGESTION_STATUSES };
+  else if (req.query.status) match.status = req.query.status;
   const after: Record<string, unknown> = {};
   if (req.query.scope === 'others') after['variant.submittedBy'] = { $ne: me };
   if (req.query.concept) after['variant.concept._id'] = new Types.ObjectId(req.query.concept as string);

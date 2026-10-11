@@ -1,3 +1,4 @@
+import { escapeRegex, searchRegex } from '../utils/mySubmissions';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import { Request, Response } from 'express';
@@ -21,10 +22,6 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   rejected:  ['pending'],
   published: ['rejected'],
 };
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function invalidId(res: Response) {
   return res.status(400).json({ success: false, error: { message: 'Invalid concept id' } });
@@ -414,7 +411,11 @@ async function getMyConceptSubmissions(req: Request, res: Response): Promise<voi
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const skip  = (page - 1) * limit;
 
-  const filter = { submittedBy: req.user!.id, isDeleted: { $ne: true } };
+  const filter: Record<string, unknown> = { submittedBy: req.user!.id, isDeleted: { $ne: true } };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.partOfSpeech) filter.partOfSpeech = req.query.partOfSpeech;
+  const search = searchRegex(req.query.q);
+  if (search) filter.englishGloss = search;
 
   const [data, total] = await Promise.all([
     Concept.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
