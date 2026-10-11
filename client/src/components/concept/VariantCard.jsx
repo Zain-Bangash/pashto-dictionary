@@ -7,6 +7,7 @@ import FormsDisplay from '../forms/FormsDisplay';
 import AudioPlayButton from '../audio/AudioPlayButton';
 import VariantAudio from '../audio/VariantAudio';
 import SuggestFormsPanel from './SuggestFormsPanel';
+import AlsoMeans from './AlsoMeans';
 import { speakerCredit } from '../../utils/audio';
 
 const TAB = 'text-xs font-ui px-3 py-1 rounded-full transition-all border';
@@ -60,6 +61,7 @@ export default function VariantCard({ group, conceptId, partOfSpeech, openVarian
       {selected.phonetic && <p className="font-display text-lg italic text-gold">{selected.phonetic}</p>}
       <p className="font-ui text-warm/80 text-sm leading-relaxed">{selected.definition}</p>
       {selected.example && <p className="font-ui text-muted text-sm italic">{selected.example}</p>}
+      <AlsoMeans meanings={selected.alsoMeans} />
       <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
       <FormsDisplay key={selected._id} forms={selected.forms} ownerSub={selected.submittedBy?.cognitoSub} />
       <SuggestFormsPanel

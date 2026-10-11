@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { updateConcept } from '../../services/api';
 import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
+import DomainPicker from '../DomainPicker';
 import { inputCls, labelCls, PRIMARY_BTN, CANCEL_BTN } from './styles';
 import useAudioRetireConfirm from '../../hooks/useAudioRetireConfirm';
 
@@ -9,6 +10,7 @@ export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
   const [englishGloss, setEnglishGloss] = useState(concept.englishGloss);
   const [partOfSpeech, setPartOfSpeech] = useState(concept.partOfSpeech || '');
   const [extra, setExtra] = useState(concept.extra || {});
+  const [domains, setDomains] = useState(concept.semanticDomains || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { send, dialog } = useAudioRetireConfirm();
@@ -18,7 +20,7 @@ export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
     setSaving(true);
     setError('');
     try {
-      const res = await send((confirm) => updateConcept(concept._id, { englishGloss, partOfSpeech, extra, ...confirm }));
+      const res = await send((confirm) => updateConcept(concept._id, { englishGloss, partOfSpeech, semanticDomains: domains, extra, ...confirm }));
       if (res) onSave(res.data.data);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to save');
@@ -49,6 +51,7 @@ export default function ConceptResubmitForm({ concept, onSave, onCancel }) {
           placeholder="— select —"
         />
       </div>
+      <DomainPicker value={domains} onChange={setDomains} label="Domains (optional)" labelClassName={labelCls} />
       <ExtraFieldsInputs
         appliesTo="concept"
         idPrefix={`resubmit-${concept._id}`}

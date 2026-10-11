@@ -34,7 +34,7 @@ const ALL_ACTIONS = [
 
 const MODEL_NAMES = { VariantSuggestion: 'Suggestion', AudioClip: 'Recording' };
 
-const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech' };
+const LOOKUP_TYPE_NAMES = { region: 'Region', partOfSpeech: 'Part of speech', semanticDomain: 'Domain' };
 const FIELD_OWNER_NAMES = { concept: 'Concept field', variant: 'Variant field' };
 
 function formatDate(ts) {

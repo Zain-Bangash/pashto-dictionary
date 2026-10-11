@@ -6,6 +6,7 @@ import LookupListEditor from '../../components/lookups/LookupListEditor';
 const LISTS = [
   { type: 'region', title: 'Regions' },
   { type: 'partOfSpeech', title: 'Parts of speech' },
+  { type: 'semanticDomain', title: 'Domains' },
 ];
 
 export default function DashboardLists() {
