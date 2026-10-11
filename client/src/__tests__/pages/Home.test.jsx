@@ -181,6 +181,20 @@ describe('Home page', () => {
   });
 });
 
+describe('Recent Words cards', () => {
+  test('show the gloss above the Pashto word and "+ 1 more word" when there is one other word', async () => {
+    mockThreeCalls({
+      wotdData: null,
+      cardsData: [mockConcept({ _id: '2', englishGloss: 'water', moreWordCount: 1, firstVariant: { _id: 'v2', pashto: 'اوبه', definition: 'liquid', region: 'Hangu' } })],
+    });
+    renderHome();
+    const pashto = await screen.findByText('اوبه');
+    const gloss = screen.getByRole('link', { name: 'water' });
+    expect(gloss.compareDocumentPosition(pashto) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('+ 1 more word')).toBeInTheDocument();
+  });
+});
+
 describe('Word of the Day — Listen', () => {
   test('plays a real recording when the word has one', async () => {
     mockThreeCalls({ wotdData: mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', region: 'Kohat', audio: { url: 'https://storage.test/a.webm', mimeType: '' } } }) });

@@ -67,3 +67,60 @@ describe('ConceptCard', () => {
     expect(screen.getByText('Noun (اسم)')).toBeInTheDocument();
   });
 });
+
+describe('ConceptCard — gloss above the word and "+ n more words"', () => {
+  const withWord = (fields = {}) => ({
+    ...baseConcept,
+    firstVariant: { _id: 'v1', pashto: 'کور', example: 'دا کور دی' },
+    ...fields,
+  });
+  const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  test('the English gloss comes before the Pashto word, and the example after it', () => {
+    renderCard(withWord());
+    const gloss = screen.getByRole('link', { name: 'house' });
+    const pashto = screen.getByTestId('card-pashto');
+    expect(follows(gloss, pashto)).toBe(true);
+    expect(follows(pashto, screen.getByText('دا کور دی'))).toBe(true);
+    expect(pashto).toHaveAttribute('dir', 'rtl');
+    expect(pashto).toHaveClass('font-pashto');
+  });
+
+  test('the gloss stays the whole-card link', () => {
+    renderCard(withWord());
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'house' })).toHaveAttribute('href', '/concepts/abc123');
+  });
+
+  test('one other word reads "+ 1 more word"', () => {
+    renderCard(withWord({ moreWordCount: 1 }));
+    expect(screen.getByText('+ 1 more word')).toBeInTheDocument();
+  });
+
+  test('several other words read "+ n more words"', () => {
+    renderCard(withWord({ moreWordCount: 3 }));
+    expect(screen.getByText('+ 3 more words')).toBeInTheDocument();
+  });
+
+  test('no note when there are no other words', () => {
+    const { unmount } = renderCard(withWord({ moreWordCount: 0 }));
+    expect(screen.queryByText(/more word/)).not.toBeInTheDocument();
+    unmount();
+    renderCard(withWord());
+    expect(screen.queryByText(/more word/)).not.toBeInTheDocument();
+  });
+
+  test('the note sits in the Pashto word row, before the word', () => {
+    renderCard(withWord({ moreWordCount: 2 }));
+    const note = screen.getByText('+ 2 more words');
+    const pashto = screen.getByTestId('card-pashto');
+    expect(note.parentElement).toBe(pashto.parentElement);
+    expect(follows(note, pashto)).toBe(true);
+  });
+
+  test('without a published word the gloss is the heading and no note shows', () => {
+    renderCard({ ...baseConcept, moreWordCount: 0 });
+    expect(screen.getByRole('heading', { name: 'house' })).toBeInTheDocument();
+    expect(screen.queryByTestId('card-pashto')).not.toBeInTheDocument();
+  });
+});

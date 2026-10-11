@@ -35,8 +35,8 @@ async function word(gloss, variants) {
   for (const v of variants) {
     seq += 1;
     created.push(await Variant.create({
-      concept: concept._id, pashto: `${v.pashto ?? 'لمر'}${seq}`, region: v.region ?? 'Kohat', definition: gloss,
-      status: v.status ?? 'published', submittedBy: 'owner-sub', example: v.example,
+      concept: concept._id, pashto: v.exact ? v.pashto : `${v.pashto ?? 'لمر'}${seq}`, region: v.region ?? 'Kohat', definition: gloss,
+      status: v.status ?? 'published', submittedBy: 'owner-sub', example: v.example, isDeleted: v.isDeleted,
     }));
   }
   return { concept, variants: created };
@@ -154,5 +154,62 @@ describe('region filter', () => {
     expect(list.status).toBe(400);
     expect(list.body.error.field).toBe('region');
     expect((await request.get('/api/concepts/search?q=sun&region=Atlantis')).status).toBe(400);
+  });
+});
+
+describe('moreWordCount: other distinct written words on the card', () => {
+  const W = (pashto, region, extra = {}) => ({ pashto, region, exact: true, ...extra });
+  const countFor = async (url, gloss) => cardOf(await request.get(url), gloss).moreWordCount;
+
+  test('the same word in two regions is one word, not more', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('لمر', 'Hangu')]);
+    expect(await countFor('/api/concepts', 'sun')).toBe(0);
+  });
+
+  test('spellings that normalize alike count as the same word', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('لَمر', 'Hangu')]);
+    expect(await countFor('/api/concepts', 'sun')).toBe(0);
+  });
+
+  test('two different words give one more', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('نمر', 'Hangu')]);
+    expect(await countFor('/api/concepts', 'sun')).toBe(1);
+  });
+
+  test('unfiltered, every region counts; variantCount still counts every regional row', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('نمر', 'Hangu'), W('لمر', 'Hangu'), W('ښمر', 'Thal')]);
+    const card = cardOf(await request.get('/api/concepts'), 'sun');
+    expect(card.moreWordCount).toBe(2);
+    expect(card.variantCount).toBe(4);
+  });
+
+  test('with a region filter, only distinct words from that region count, minus the word shown', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('نمر', 'Hangu'), W('لمر', 'Hangu'), W('ښمر', 'Thal'), W('ځمر', 'Hangu')]);
+    const card = cardOf(await request.get('/api/concepts?region=Hangu'), 'sun');
+    expect(card.firstVariant.region).toBe('Hangu');
+    expect(card.moreWordCount).toBe(2);
+    expect(cardOf(await request.get('/api/concepts?region=Thal'), 'sun').moreWordCount).toBe(0);
+  });
+
+  test('search results carry it too, honouring the region', async () => {
+    await word('sun', [W('لمر', 'Kohat'), W('نمر', 'Kohat'), W('ښمر', 'Hangu')]);
+    expect(await countFor('/api/concepts/search?q=sun', 'sun')).toBe(2);
+    expect(await countFor('/api/concepts/search?q=sun&region=Kohat', 'sun')).toBe(1);
+  });
+
+  test('deleted and unpublished words are ignored', async () => {
+    await word('sun', [
+      W('لمر', 'Kohat'),
+      W('نمر', 'Hangu', { status: 'pending' }),
+      W('ښمر', 'Thal', { status: 'approved' }),
+      W('ځمر', 'Tirah', { status: 'rejected', isDeleted: true }),
+      W('ګمر', 'Parachinar', { isDeleted: true }),
+    ]);
+    expect(await countFor('/api/concepts', 'sun')).toBe(0);
+  });
+
+  test('a concept with no published word has 0', async () => {
+    await word('house', [W('کور', 'Kohat', { status: 'pending' })]);
+    expect(await countFor('/api/concepts', 'house')).toBe(0);
   });
 });
