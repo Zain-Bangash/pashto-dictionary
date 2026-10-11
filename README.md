@@ -95,7 +95,7 @@ rejected  → pending    (user edits and resubmits)
 
 Users can propose missing details (forms, optional extra fields) or changes to the Pashto, phonetic, definition and example sentence for their own published words, shown to reviewers as before → after, and anyone signed in can propose missing grammatical forms for any published word, credited by name once published. A suggestion is a separate record with the same review flow; the live word is untouched until an admin publishes it.
 
-Any logged-in user can record a pronunciation for a published word. Clips follow the same review flow in their own `AudioClip` records, plus `withdrawn` (by the speaker, while pending) and `retired` (replaced by a newer clip, or the text it speaks was edited). Only published clips are ever played to the public.
+Any logged-in user can record a pronunciation for a published word, and a submitter can attach a recording of the word itself when submitting it. Clips follow the same review flow in their own `AudioClip` records, plus `withdrawn` (by the speaker, while pending) and `retired` (replaced by a newer clip, or the text it speaks was edited). Only published clips are ever played to the public.
 
 Every transition on Concept or Variant writes a record to `ModerationLog` with the actor, action, timestamp, and optional note. Invalid transitions return 400. Moderators cannot approve their own submissions.
 
@@ -129,10 +129,10 @@ All responses use the envelope `{ success, data, meta }` or `{ success, error }`
 | PATCH | `/api/suggestions/:id` | Token (suggestion's sender) | Edit and resubmit a rejected suggestion (rejected → pending); still forms-only for someone else's word |
 | PATCH | `/api/suggestions/:id/edit` | Admin | Edit a pending or approved suggestion (note required; takes a fresh `baseline`) |
 | PATCH | `/api/suggestions/:id/status` | Moderator+ | Approve / reject / publish. Approve and publish refuse (`400` / `409`) if the word changed since the suggestion's `baseline`; publish (admin) merges into the live word after re-checking fill-only; rejecting an approved suggestion is admin-only |
-| POST | `/api/variants/:id/audio?slot=` | Token | Upload a pronunciation clip for a published word. Raw body (`audio/webm`, `audio/mp4`, `audio/ogg`, `audio/mpeg`), max 1 MB; `slot` is `headword`, `example` or `form:<slot>`. The server reads the real duration (limit per slot) and format from the bytes. `409` if a clip for that slot is already under review; rate-limited |
+| POST | `/api/variants/:id/audio?slot=` | Token | Upload a pronunciation clip for a published word, or a `headword` clip for my own word while it is pending or approved. Raw body (`audio/webm`, `audio/mp4`, `audio/ogg`, `audio/mpeg`), max 1 MB; `slot` is `headword`, `example` or `form:<slot>`. The server reads the real duration (limit per slot) and format from the bytes. `409` if a clip for that slot is already under review; rate-limited |
 | DELETE | `/api/audio/:id` | Token (speaker) | Withdraw my pending clip (its file is deleted) |
 | GET | `/api/audio/mine?status=&slot=` | Token | My clips with status, note, word and a signed URL while pending/approved/published (paginated); `slot` is `headword`, `example` or `form` |
-| PATCH | `/api/audio/:id/status` | Moderator+ | Approve / reject (note) / publish (admin). Publishing a replacement retires the old clip; rejecting an approved or published clip is admin-only; moderators cannot review their own |
+| PATCH | `/api/audio/:id/status` | Moderator+ | Approve / reject (note) / publish (admin). Publishing needs the word and its concept to be published (`400` "Publish the word first"); publishing a replacement retires the old clip; rejecting an approved or published clip is admin-only; moderators cannot review their own |
 | GET | `/api/moderation/audio?status=&q=&region=&user=` | Moderator+ | Clips under review with the word, the slot text and limit, signed URLs, and the current live clip for side-by-side review (admins may pass `status=approved`) |
 | GET | `/api/moderation/concepts/queue` | Moderator+ | Pending concepts |
 | GET | `/api/moderation/variants/queue` | Moderator+ | Pending variants |

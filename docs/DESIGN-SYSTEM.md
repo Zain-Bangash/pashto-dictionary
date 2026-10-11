@@ -191,7 +191,7 @@ All pages use the same outer shell:
 
 ```jsx
 <div className="min-h-screen bg-charcoal">
-  <AmbientBackground />   {/* import from Home.jsx or a shared components file */}
+  <AmbientBackground />   {/* components/AmbientBackground.jsx */}
   <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
     {/* page content */}
   </div>
@@ -207,8 +207,8 @@ Grid for multi-column card layouts:
 
 ## Ambient Background
 
-`AmbientBackground` lives in `client/src/pages/Home.jsx` (not yet extracted to `components/`). It renders:
-- 72 floating bezier paths (CSS animated, `floatingPathPulse`)
+`AmbientBackground` lives in `client/src/components/AmbientBackground.jsx` and is used by Home and Submit. It renders:
+- A faint diamond lattice (`.ambient-lattice` in `index.css`)
 - Two radial gradient blobs (terracotta top-left, gold bottom-right)
 - Grain overlay (`grain-overlay`)
 
@@ -225,6 +225,16 @@ The dashboard is a work tool for scanning many items, so it keeps the tokens, gl
 - **Bulk bar**: sticky at the bottom (`sticky bottom-4`), `bg-charcoal/95` glass, lists failures in red under the buttons.
 - **Feedback**: success → toast (`useToast()`, bottom-right, fades after 4 s); a failed single action → dismissible red banner (`ActionError`) above the list; a failed bulk run → error toast plus the failure list.
 - **Loading**: the first load shows "Loading…"; later loads keep the list on screen at `opacity-60` so inputs never lose focus.
+
+## Forms (Submit)
+
+A single-column form inside the standard shell: `max-w-xl mx-auto` within the `max-w-6xl` container. The form card uses the glass classes and `rounded-3xl` but **not** `bento-card`, so the form does not lift under the cursor while typing. Shared classes live in `components/submit/submitStyles.js`:
+
+- Inputs: `bg-black/40 border-white/[0.08] rounded-[12px]`, focus `border-terracotta/60`
+- Labels: `text-xs uppercase tracking-wider text-muted`
+- Inner sections (concept summary, pronunciation): `rounded-[16px] bg-white/[0.03] border-white/[0.07]`
+- Hints and similar-word notices: gold; field errors: `text-red-400 text-xs`
+- Record button: the `.listen-btn` terracotta pill (`components/audio/RecordingControls.jsx`), shared with the concept-page recorder
 
 ## Applying to a New Page — Checklist
 

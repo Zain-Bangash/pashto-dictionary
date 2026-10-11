@@ -24,8 +24,8 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 
 ### Frontend
 - [ ] About page `[F2]`
-- [ ] Extract `AmbientBackground` from `Home.jsx` into `components/` _(suggested)_ `[F3]`
-- [ ] Split oversized components — `Home.jsx` (454), `Submit.jsx` (368), `MySubmissions.jsx` (347) _(suggested)_ `[F4]`
+- [x] Extract `AmbientBackground` from `Home.jsx` into `components/` _(suggested)_ `[F3]`
+- [ ] Split oversized components — `Home.jsx` (438), `MySubmissions.jsx` (347) _(suggested; `Submit.jsx` done)_ `[F4]`
 
 ### Backend
 - [ ] Improve search — fuzzy matching `[B1]`
@@ -85,6 +85,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 - Semantic domains `[S6]`: `semanticDomain` Lookup type (nothing built in, `npm run seed:domains` starter list), `Concept.semanticDomains` (up to 10, optional on submit/resubmit, admin edit, merge unions), chips on the concept page, browse/search filter
 - "Also means" `[S7]`: `alsoMeans` on each variant of `GET /api/concepts/:id`, derived from published variants with the same `normalizedPashto` under other concepts
 - Dashboard QoL: queue filters (search, region, submitter; in the URL, clickable submitter names) on Entries/Suggestions/Audio; bulk approve/publish/reject with per-item failures; toasts; Overview to-do linking to filtered queues; Queue badge and tab counts; phone layout; Concepts page chips, pagination and search focus fix (`status=all` now real); terracotta action buttons and Tailwind-only status badges per DESIGN-SYSTEM
+- Record on Submit: optional headword recording on the Submit form, uploaded after the word is created (retry / continue on failure); the submitter may record their own pending/approved word; clip publish waits for the word ("Publish the word first"); `Submit.jsx` split into `components/submit/` + `useSubmitForm`; shared `RecordingControls` / `useClipCapture`; `AmbientBackground` extracted; Submit design pass
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)
