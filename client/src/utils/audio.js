@@ -28,3 +28,9 @@ export function speakerCredit(user, labelFor) {
   const place = [user.village, user.region && labelFor('region', user.region)].filter(Boolean).join(', ');
   return place ? `${user.username} (${place})` : user.username;
 }
+
+// Mirrors the server's headword limit (utils/audioSlots.ts): a second per three letters plus two, at most 10
+export function headwordMaxSeconds(pashto) {
+  const chars = Array.from((pashto || '').replace(/\s/g, '')).length;
+  return Math.min(10, Math.ceil(chars / 3) + 2);
+}

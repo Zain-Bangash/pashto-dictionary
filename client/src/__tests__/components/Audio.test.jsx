@@ -290,3 +290,30 @@ describe('My recordings', () => {
     expect(await screen.findByText('You have not recorded anything yet.')).toBeInTheDocument();
   });
 });
+
+describe('AudioQueueRow — recording sent with an unpublished word', () => {
+  const withWord = (status, clipStatus = 'approved') => ({
+    ...clip({ _id: 'n2', submittedBy: { _id: 'u5', username: 'zarin' } }),
+    slot: 'headword', status: clipStatus, current: null,
+    variant: { _id: 'v1', pashto: 'لمر', region: 'Kohat', status, concept: { englishGloss: 'sun' } },
+    slotInfo: { slot: 'headword', text: 'لمر', maxSeconds: 3 },
+  });
+
+  it('shows the word status and blocks publishing until the word is published', () => {
+    render(<LookupsWrapper><ul><AudioQueueRow clip={withWord('pending')} isAdmin userId="a1" onApprove={vi.fn()} onReject={vi.fn()} onPublish={vi.fn()} /></ul></LookupsWrapper>);
+    expect(screen.getByText('Word pending')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+    expect(screen.getByText(/publish the word first/i)).toBeInTheDocument();
+  });
+
+  it('lets a moderator approve a pending clip on a pending word', () => {
+    render(<LookupsWrapper><ul><AudioQueueRow clip={withWord('pending', 'pending')} isAdmin={false} userId="m1" onApprove={vi.fn()} onReject={vi.fn()} onPublish={vi.fn()} /></ul></LookupsWrapper>);
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+  });
+
+  it('shows no word badge once the word is published', () => {
+    render(<LookupsWrapper><ul><AudioQueueRow clip={withWord('published')} isAdmin userId="a1" onApprove={vi.fn()} onReject={vi.fn()} onPublish={vi.fn()} /></ul></LookupsWrapper>);
+    expect(screen.queryByText(/^Word (pending|approved)$/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+  });
+});

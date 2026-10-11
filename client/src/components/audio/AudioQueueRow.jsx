@@ -4,6 +4,7 @@ import { audioSlotLabel, speakerCredit } from '../../utils/audio';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN } from '../moderation/queueButtons';
 import SelectBox from '../moderation/SelectBox';
 import SubmitterName from '../moderation/SubmitterName';
+import StatusBadge from '../submissions/StatusBadge';
 
 function ClipPanel({ title, clip, tone }) {
   const { labelFor } = useLookups();
@@ -30,6 +31,8 @@ export default function AudioQueueRow({ clip, isAdmin, userId, selected = false,
   const { variant, slotInfo, status } = clip;
   const own = Boolean(userId) && String(clip.submittedBy?._id) === String(userId);
   const blockedOwn = own && !isAdmin;
+  // A clip sent with a new word waits for that word to be published
+  const wordUnpublished = Boolean(variant?.status) && variant.status !== 'published';
 
   return (
     <li className="bg-white/[0.035] border border-white/[0.08] rounded-[20px] p-5 space-y-3">
@@ -45,6 +48,7 @@ export default function AudioQueueRow({ clip, isAdmin, userId, selected = false,
                   <span className="font-ui text-xs px-2 py-0.5 bg-white/[0.05] border border-white/[0.07] rounded-full text-muted/70">
                     {labelFor('region', variant.region)}
                   </span>
+                  {wordUnpublished && <StatusBadge status={variant.status} label={`Word ${variant.status}`} />}
                 </div>
               </>
             ) : (
@@ -62,7 +66,7 @@ export default function AudioQueueRow({ clip, isAdmin, userId, selected = false,
           )}
           {status === 'approved' && isAdmin && (
             <>
-              <button onClick={() => onPublish(clip._id)} className={PUBLISH_BTN}>Publish</button>
+              <button onClick={() => onPublish(clip._id)} disabled={wordUnpublished} className={PUBLISH_BTN}>Publish</button>
               <button onClick={() => onReject(clip._id)} className={REJECT_BTN}>Reject</button>
             </>
           )}
@@ -82,6 +86,9 @@ export default function AudioQueueRow({ clip, isAdmin, userId, selected = false,
         {clip.current && <ClipPanel title="Current" clip={clip.current} tone="border-white/[0.08] bg-white/[0.02]" />}
         <ClipPanel title={clip.current ? 'Replacement' : 'New'} clip={clip} tone="border-gold/25 bg-gold/[0.04]" />
       </div>
+      {wordUnpublished && status === 'approved' && isAdmin && (
+        <p className="text-[11px] font-ui text-gold">Publish the word first. This recording was sent with it.</p>
+      )}
       {blockedOwn && <p className="text-[11px] font-ui text-muted/60">You recorded this, so another moderator must review it.</p>}
     </li>
   );

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
+import AmbientBackground from '../components/AmbientBackground';
 
 const POS_SHORT = { noun: 'N.', verb: 'V.', adjective: 'Adj.', adverb: 'Adv.', phrase: 'Ph.', other: '—' };
 
@@ -39,26 +40,6 @@ function AvatarStack() {
           {l}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ─── Ambient background ────────────────────────────────────────
-function AmbientBackground() {
-  return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      {/* Islamic diamond lattice — very faint, culturally resonant */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg stroke='rgba(255,255,255,0.022)' stroke-width='0.6' fill='none'%3E%3Cpath d='M28 3 L53 28 L28 53 L3 28 Z'/%3E%3Cpath d='M28 17 L39 28 L28 39 L17 28 Z'/%3E%3C/g%3E%3C/svg%3E\")",
-        backgroundSize: '56px 56px',
-      }} />
-      <div className="absolute rounded-full"
-        style={{ width: '65vw', height: '65vw', top: '-25%', left: '-20%',
-          background: 'radial-gradient(circle, rgba(196,119,90,0.07) 0%, transparent 55%)' }} />
-      <div className="absolute rounded-full"
-        style={{ width: '55vw', height: '55vw', bottom: '-15%', right: '-15%',
-          background: 'radial-gradient(circle, rgba(232,197,71,0.06) 0%, transparent 55%)' }} />
-      <div className="grain-overlay" />
     </div>
   );
 }

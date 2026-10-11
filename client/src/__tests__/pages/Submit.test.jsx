@@ -19,10 +19,11 @@ vi.mock('../../services/api', async (importOriginal) => {
     suggestConcepts: vi.fn(),
     createConcept: vi.fn(),
     createVariant: vi.fn(),
+    uploadAudio: vi.fn(),
   };
 });
 
-import { suggestConcepts, createConcept, createVariant } from '../../services/api';
+import { suggestConcepts, createConcept, createVariant, uploadAudio } from '../../services/api';
 
 const renderSubmit = (initialEntries = ['/submit']) => {
   let locationRef = {};
@@ -340,5 +341,102 @@ describe('Submit page — admin-defined extra fields', () => {
       expect(createConcept).toHaveBeenCalledWith(expect.objectContaining({ extra: { etymology: 'Old Iranian' } }));
       expect(createVariant).toHaveBeenCalledWith(expect.objectContaining({ extra: { plural: 'سپوږمۍ ګانې', register: 'Formal' } }));
     });
+  });
+});
+
+describe('Submit page — pronunciation recording', () => {
+  const clipFile = () => new File([new Uint8Array(8)], 'word.webm', { type: 'audio/webm' });
+
+  async function toStep2(user) {
+    suggestConcepts.mockResolvedValue({ data: { data: [{ _id: 'c1', englishGloss: 'sun', partOfSpeech: 'noun' }] } });
+    await user.type(screen.getByLabelText(/english meaning/i), 'sun');
+    await user.click(await screen.findByText('sun'));
+  }
+
+  async function fillWord(user) {
+    await user.type(await screen.findByLabelText(/pashto word/i), 'لمر');
+    await user.selectOptions(screen.getByLabelText(/^region/i), 'Kohat');
+    await user.type(screen.getByLabelText(/definition/i), 'the sun');
+  }
+
+  it('asks for the Pashto word before recording', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await toStep2(user);
+    expect(screen.getByText(/type the pashto word above/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Upload a recording')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/pashto word/i), 'لمر');
+    expect(screen.getByLabelText('Upload a recording')).toBeInTheDocument();
+    expect(screen.getByText(/up to 3 seconds/i)).toBeInTheDocument();
+  });
+
+  it('submits without a recording and never calls uploadAudio', async () => {
+    const user = userEvent.setup();
+    createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+    const { locationRef } = renderSubmit();
+    await toStep2(user);
+    await fillWord(user);
+    await user.click(screen.getByRole('button', { name: /submit word/i }));
+    await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+    expect(uploadAudio).not.toHaveBeenCalled();
+  });
+
+  it('uploads the recording for the new word after it is created', async () => {
+    const user = userEvent.setup();
+    createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+    uploadAudio.mockResolvedValueOnce({ data: { data: { _id: 'a1', status: 'pending' } } });
+    const { locationRef } = renderSubmit();
+    await toStep2(user);
+    await fillWord(user);
+    const file = clipFile();
+    await user.upload(screen.getByLabelText('Upload a recording'), file);
+    await user.click(screen.getByRole('button', { name: /submit word/i }));
+    await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+    expect(uploadAudio).toHaveBeenCalledWith('v1', 'headword', file);
+    expect(createVariant.mock.invocationCallOrder[0]).toBeLessThan(uploadAudio.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the word when the upload fails and offers retry or continue', async () => {
+    const user = userEvent.setup();
+    createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+    uploadAudio
+      .mockRejectedValueOnce({ response: { data: { error: { message: 'The recording is too long: this one allows up to 3 seconds' } } } })
+      .mockResolvedValueOnce({ data: { data: { _id: 'a1' } } });
+    const { locationRef } = renderSubmit();
+    await toStep2(user);
+    await fillWord(user);
+    await user.upload(screen.getByLabelText('Upload a recording'), clipFile());
+    await user.click(screen.getByRole('button', { name: /submit word/i }));
+
+    expect(await screen.findByText(/your word was submitted/i)).toBeInTheDocument();
+    expect(screen.getByText(/too long/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /try again/i }));
+    await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+    expect(uploadAudio).toHaveBeenCalledTimes(2);
+    expect(createVariant).toHaveBeenCalledTimes(1);
+  });
+
+  it('can continue without the recording after a failed upload', async () => {
+    const user = userEvent.setup();
+    createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+    uploadAudio.mockRejectedValueOnce({ response: { data: { error: { message: 'Upload failed' } } } });
+    const { locationRef } = renderSubmit();
+    await toStep2(user);
+    await fillWord(user);
+    await user.upload(screen.getByLabelText('Upload a recording'), clipFile());
+    await user.click(screen.getByRole('button', { name: /submit word/i }));
+    await user.click(await screen.findByRole('button', { name: /continue without it/i }));
+    await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+  });
+
+  it('warns when the word changes after recording', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await toStep2(user);
+    await user.type(screen.getByLabelText(/pashto word/i), 'لمر');
+    await user.upload(screen.getByLabelText('Upload a recording'), clipFile());
+    expect(screen.queryByText(/word changed since you recorded/i)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/pashto word/i), 'ونه');
+    expect(screen.getByText(/word changed since you recorded/i)).toBeInTheDocument();
   });
 });
