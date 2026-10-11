@@ -65,6 +65,11 @@ const wantedValidators = [
 ];
 
 const domainFilter = [query('domain').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid domain')];
+const regionFilter = query('region').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid region')
+  .custom(async (value: string) => {
+    if (!(await isAllowedLookup('region', value))) throw new Error(invalidLookupMessage('region'));
+    return true;
+  });
 
 const myConceptsValidators = [
   statusFilter(),
@@ -77,9 +82,9 @@ const myConceptsValidators = [
 router.get('/wotd',           getWotd);
 router.get('/wanted',         wantedValidators, rejectInvalid, getWanted);
 router.get('/suggest',        suggestConcepts);
-router.get('/search',         domainFilter, rejectInvalid, searchConcepts);
+router.get('/search',         domainFilter, regionFilter, rejectInvalid, searchConcepts);
 router.get('/my-submissions', verifyToken, myConceptsValidators, rejectInvalid, getMyConceptSubmissions);
-router.get('/',               optionalVerifyToken, domainFilter, rejectInvalid, listConcepts);
+router.get('/',               optionalVerifyToken, domainFilter, regionFilter, rejectInvalid, listConcepts);
 router.get('/:id',            getConcept);
 router.post('/', verifyToken, createValidators, createConcept);
 router.patch('/:id', verifyToken, updateValidators, updateConcept);

@@ -10,9 +10,13 @@ As a guest I should be able to click any concept card on the homepage to go to t
 
 As a guest I should be able to search for words using the homepage search bar or by clicking Browse, both of which take me to the Concepts page with ranked results.
 
-As a guest I should be able to browse all published concepts from the Concepts page, which shows each concept's Pashto word, English gloss, variant count, and an example sentence.
+As a guest I should be able to browse all published concepts from the Concepts page. Each card shows the Pashto word, part of speech, English meaning, an example sentence in Pashto and how many regions have a word for it, with a count of matching concepts above the grid. If the word has a published recording, a Listen button on the card plays it without opening the page. The same cards are used for Recent Words on the homepage, and the Word of the Day has a Listen button only when its word has a published recording.
 
-As a guest I should be able to click a concept card to go to its detail page, where I see the concept's English gloss and part of speech, and all published variants grouped by Pashto word. Variants that share the same Pashto word are shown as one card with a region tab strip — clicking a region tab shows that region's phonetic, definition, and example.
+As a guest I should be able to click a concept card to go to its detail page, where I see the concept's English gloss and part of speech, and all published variants grouped by Pashto word. Variants that share the same Pashto word are shown as one card with a region tab strip — clicking a region tab shows that region's phonetic, definition, and example (shown in Pashto, right to left).
+
+As a guest, on a wide screen a concept page shows the concept (meaning, part of speech, how many words and regions it has, domains, details and submitter) in a column on the left that stays in view while I scroll the words on the right. On a phone it sits above the words.
+
+As a guest, the Concepts page shows region pills above the domain pills. Picking one shows only concepts that have a published word from that region (in search results too), and each card shows that region's word. Picking it again clears it, "Clear filters" resets search, region and domain together, and the choice stays in the URL.
 
 As a guest, a concept's detail page shows its domains (for example "Food & cooking") as chips under the heading. Clicking one takes me to the Concepts page filtered to that domain.
 
@@ -72,7 +76,9 @@ As a user I should be able to submit a new concept and its first variant togethe
 
 As a user I should be able to submit a new variant for an existing concept by selecting it from the autocomplete in Step 1, then completing Step 2 for my variant.
 
-As a user, on any concept detail page, I should be able to click "+ I also say this in my region" on a variant card. If I am not logged in, it takes me to the login page. Once logged in, it takes me to the Submit page pre-filled with the concept and Pashto word so I only need to fill in my region, phonetic, definition, and example.
+As a user, each word card on a concept page keeps its actions in a "Contribute" column on the right (a row under the word on a phone): "Record a pronunciation", "+ I also say this" and "+ Suggest forms" (when forms can be added). Opening one shows its panel under the card and closes any other; switching region tab closes it.
+
+As a user, on any concept detail page, I should be able to click "+ I also say this" on a variant card. If I am not logged in, it takes me to the login page. Once logged in, it takes me to the Submit page pre-filled with the concept and Pashto word so I only need to fill in my region, phonetic, definition, and example.
 
 As a user, "Add your [Region] word" on Wanted Words opens the Submit page at Step 2 with the concept and region already filled in. Wanted Words defaults to my own region.
 

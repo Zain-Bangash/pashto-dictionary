@@ -15,6 +15,7 @@ import { attachAudio, rejectOpenClips, staleClips, retireClips, needsRetireConfi
 import { IAudioClip } from '../types/models';
 import { normalizePashto } from '../utils/normalize';
 import { alsoMeansFor } from '../utils/alsoMeans';
+import { withCardFields, conceptsInRegion } from '../utils/conceptCards';
 
 type Doc = Record<string, unknown>;
 
@@ -127,24 +128,15 @@ async function listConcepts(req: Request, res: Response): Promise<void> {
 
   filter.isDeleted = { $ne: true };
   if (req.query.domain) filter.semanticDomains = req.query.domain;
+  const region = req.query.region as string | undefined;
+  if (region) filter._id = { $in: await conceptsInRegion(region) };
 
   const [concepts, total] = await Promise.all([
     Concept.find(filter).skip(skip).limit(limit).lean(),
     Concept.countDocuments(filter),
   ]);
 
-  const data = await Promise.all(
-    concepts.map(async (c) => {
-      const [firstVariant, variantCount] = await Promise.all([
-        Variant.findOne(
-          { concept: c._id, status: 'published' },
-          'pashto phonetic region definition example'
-        ).lean(),
-        Variant.countDocuments({ concept: c._id, status: 'published' }),
-      ]);
-      return { ...c, firstVariant: firstVariant || null, variantCount };
-    })
-  );
+  const data = await withCardFields(concepts, region);
 
   res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
@@ -258,7 +250,9 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const unionIds = Array.from(scoreMap.keys());
+  const region = req.query.region as string | undefined;
+  const inRegion = region ? new Set((await conceptsInRegion(region)).map(String)) : null;
+  const unionIds = Array.from(scoreMap.keys()).filter((id) => !inRegion || inRegion.has(id));
   const concepts = await Concept.find({
     _id: { $in: unionIds },
     status: 'published',
@@ -266,24 +260,12 @@ async function searchConcepts(req: Request, res: Response): Promise<void> {
     ...(req.query.domain ? { semanticDomains: req.query.domain as string } : {}),
   }).lean();
 
-  const enriched = await Promise.all(
-    concepts.map(async (c) => {
-      const id = (c._id as mongoose.Types.ObjectId).toString();
-      const [firstVariant, variantCount] = await Promise.all([
-        Variant.findOne(
-          { concept: c._id, status: 'published' },
-          'pashto phonetic region definition example'
-        ).lean(),
-        Variant.countDocuments({ concept: c._id, status: 'published' }),
-      ]);
-      return { ...c, firstVariant: firstVariant || null, variantCount, _score: scoreMap.get(id) ?? 0 };
-    })
-  );
-
-  enriched.sort((a, b) => b._score - a._score);
+  const enriched = concepts
+    .map((c) => ({ ...c, _score: scoreMap.get(String(c._id)) ?? 0 }))
+    .sort((a, b) => b._score - a._score);
 
   const total    = enriched.length;
-  const pageData = enriched.slice((page - 1) * limit, page * limit).map(({ _score, ...rest }) => rest);
+  const pageData = await withCardFields(enriched.slice((page - 1) * limit, page * limit).map(({ _score, ...rest }) => rest), region);
 
   res.status(200).json({ success: true, data: pageData, meta: { page, limit, total } });
 }
@@ -406,11 +388,8 @@ async function getWotd(req: Request, res: Response): Promise<void> {
   }
   const index   = seed % total;
   const concept = await Concept.findOne({ status: 'published', isDeleted: { $ne: true } }).skip(index).lean();
-  const firstVariant = await Variant.findOne(
-    { concept: concept!._id, status: 'published' },
-    'pashto phonetic region definition example'
-  ).lean();
-  res.status(200).json({ success: true, data: { ...concept, firstVariant: firstVariant || null } });
+  const [data] = await withCardFields([concept!]);
+  res.status(200).json({ success: true, data });
 }
 
 // Published concepts with no variant in the region. A variant in any status hides the gap; rejected

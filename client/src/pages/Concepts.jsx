@@ -1,103 +1,85 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import AmbientBackground from '../components/AmbientBackground';
+import ConceptCard from '../components/ConceptCard';
 import Pagination from '../components/Pagination';
-import SearchBar from '../components/SearchBar';
-import DomainFilter from '../components/DomainFilter';
-import api from '../services/api';
+import BrowseFilters from '../components/concepts/BrowseFilters';
+import useConceptList from '../hooks/useConceptList';
 import useLookups from '../hooks/useLookups';
+
+// Tailwind needs literal class names, so the card stagger is a fixed list
+const STAGGER = ['[animation-delay:0.12s]', '[animation-delay:0.17s]', '[animation-delay:0.22s]', '[animation-delay:0.27s]', '[animation-delay:0.32s]', '[animation-delay:0.37s]'];
 
 export default function Concepts() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const q    = searchParams.get('q') ?? '';
+  const { labelFor } = useLookups();
+  const q      = searchParams.get('q') ?? '';
   const domain = searchParams.get('domain') ?? '';
-  const page = parseInt(searchParams.get('page') ?? '1', 10);
+  const region = searchParams.get('region') ?? '';
+  const page   = parseInt(searchParams.get('page') ?? '1', 10);
+  const { concepts, meta, loading, loaded, error } = useConceptList({ q, domain, region, page });
 
-  const [concepts, setConcepts] = useState([]);
-  const [meta, setMeta]         = useState({ page: 1, limit: 20, total: 0 });
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-
-    const params = new URLSearchParams({ page });
-    if (q) params.set('q', q);
-    if (domain) params.set('domain', domain);
-    const url = q
-      ? `/api/concepts/search?${params.toString()}`
-      : `/api/concepts?${params.toString()}`;
-
-    api.get(url)
-      .then((res) => {
-        setConcepts(res.data.data);
-        setMeta(res.data.meta);
-      })
-      .catch(() => setError('Failed to load concepts.'))
-      .finally(() => setLoading(false));
-  }, [q, domain, page]);
-
-  function go({ q: nextQ = q, domain: nextDomain = domain, page: nextPage } = {}) {
+  // Changing any filter returns to page 1
+  function go(changes) {
+    const next = { q, domain, region, page: undefined, ...changes };
     const params = new URLSearchParams();
-    if (nextQ) params.set('q', nextQ);
-    if (nextDomain) params.set('domain', nextDomain);
-    if (nextPage) params.set('page', String(nextPage));
+    for (const key of ['q', 'domain', 'region', 'page']) if (next[key]) params.set(key, String(next[key]));
     const qs = params.toString();
     navigate(qs ? `/concepts?${qs}` : '/concepts');
   }
 
-  const handleSearch = (newQ) => go({ q: newQ });
-  const handlePageChange = (newPage) => go({ page: newPage });
-
   const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
+  const filtered = Boolean(q || domain || region);
+  const summary = [
+    `${meta.total} concept${meta.total !== 1 ? 's' : ''}`,
+    q && `for “${q}”`,
+    region && `in ${labelFor('region', region)}`,
+  ].filter(Boolean).join(' ');
 
   return (
     <div className="min-h-screen bg-charcoal">
-      <div className="max-w-5xl mx-auto px-5 py-10">
-        <div className="mb-8">
-          <h1 className="text-2xl font-display text-warm mb-6">Browse Entries</h1>
-          <SearchBar initialValue={q} onSubmit={handleSearch} />
-          <div className="mt-4">
-            <DomainFilter value={domain} onChange={(d) => go({ domain: d })} />
-          </div>
+      <AmbientBackground />
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 flex flex-col gap-4 sm:gap-5">
+        <header className="bento-enter">
+          <p className="meta-label mb-2">Dictionary</p>
+          <h1 className="text-3xl font-display text-warm">Browse Entries</h1>
+        </header>
+
+        <div className="bento-enter [animation-delay:0.06s]">
+          <BrowseFilters q={q} domain={domain} region={region} onChange={go} />
         </div>
 
-        {loading && <p className="text-muted font-ui text-sm text-center py-20">Loading…</p>}
-        {error && <p className="text-red-400 font-ui text-sm text-center py-20">{error}</p>}
-        {!loading && !error && concepts.length === 0 && (
-          <p className="text-muted font-ui text-sm text-center py-20">No concepts found.</p>
-        )}
-        {!loading && !error && concepts.length > 0 && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {concepts.map((concept) => (
-                <ConceptCard key={concept._id} concept={concept} />
-              ))}
+        {!loaded && loading && <p className="text-muted font-ui text-sm text-center py-20 animate-pulse">Loading…</p>}
+        {error && <p role="alert" className="text-red-400 font-ui text-sm text-center py-20">{error}</p>}
+
+        {loaded && !error && (
+          <section aria-label="Results" aria-busy={loading} className={`transition-opacity ${loading ? 'opacity-60' : ''}`}>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="font-ui text-warm/70 text-[10px] uppercase tracking-[0.14em]">{summary}</p>
+              {filtered && (
+                <button type="button" onClick={() => navigate('/concepts')} className="font-ui text-xs text-muted hover:text-warm transition-colors">
+                  Clear filters
+                </button>
+              )}
             </div>
-            <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
-          </>
+
+            {concepts.length === 0 ? (
+              <p className="text-muted font-ui text-sm text-center py-20">No concepts found.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch">
+                  {concepts.map((concept, i) => (
+                    <div key={concept._id} className={`bento-enter ${STAGGER[Math.min(i, STAGGER.length - 1)]}`}>
+                      <ConceptCard concept={concept} />
+                    </div>
+                  ))}
+                </div>
+                {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={(p) => go({ page: p })} />}
+              </>
+            )}
+          </section>
         )}
       </div>
     </div>
-  );
-}
-
-function ConceptCard({ concept }) {
-  const { labelFor } = useLookups();
-  const variantCount = concept.variantCount ?? 0;
-  return (
-    <Link
-      to={`/concepts/${concept._id}`}
-      className="bento-card block bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-5 no-underline"
-    >
-      <p className="text-warm text-xl font-display font-semibold leading-snug">{concept.englishGloss}</p>
-      {concept.partOfSpeech && (
-        <span className="meta-label mt-1 inline-block">{labelFor('partOfSpeech', concept.partOfSpeech)}</span>
-      )}
-      <p className="text-muted text-xs font-ui mt-2">
-        {variantCount} regional variant{variantCount !== 1 ? 's' : ''}
-      </p>
-    </Link>
   );
 }

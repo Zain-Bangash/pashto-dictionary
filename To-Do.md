@@ -8,9 +8,6 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-![alt text](docs\image.png)
-These + i also say, + record or + suggest form can be pushed to the right side and made more appealing 
-
 1. 'Wanted Words' make it a drop down and show the variant thats present and have a 'Also spoken in Kohat' type button next to each variant (keep the Add your word button)
 2. limit mod 'rights' and increase admin rights
 4. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
@@ -25,7 +22,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 ### Frontend
 - [ ] About page `[F2]`
 - [x] Extract `AmbientBackground` from `Home.jsx` into `components/` _(suggested)_ `[F3]`
-- [ ] Split oversized components — `Home.jsx` (438), `MySubmissions.jsx` (347) _(suggested; `Submit.jsx` done)_ `[F4]`
+- [ ] Split oversized components — `Home.jsx` (333), `MySubmissions.jsx` (347) _(suggested; `Submit.jsx` done)_ `[F4]`
 
 ### Backend
 - [ ] Improve search — fuzzy matching `[B1]`
@@ -37,7 +34,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 
 ### Full stack
 - [ ] Community page: top contributing users `[S1]`
-- [ ] Region filter on the Concepts browse page _(suggested)_ `[S2]`
+- [x] Region filter on the Concepts browse page _(suggested)_ `[S2]`
 - [ ] Admin trash view — restore soft-deleted concepts/variants _(suggested)_ `[S3]`
 - [ ] Synonyms and AI data pass (later, once there are a few hundred entries) `[S8]`
   - Variant-to-variant links (synonym / related) across concepts as a moderated `VariantRelation` collection: own state machine, ModerationLog entries, self-approval ban
@@ -86,6 +83,7 @@ These + i also say, + record or + suggest form can be pushed to the right side a
 - "Also means" `[S7]`: `alsoMeans` on each variant of `GET /api/concepts/:id`, derived from published variants with the same `normalizedPashto` under other concepts
 - Dashboard QoL: queue filters (search, region, submitter; in the URL, clickable submitter names) on Entries/Suggestions/Audio; bulk approve/publish/reject with per-item failures; toasts; Overview to-do linking to filtered queues; Queue badge and tab counts; phone layout; Concepts page chips, pagination and search focus fix (`status=all` now real); terracotta action buttons and Tailwind-only status badges per DESIGN-SYSTEM
 - Record on Submit: optional headword recording on the Submit form, uploaded after the word is created (retry / continue on failure); the submitter may record their own pending/approved word; clip publish waits for the word ("Publish the word first"); `Submit.jsx` split into `components/submit/` + `useSubmitForm`; shared `RecordingControls` / `useClipCapture`; `AmbientBackground` extracted; Submit design pass
+- Browse and concept page pass: shared `ConceptCard` (Home + Browse) with real Listen from `firstVariant.audio` (also Word of the Day); region filter on list/search `[S2]`; card fields batched in `utils/conceptCards.ts`; concept page two-column with sticky `ConceptPanel`; word card split with a Contribute rail and one panel at a time; Pashto examples right-to-left; dark `Pagination`; `bento-enter` moved into `@layer components` so stagger delays apply
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

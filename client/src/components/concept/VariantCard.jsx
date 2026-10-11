@@ -2,82 +2,96 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import useLookups from '../../hooks/useLookups';
-import ExtraFieldsDisplay from '../fields/ExtraFieldsDisplay';
-import FormsDisplay from '../forms/FormsDisplay';
-import AudioPlayButton from '../audio/AudioPlayButton';
-import VariantAudio from '../audio/VariantAudio';
+import AudioRecorder from '../audio/AudioRecorder';
+import VariantHeader from './VariantHeader';
+import RegionTabs from './RegionTabs';
+import VariantBody from './VariantBody';
+import VariantActions from './VariantActions';
 import SuggestFormsPanel from './SuggestFormsPanel';
-import AlsoMeans from './AlsoMeans';
 import { speakerCredit } from '../../utils/audio';
+import { hasEmptyFormSlots } from '../../utils/forms';
 
-const TAB = 'text-xs font-ui px-3 py-1 rounded-full transition-all border';
-const TAB_ON = 'bg-mint/[0.12] border-mint/35 text-mint';
-const TAB_OFF = 'bg-white/[0.05] border-white/[0.08] text-[#888]';
-
-// One Pashto word with a region tab strip; the same word from several regions shares a card
-export default function VariantCard({ group, conceptId, partOfSpeech, openVariantIds, onSuggestionSent }) {
+// One Pashto word with a region tab strip; reading on the left, contributing on the right, one panel open at a time
+export default function VariantCard({ group, conceptId, partOfSpeech, openVariantIds, onSuggestionSent, className = '' }) {
   const { user } = useAuth();
   const { labelFor } = useLookups();
   const navigate = useNavigate();
   const [activeIdx, setActiveIdx] = useState(0);
+  const [panel, setPanel] = useState(null);
+  const [sentIds, setSentIds] = useState([]);
+  const [openSlotsById, setOpenSlotsById] = useState({});
 
   const pashtoWord = group[0].pashto;
   const selected = group[activeIdx] ?? group[0];
-  const headwordClip = selected.audio?.headword;
-  const headwordCredit = speakerCredit(headwordClip?.submittedBy, labelFor);
+  const id = String(selected._id);
+  const openSlots = openSlotsById[id] ?? selected.audioOpen ?? [];
+  const slots = (selected.audioSlots ?? []).map((s) => ({ ...s, open: openSlots.includes(s.slot) }));
   const addedBy = speakerCredit(selected.submittedBy, labelFor);
 
-  const alsoSayThis = () => {
-    if (!user) { navigate('/login'); return; }
+  let formsState = null;
+  if (sentIds.includes(id)) formsState = 'sent';
+  else if (openVariantIds?.has(id)) formsState = 'open';
+  else if (hasEmptyFormSlots(selected.forms, partOfSpeech)) formsState = 'available';
+
+  const requireUser = (fn) => () => (user ? fn() : navigate('/login'));
+  const toggle = (name) => requireUser(() => setPanel((p) => (p === name ? null : name)));
+
+  const selectRegion = (idx) => {
+    setActiveIdx(idx);
+    setPanel(null);
+  };
+
+  const alsoSayThis = requireUser(() => {
     const params = new URLSearchParams({
       conceptId,
       pashto: pashtoWord,
       ...(selected.phonetic && { phonetic: selected.phonetic }),
     });
     navigate(`/submit?${params.toString()}`);
+  });
+
+  const formsSent = (variantId) => {
+    setSentIds((ids) => [...ids, String(variantId)]);
+    setPanel(null);
+    onSuggestionSent?.(variantId);
   };
 
   return (
-    <li className="bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-6 space-y-3">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div dir="rtl" className="font-pashto text-warm font-bold text-[56px] leading-[1.7]">{pashtoWord}</div>
-        <AudioPlayButton key={selected._id} clip={headwordClip} label={`Play ${labelFor('region', selected.region)} pronunciation`} />
-      </div>
-      {headwordCredit && <p className="text-[10px] font-ui text-muted/50 -mt-2">Recorded by {headwordCredit}</p>}
-
-      <div className="flex gap-2 flex-wrap">
-        {group.map((v, idx) => (
-          <button
-            key={v._id}
-            type="button"
-            onClick={() => setActiveIdx(idx)}
-            className={`${TAB} ${activeIdx === idx ? TAB_ON : TAB_OFF}`}
-          >
-            {labelFor('region', v.region)}
-          </button>
-        ))}
+    <li className={`bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-5 sm:p-6 ${className}`}>
+      <div className="flex flex-col sm:flex-row gap-5">
+        <div className="flex-1 min-w-0 space-y-3">
+          <VariantHeader pashto={pashtoWord} variant={selected} />
+          <RegionTabs group={group} activeIdx={activeIdx} onSelect={selectRegion} />
+          <VariantBody variant={selected} />
+        </div>
+        <VariantActions
+          panel={panel}
+          canRecord={slots.length > 0}
+          formsState={formsState}
+          onRecord={toggle('record')}
+          onAlsoSay={alsoSayThis}
+          onSuggestForms={toggle('forms')}
+        />
       </div>
 
-      {selected.phonetic && <p className="font-display text-lg italic text-gold">{selected.phonetic}</p>}
-      <p className="font-ui text-warm/80 text-sm leading-relaxed">{selected.definition}</p>
-      {selected.example && <p className="font-ui text-muted text-sm italic">{selected.example}</p>}
-      <AlsoMeans meanings={selected.alsoMeans} />
-      <ExtraFieldsDisplay appliesTo="variant" values={selected.extra} />
-      <FormsDisplay key={selected._id} forms={selected.forms} ownerSub={selected.submittedBy?.cognitoSub} />
-      <SuggestFormsPanel
-        key={`suggest-${selected._id}`}
-        variant={selected}
-        partOfSpeech={partOfSpeech}
-        hasOpen={openVariantIds?.has(String(selected._id))}
-        onSent={onSuggestionSent}
-      />
-      <VariantAudio key={`audio-${selected._id}`} variant={selected} />
+      {panel && (
+        <div className="mt-5 pt-5 border-t border-white/[0.06]">
+          {panel === 'record' && (
+            <AudioRecorder
+              key={id}
+              variantId={selected._id}
+              slots={slots}
+              onUploaded={(slot) => setOpenSlotsById((m) => ({ ...m, [id]: [...openSlots, slot] }))}
+              onClose={() => setPanel(null)}
+            />
+          )}
+          {panel === 'forms' && (
+            <SuggestFormsPanel key={id} variant={selected} partOfSpeech={partOfSpeech} onSent={formsSent} onCancel={() => setPanel(null)} />
+          )}
+        </div>
+      )}
 
-      {addedBy && <p className="text-[11px] font-ui text-muted/40">Added by {addedBy}</p>}
-
-      <button type="button" onClick={alsoSayThis} className="mt-1 text-xs font-ui text-gold/70 hover:text-gold transition-colors">
-        + I also say this in my region
-      </button>
+      {addedBy && <p className="mt-4 text-[11px] font-ui text-muted/50">Added by {addedBy}</p>}
     </li>
   );
 }
