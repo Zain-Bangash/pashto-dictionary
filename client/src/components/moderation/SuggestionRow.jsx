@@ -1,25 +1,12 @@
 import { useState } from 'react';
 import useLookups from '../../hooks/useLookups';
-import useFieldDefinitions from '../../hooks/useFieldDefinitions';
 import SuggestionEditForm from './SuggestionEditForm';
 import { APPROVE_BTN, REJECT_BTN, PUBLISH_BTN, EDIT_BTN } from './queueButtons';
-import { formSlot, slotLabel, sortForms } from '../../utils/forms';
-
-function Proposed({ label, value }) {
-  return (
-    <p className="text-xs font-ui text-muted">
-      <span className="text-muted/50">{label}: </span>
-      <span className="text-muted/40 italic">blank</span>
-      <span className="text-muted/40 mx-1">→</span>
-      <span dir="auto" className="text-warm/90">{value}</span>
-    </p>
-  );
-}
+import EditDiff from './EditDiff';
 
 // compact: shown inside a SuggestionGroup, which already shows the word
 export default function SuggestionRow({ suggestion, compact = false, isAdmin, onApprove, onReject, onPublish, onSaved }) {
   const { labelFor } = useLookups();
-  const { fieldLabel } = useFieldDefinitions();
   const [editing, setEditing] = useState(false);
   const { variant, proposed = {}, status } = suggestion;
   const canEdit = isAdmin && ['pending', 'approved'].includes(status);
@@ -46,23 +33,12 @@ export default function SuggestionRow({ suggestion, compact = false, isAdmin, on
             <p className="text-sm font-ui text-muted italic">The word is no longer available</p>
           )}
 
-          <section aria-label="Proposed details" className="mt-2 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-[10px] space-y-1">
-            <p className="text-[10px] font-ui font-semibold text-muted uppercase tracking-wider">
-              Proposed by {proposer ?? 'unknown'}{byOwner && " (the word's submitter)"}
-            </p>
-            {proposed.phonetic && <Proposed label="Phonetic" value={proposed.phonetic} />}
-            {proposed.example && <Proposed label="Example" value={proposed.example} />}
-            {Object.entries(proposed.extra ?? {}).map(([key, value]) => (
-              <Proposed key={key} label={fieldLabel('variant', key)} value={value} />
-            ))}
-            {sortForms(proposed.forms).map((f) => (
-              <Proposed
-                key={formSlot(f)}
-                label={`Form (${slotLabel(formSlot(f))})`}
-                value={[f.pashto, f.phonetic && `/${f.phonetic}/`, f.example].filter(Boolean).join(' · ')}
-              />
-            ))}
-          </section>
+          <EditDiff
+            variant={variant}
+            proposed={proposed}
+            baseline={suggestion.baseline}
+            heading={`Proposed by ${proposer ?? 'unknown'}${byOwner ? " (the word's submitter)" : ''}`}
+          />
 
         </div>
 

@@ -7,10 +7,12 @@ import { formKindFor, formSlot, formsPayload } from '../../utils/forms';
 const INPUT = 'w-full bg-black/40 border border-white/[0.08] rounded-[10px] px-3 py-1.5 text-warm text-sm font-ui outline-none focus:border-mint/50';
 const LABEL = 'block text-xs font-ui text-muted uppercase tracking-wider mb-1';
 
-// Staff fix a suggestion in place (fill-only still applies on the server); a note is required and the diff is logged
+// Staff fix a suggestion in place (forms and custom fields stay fill-only on the server); a note is required and the diff is logged
 export default function SuggestionEditForm({ suggestion, onSave, onCancel }) {
   const { proposed = {}, variant } = suggestion;
   const extraKeys = Object.keys(proposed.extra ?? {});
+  const [pashto, setPashto]       = useState(proposed.pashto ?? '');
+  const [definition, setDefinition] = useState(proposed.definition ?? '');
   const [phonetic, setPhonetic] = useState(proposed.phonetic ?? '');
   const [example, setExample]   = useState(proposed.example ?? '');
   const [extra, setExtra]       = useState(proposed.extra ?? {});
@@ -24,6 +26,8 @@ export default function SuggestionEditForm({ suggestion, onSave, onCancel }) {
     setSaving(true);
     setError('');
     const body = { note };
+    if (pashto.trim()) body.pashto = pashto;
+    if (definition.trim()) body.definition = definition;
     if (phonetic.trim()) body.phonetic = phonetic;
     if (example.trim()) body.example = example;
     if (forms.length) body.forms = formsPayload(forms);
@@ -43,6 +47,18 @@ export default function SuggestionEditForm({ suggestion, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} aria-label="Edit suggestion" className="mt-3 bg-white/[0.03] border border-white/[0.06] rounded-[14px] p-4 space-y-3">
+      {proposed.pashto !== undefined && (
+        <div>
+          <label htmlFor={id('pashto')} className={LABEL}>Pashto</label>
+          <input id={id('pashto')} dir="rtl" maxLength={100} value={pashto} onChange={(e) => setPashto(e.target.value)} className={`${INPUT} font-pashto`} />
+        </div>
+      )}
+      {proposed.definition !== undefined && (
+        <div>
+          <label htmlFor={id('definition')} className={LABEL}>Definition</label>
+          <input id={id('definition')} maxLength={500} value={definition} onChange={(e) => setDefinition(e.target.value)} className={INPUT} />
+        </div>
+      )}
       {proposed.phonetic !== undefined && (
         <div>
           <label htmlFor={id('phonetic')} className={LABEL}>Phonetic</label>

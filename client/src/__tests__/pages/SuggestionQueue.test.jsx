@@ -88,6 +88,59 @@ describe('Moderation queue — Suggestions view', () => {
     expect(within(proposed).getByText(/Proposed by zain/)).toBeInTheDocument();
   });
 
+  it('shows an edit as old → new for each changed field, and the other details as unchanged', async () => {
+    mockQueue([suggestion({
+      proposed: { definition: 'the sun', pashto: 'لمر۱' },
+      baseline: { definition: 'sun', pashto: 'لمر' },
+      variant: {
+        _id: 'v1', pashto: 'لمر', phonetic: 'lmar', example: 'مثال', region: 'Kohat', definition: 'sun', forms: [],
+        concept: { _id: 'c1', englishGloss: 'Sun', partOfSpeech: 'noun' },
+      },
+    })]);
+    renderQueue();
+    const proposed = await screen.findByRole('region', { name: 'Proposed details' });
+    expect(within(proposed).getByText('sun').tagName).toBe('DEL');
+    expect(within(proposed).getByText('the sun').tagName).toBe('INS');
+    expect(within(proposed).getByText('لمر').tagName).toBe('DEL');
+    expect(within(proposed).getByText('لمر۱').tagName).toBe('INS');
+    expect(within(proposed).queryByRole('status')).not.toBeInTheDocument();
+
+    const unchanged = screen.getByRole('region', { name: 'Unchanged details' });
+    expect(within(unchanged).getByText('lmar')).toBeInTheDocument();
+    expect(within(unchanged).getByText('مثال')).toBeInTheDocument();
+    expect(within(unchanged).queryByText('the sun')).not.toBeInTheDocument();
+  });
+
+  it('flags an edit whose word has changed since it was written', async () => {
+    mockQueue([suggestion({
+      proposed: { definition: 'the sun' },
+      baseline: { definition: 'sun' },
+      variant: {
+        _id: 'v1', pashto: 'لمر', region: 'Kohat', definition: 'sun (edited)', forms: [],
+        concept: { _id: 'c1', englishGloss: 'Sun', partOfSpeech: 'noun' },
+      },
+    })]);
+    renderQueue();
+    expect(await screen.findByRole('status')).toHaveTextContent(/changed since this was suggested/i);
+  });
+
+  it('an admin can edit a suggested definition and pashto in place', async () => {
+    const user = userEvent.setup();
+    asAdmin();
+    mockQueue([suggestion({ proposed: { definition: 'the sun', pashto: 'لمر۱' }, baseline: { definition: 'sun', pashto: 'لمر' } })]);
+    editSuggestion.mockResolvedValue({ data: { data: {} } });
+    renderQueue();
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const definition = screen.getByLabelText('Definition');
+    expect(definition).toHaveValue('the sun');
+    expect(screen.getByLabelText('Pashto')).toHaveValue('لمر۱');
+    await user.clear(definition);
+    await user.type(definition, 'bright sun');
+    await user.type(screen.getByLabelText(/note/i), 'tidy');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(editSuggestion).toHaveBeenCalledWith('s1', { note: 'tidy', pashto: 'لمر۱', definition: 'bright sun' }));
+  });
+
   it('moderator approves a pending suggestion and the list refreshes', async () => {
     const user = userEvent.setup();
     mockQueue([suggestion()]);
