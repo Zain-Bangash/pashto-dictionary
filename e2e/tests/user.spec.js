@@ -228,6 +228,8 @@ test.describe('User — My Submissions shows pending badge for submitted concept
   test('navigating to /my-submissions shows the pending concept with a pending badge', async ({ page }) => {
     await loginAs(page, 'user');
     await page.goto('/my-submissions');
+    // My Submissions sections start closed
+    await page.getByRole('button', { name: /^Concepts/ }).click();
 
     await expect(page.getByRole('heading', { name: 'My Submissions' })).toBeVisible();
 
@@ -272,6 +274,8 @@ test.describe('User — rejected concept shows rejection note in My Submissions'
   test('submitter sees rejected badge and the rejection note text in My Submissions', async ({ page }) => {
     await loginAs(page, 'user');
     await page.goto('/my-submissions');
+    // My Submissions sections start closed
+    await page.getByRole('button', { name: /^Concepts/ }).click();
 
     // The concept gloss must appear
     await expect(page.getByText(pendingConcept.englishGloss)).toBeVisible({ timeout: 10000 });

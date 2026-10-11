@@ -355,6 +355,8 @@ test.describe('Moderator — reject pending concept via modal', () => {
   test('submitter sees rejected badge and rejection reason in My Submissions', async ({ page }) => {
     await loginAs(page, 'user');
     await page.goto('/my-submissions');
+    // My Submissions sections start closed
+    await page.getByRole('button', { name: /^Concepts/ }).click();
 
     await expect(page.getByText(pendingConcept.englishGloss)).toBeVisible({ timeout: 10000 });
 
@@ -446,6 +448,8 @@ test.describe('Moderator — reject pending variant via modal', () => {
   test('submitter sees rejected badge and rejection reason for the variant in My Submissions', async ({ page }) => {
     await loginAs(page, 'user');
     await page.goto('/my-submissions');
+    // My Submissions sections start closed
+    await page.getByRole('button', { name: /^Variants/ }).click();
 
     await expect(page.getByText('eye (e2e variant rejection)')).toBeVisible({ timeout: 10000 });
 

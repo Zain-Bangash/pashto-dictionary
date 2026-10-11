@@ -72,7 +72,9 @@ As a user I should not be able to submit a variant with the same Pashto word and
 
 As a user, in Step 2 of the Submit form, I can optionally add a note to the moderators — such as a book reference, page number, or link — to help them verify the word. This note is visible to moderators and admins in the moderation queue but is not shown on the public concept detail page.
 
-As a user I should be able to view My Submissions, which lists all my submitted concepts and variants with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
+As a user I should be able to view My Submissions, which lists all my submitted concepts, variants and recordings (and the forms I suggested for other people's words) with their current status (pending, approved, rejected, or published). If an item is rejected, the moderator's rejection reason is shown beneath the status badge.
+
+As a user, My Submissions opens with a row of totals (Pending, Approved, Published, Rejected) across everything I have submitted, then one collapsible section each for Concepts, Variants, Recordings and Forms you suggested. All sections start closed. Each header shows how many I have and, in red, how many were rejected; a section loads its list only when I open it. Clicking a total opens every section that has submissions in that status, already filtered to it. If the totals cannot be loaded the sections still work, just without counts.
 
 As a user, if an admin rejects my published concept or variant, it disappears from the public site and shows as rejected with the admin's note in My Submissions. If my variant was rejected because its concept was rejected, the note says so. I can edit and resubmit it, and it goes through normal review again (pending → approved → published). The resubmit form includes the entry's extra fields and grammatical forms, so I can fix, add or remove those too.
 
@@ -81,6 +83,8 @@ As a user I cannot change the forms of my pending or published variant directly 
 As a user, if someone else adds the same word for the same concept and region while mine is rejected, resubmitting mine shows a clear message asking me to change the word or region.
 
 As a user, My Submissions has a "Needs completion (n)" chip. It lists my published words that are missing a phonetic, an example, any grammatical forms (where the part of speech allows them) or an optional extra field, and shows what each one needs as gold "+ Forms" / "+ Example" chips; clicking a chip opens the edit form. I can narrow the list by the missing detail and by region; the region filter also works on my whole list. Words whose forms are only partly filled are not counted, but show a quiet "Forms 2/8" beside the region, and "Forms: some empty" in the filter finds them.
+
+As a user, every section has status chips (All, Pending, Approved, Published, Rejected, with how many are in each; a status I have none of is hidden) and is paginated, 5 to a page; changing a filter returns to page 1. Concepts can also be searched by English gloss and filtered by part of speech. Variants can be searched by Pashto, phonetic, definition or English gloss, filtered by region, and narrowed to "Needs completion" (which is always published words, so it replaces the status filter). Recordings can be filtered by type (words, example sentences, forms) and also by replaced or withdrawn. A filter that matches nothing says so.
 
 As a user, My Submissions has a "Forms you suggested" section listing the forms I suggested for other people's words, each with the word, its concept (linking to the concept page), the forms I proposed and the suggestion's status. If one was rejected I see the moderator's note and can edit and resubmit its forms while the word is still published. The section is hidden when I have none.
 
