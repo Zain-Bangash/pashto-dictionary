@@ -159,6 +159,20 @@ describe('Concepts page — region filter and browse cards', () => {
     expect(screen.getByRole('link', { name: 'sun' })).toHaveAttribute('href', '/concepts/1');
   });
 
+  test('cards put the gloss above the Pashto word and note other words', async () => {
+    api.get.mockResolvedValue(page([
+      { _id: '1', englishGloss: 'sun', variantCount: 3, moreWordCount: 2, firstVariant: { _id: 'v1', pashto: 'لمر' } },
+      { _id: '2', englishGloss: 'moon', variantCount: 2, moreWordCount: 0, firstVariant: { _id: 'v2', pashto: 'سپوږمۍ' } },
+    ], 2));
+    renderAt('/concepts');
+    const pashto = await screen.findByText('لمر');
+    const gloss = screen.getByRole('link', { name: 'sun' });
+    expect(gloss.compareDocumentPosition(pashto) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('+ 2 more words')).toBeInTheDocument();
+    expect(screen.getAllByText(/more word/)).toHaveLength(1);
+    expect(screen.getByText('3 regional variants')).toBeInTheDocument();
+  });
+
   test('hides pagination when everything fits on one page', async () => {
     api.get.mockResolvedValue(page([{ _id: '1', englishGloss: 'sun' }], 1));
     renderAt('/concepts');

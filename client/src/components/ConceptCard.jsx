@@ -9,6 +9,7 @@ export default function ConceptCard({ concept }) {
   const { ref: tiltRef, onMouseMove, onMouseLeave } = useTilt();
   const word = concept.firstVariant ?? null;
   const count = concept.variantCount ?? 0;
+  const more = concept.moreWordCount ?? 0;
   const glossLink = (
     <Link to={`/concepts/${concept._id}`} className="no-underline after:absolute after:inset-0 after:content-['']">
       {concept.englishGloss}
@@ -25,15 +26,16 @@ export default function ConceptCard({ concept }) {
     >
       <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
         <div className="flex items-start justify-between gap-2">
-          {word ? (
-            <div dir="rtl" data-testid="card-pashto" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0">
-              {word.pashto}
-            </div>
-          ) : (
-            <h2 className="font-display text-warm font-bold text-xl min-w-0">{glossLink}</h2>
-          )}
+          <h2
+            dir="ltr"
+            className={word
+              ? 'font-display italic text-gold text-base sm:text-lg leading-snug line-clamp-2 min-w-0'
+              : 'font-display text-warm font-bold text-xl min-w-0'}
+          >
+            {glossLink}
+          </h2>
           {concept.partOfSpeech && (
-            <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-2.5 uppercase tracking-wider">
+            <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-1 uppercase tracking-wider">
               {labelFor('partOfSpeech', concept.partOfSpeech)}
             </span>
           )}
@@ -41,8 +43,15 @@ export default function ConceptCard({ concept }) {
 
         {word && (
           <>
+            <div className="flex items-center justify-between gap-3">
+              {more > 0 && (
+                <span className="font-ui text-muted text-xs shrink-0">+ {more} more word{more !== 1 ? 's' : ''}</span>
+              )}
+              <div dir="rtl" data-testid="card-pashto" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0 ml-auto">
+                {word.pashto}
+              </div>
+            </div>
             <div className="h-px bg-white/[0.06]" />
-            <h2 dir="ltr" className="font-display italic text-gold text-base sm:text-lg leading-snug line-clamp-2">{glossLink}</h2>
             {word.example && (
               <p dir="rtl" className="font-pashto text-warm/45 text-sm line-clamp-2">{word.example}</p>
             )}
