@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
 import { createSuggestion, getMySuggestions, resubmitSuggestion } from '../../services/api';
-import SuggestFormsPanel from '../../components/concept/SuggestFormsPanel';
+import VariantCard from '../../components/concept/VariantCard';
 import FormsDisplay from '../../components/forms/FormsDisplay';
 import SuggestionGroup from '../../components/moderation/SuggestionGroup';
 import MySuggestions from '../../components/submissions/MySuggestions';
@@ -53,7 +53,7 @@ describe('Suggest forms on the concept page', () => {
     const user = userEvent.setup();
     const onSent = vi.fn();
     createSuggestion.mockResolvedValue({ data: { data: { _id: 's1' } } });
-    wrap(<SuggestFormsPanel variant={word()} partOfSpeech="noun" onSent={onSent} />);
+    wrap(<VariantCard group={[word()]} conceptId="c1" partOfSpeech="noun" onSuggestionSent={onSent} />);
 
     await user.click(screen.getByRole('button', { name: '+ Suggest forms' }));
     const form = screen.getByRole('form', { name: 'Suggest forms' });
@@ -73,7 +73,7 @@ describe('Suggest forms on the concept page', () => {
   it('shows the server message when the suggestion is refused', async () => {
     const user = userEvent.setup();
     createSuggestion.mockRejectedValue({ response: { data: { error: { message: 'You already have an open suggestion for this word' } } } });
-    wrap(<SuggestFormsPanel variant={word()} partOfSpeech="noun" />);
+    wrap(<VariantCard group={[word()]} conceptId="c1" partOfSpeech="noun" />);
 
     await user.click(screen.getByRole('button', { name: '+ Suggest forms' }));
     await user.click(screen.getByRole('button', { name: '+ Add form' }));
@@ -86,26 +86,44 @@ describe('Suggest forms on the concept page', () => {
   it('sends a guest to log in', async () => {
     const user = userEvent.setup();
     mockUseAuth.mockReturnValue({ user: null });
-    wrap(<SuggestFormsPanel variant={word()} partOfSpeech="noun" />);
+    wrap(<VariantCard group={[word()]} conceptId="c1" partOfSpeech="noun" />);
 
     await user.click(screen.getByRole('button', { name: '+ Suggest forms' }));
     expect(screen.getByText('Login page')).toBeInTheDocument();
   });
 
   it('tells the user when their suggestion for the word is already under review', () => {
-    wrap(<SuggestFormsPanel variant={word()} partOfSpeech="noun" hasOpen />);
+    wrap(<VariantCard group={[word()]} conceptId="c1" partOfSpeech="noun" openVariantIds={new Set(['v1'])} />);
     expect(screen.getByText(/your suggestion for this word is under review/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Suggest forms' })).not.toBeInTheDocument();
   });
 
   it('offers nothing when the part of speech has no forms or every slot is filled', () => {
-    const { unmount } = wrap(<SuggestFormsPanel variant={word()} partOfSpeech="adverb" />);
+    const { unmount } = wrap(<VariantCard group={[word()]} conceptId="c1" partOfSpeech="adverb" />);
     expect(screen.queryByRole('button', { name: '+ Suggest forms' })).not.toBeInTheDocument();
     unmount();
 
     const verbForms = ['infinitive', 'past', 'present', 'imperative'].map((verbForm) => ({ kind: 'verb', verbForm, pashto: 'x' }));
-    wrap(<SuggestFormsPanel variant={word({ forms: verbForms })} partOfSpeech="verb" />);
+    wrap(<VariantCard group={[word({ forms: verbForms })]} conceptId="c1" partOfSpeech="verb" />);
     expect(screen.queryByRole('button', { name: '+ Suggest forms' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Word card action rail', () => {
+  it('opens one panel at a time under the card', async () => {
+    const user = userEvent.setup();
+    const recordable = word({ audioSlots: [{ slot: 'headword', text: 'کور', maxSeconds: 3 }], audioOpen: [] });
+    wrap(<VariantCard group={[recordable]} conceptId="c1" partOfSpeech="noun" />);
+
+    await user.click(screen.getByRole('button', { name: /record a pronunciation/i }));
+    expect(screen.getByRole('region', { name: 'Record a pronunciation' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '+ Suggest forms' }));
+    expect(screen.getByRole('form', { name: 'Suggest forms' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Record a pronunciation' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '+ Suggest forms' }));
+    expect(screen.queryByRole('form', { name: 'Suggest forms' })).not.toBeInTheDocument();
   });
 });
 

@@ -106,12 +106,15 @@ body {
   animation: shimmer 6s linear infinite;
 }
 
-/* ─── Waveform bars ─────────────────────────────────────────── */
-.wave-idle   { animation: waveIdle  2.4s ease-in-out infinite; }
-.wave-active { animation: wave      1.2s ease-in-out infinite; }
+/* In a layer so [animation-delay:…] utilities can stagger them */
+@layer components {
+  /* ─── Waveform bars ─────────────────────────────────────────── */
+  .wave-idle   { animation: waveIdle  2.4s ease-in-out infinite; }
+  .wave-active { animation: wave      1.2s ease-in-out infinite; }
 
-/* ─── Bento entrance animation ──────────────────────────────── */
-.bento-enter { animation: slideUpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+  /* ─── Bento entrance animation ──────────────────────────────── */
+  .bento-enter { animation: slideUpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+}
 
 /* ─── Bento card spring hover ───────────────────────────────── */
 .bento-card {

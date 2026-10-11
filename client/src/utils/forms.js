@@ -46,3 +46,9 @@ export function formsPayload(forms = []) {
     ...(f.example?.trim() && { example: f.example }),
   }));
 }
+
+// True when the part of speech has form slots and the word has not filled all of them
+export function hasEmptyFormSlots(forms = [], partOfSpeech) {
+  const kind = formKindFor(partOfSpeech);
+  return Boolean(kind) && forms.filter((f) => f.kind === kind).length < SLOTS[kind].length;
+}

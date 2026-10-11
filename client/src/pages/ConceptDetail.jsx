@@ -1,85 +1,52 @@
-import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
-import useLookups from '../hooks/useLookups';
-import ExtraFieldsDisplay from '../components/fields/ExtraFieldsDisplay';
+import AmbientBackground from '../components/AmbientBackground';
+import ConceptPanel from '../components/concept/ConceptPanel';
 import VariantCard from '../components/concept/VariantCard';
-import DomainChips from '../components/DomainChips';
+import useConcept from '../hooks/useConcept';
 import useMyOpenSuggestions from '../hooks/useMyOpenSuggestions';
 import { useAuth } from '../context/AuthContext';
 
+const STAGGER = ['[animation-delay:0.1s]', '[animation-delay:0.16s]', '[animation-delay:0.22s]', '[animation-delay:0.28s]'];
+
+// Words that share the same Pashto spelling become one card with a region tab per word
+function groupByPashto(variants = []) {
+  return Object.values(variants.reduce((acc, v) => {
+    (acc[v.pashto] ??= []).push(v);
+    return acc;
+  }, {}));
+}
+
 export default function ConceptDetail() {
   const { id } = useParams();
-  const { labelFor } = useLookups();
-  const [concept, setConcept] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { user } = useAuth();
+  const { concept, loading, error } = useConcept(id);
   const { openVariantIds, markOpen } = useMyOpenSuggestions(id, Boolean(user));
-
-  useEffect(() => {
-    api.get(`/api/concepts/${id}`)
-      .then((res) => setConcept(res.data.data))
-      .catch((err) => {
-        if (err.response?.status === 404) setError('Entry not found.');
-        else setError('Failed to load entry.');
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  // Group variants by pashto word — same word from different regions becomes one card
-  const variantGroups = concept?.variants
-    ? Object.values(
-        concept.variants.reduce((acc, v) => {
-          if (!acc[v.pashto]) acc[v.pashto] = [];
-          acc[v.pashto].push(v);
-          return acc;
-        }, {})
-      )
-    : [];
+  const groups = groupByPashto(concept?.variants);
 
   return (
     <div className="min-h-screen bg-charcoal">
-      <div className="max-w-2xl mx-auto px-5 py-10">
-        <Link to="/concepts" className="inline-flex items-center gap-1.5 text-sm font-ui text-muted hover:text-warm transition-colors mb-8">
-          ← Back to concepts
-        </Link>
+      <AmbientBackground />
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8">
+        {loading && <p className="text-muted font-ui text-sm animate-pulse">Loading…</p>}
+        {error && (
+          <div className="space-y-4">
+            <BackLink />
+            <p role="alert" className="text-red-400 font-ui text-sm">{error}</p>
+          </div>
+        )}
 
-        {loading && <p className="text-muted font-ui text-sm">Loading…</p>}
-        {error && <p className="text-red-400 font-ui text-sm">{error}</p>}
+        {concept && (
+          <article className="grid grid-cols-1 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-4 sm:gap-5 items-start">
+            <aside className="bento-enter lg:sticky lg:top-20 space-y-4">
+              <BackLink />
+              <ConceptPanel concept={concept} wordCount={concept.variants?.length ?? 0} />
+            </aside>
 
-        {!loading && !error && concept && (
-          <article className="space-y-6">
-            {/* Concept heading */}
-            <div className="bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-[20px] p-8 space-y-4">
-              <h1 className="font-display text-warm text-4xl font-bold">{concept.englishGloss}</h1>
-              <div className="flex gap-2 flex-wrap">
-                {concept.partOfSpeech && (
-                  <span className="meta-label bg-white/[0.05] border border-white/[0.08] rounded-full px-3 py-1">
-                    {labelFor('partOfSpeech', concept.partOfSpeech)}
-                  </span>
-                )}
-              </div>
-              <DomainChips domains={concept.semanticDomains} />
-              <ExtraFieldsDisplay appliesTo="concept" values={concept.extra} />
-              {concept.submittedBy?.username && (
-                <p className="text-[11px] font-ui text-muted/50">
-                  Submitted by {concept.submittedBy.username}
-                  {(concept.submittedBy.village || concept.submittedBy.region) && (
-                    <span className="ml-1">
-                      ({[concept.submittedBy.village, labelFor('region', concept.submittedBy.region)].filter(Boolean).join(', ')})
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-
-            {/* Regional variants */}
-            {variantGroups.length > 0 && (
-              <section>
-                <h2 className="font-ui text-muted text-xs uppercase tracking-widest mb-3">Regional Variants</h2>
+            <section aria-labelledby="words-heading" className="space-y-3 lg:pt-9">
+              <h2 id="words-heading" className="meta-label">Regional Variants</h2>
+              {groups.length > 0 ? (
                 <ul className="space-y-4">
-                  {variantGroups.map((group) => (
+                  {groups.map((group, i) => (
                     <VariantCard
                       key={group[0].pashto}
                       group={group}
@@ -87,18 +54,27 @@ export default function ConceptDetail() {
                       partOfSpeech={concept.partOfSpeech}
                       openVariantIds={openVariantIds}
                       onSuggestionSent={markOpen}
+                      className={`bento-enter ${STAGGER[Math.min(i, STAGGER.length - 1)]}`}
                     />
                   ))}
                 </ul>
-              </section>
-            )}
-
-            {variantGroups.length === 0 && (
-              <p className="text-muted font-ui text-sm text-center py-8">No published variants yet.</p>
-            )}
+              ) : (
+                <p className="text-muted font-ui text-sm text-center py-8 bg-white/[0.03] border border-white/[0.07] rounded-3xl">
+                  No published variants yet.
+                </p>
+              )}
+            </section>
           </article>
         )}
       </div>
     </div>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link to="/concepts" className="inline-flex items-center gap-1.5 text-sm font-ui text-muted hover:text-warm transition-colors">
+      ← Back to concepts
+    </Link>
   );
 }

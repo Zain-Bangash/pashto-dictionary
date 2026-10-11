@@ -32,7 +32,7 @@ export default function FormsDisplay({ forms, ownerSub, className = '' }) {
                   <span dir="rtl" className="font-pashto text-warm text-lg">{form.pashto}</span>
                 </div>
               </div>
-              {form.example && <p dir="auto" className="font-ui text-muted text-xs italic mt-1">{form.example}</p>}
+              {form.example && <p dir="rtl" className="font-pashto text-warm/55 text-sm mt-1">{form.example}</p>}
               {typeof form.addedBy === 'object' && form.addedBy?.cognitoSub !== ownerSub && speakerCredit(form.addedBy, labelFor) && (
                 <p className="text-[10px] font-ui text-muted/50 mt-1">Added by {speakerCredit(form.addedBy, labelFor)}</p>
               )}

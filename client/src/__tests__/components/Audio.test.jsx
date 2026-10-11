@@ -6,7 +6,7 @@ import api, { uploadAudio, withdrawAudio, getMyAudio, transitionAudio, getAudioQ
 import DashboardQueue from '../../pages/dashboard/DashboardQueue';
 import { useAuth } from '../../context/AuthContext';
 import useRecorder from '../../hooks/useRecorder';
-import VariantAudio from '../../components/audio/VariantAudio';
+import VariantClips from '../../components/audio/VariantClips';
 import VariantCard from '../../components/concept/VariantCard';
 import AudioQueueRow from '../../components/audio/AudioQueueRow';
 import MyRecordings from '../../components/audio/MyRecordings';
@@ -80,7 +80,7 @@ describe('public word page', () => {
   });
 
   it('lists other live recordings with their text', () => {
-    wrap(<VariantAudio variant={variant({ audio: { example: clip() } })} />);
+    wrap(<VariantClips variant={variant({ audio: { example: clip() } })} />);
     const list = screen.getByRole('list');
     expect(within(list).getByText('Example sentence')).toBeInTheDocument();
     expect(within(list).getByText('لمر راختلی دی')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('public word page', () => {
 
   it('sends guests to log in when they try to record', async () => {
     const user = userEvent.setup();
-    wrap(<VariantAudio variant={variant()} />);
+    wrap(<VariantCard group={[variant()]} conceptId="c1" />);
     await user.click(screen.getByRole('button', { name: /record a pronunciation/i }));
     expect(await screen.findByText('Login page')).toBeInTheDocument();
   });
@@ -98,7 +98,7 @@ describe('public word page', () => {
     const user = userEvent.setup();
     useAuth.mockReturnValue({ user: { id: 'u1', role: 'user' } });
     uploadAudio.mockResolvedValue({ data: { data: { _id: 'a9' } } });
-    wrap(<VariantAudio variant={variant({ audioOpen: ['headword'] })} />);
+    wrap(<VariantCard group={[variant({ audioOpen: ['headword'] })]} conceptId="c1" />);
 
     await user.click(screen.getByRole('button', { name: /record a pronunciation/i }));
     const select = screen.getByRole('combobox');
@@ -118,7 +118,7 @@ describe('public word page', () => {
   it('refuses files over 1 MB before uploading and shows server errors', async () => {
     const user = userEvent.setup();
     useAuth.mockReturnValue({ user: { id: 'u1', role: 'user' } });
-    wrap(<VariantAudio variant={variant()} />);
+    wrap(<VariantCard group={[variant()]} conceptId="c1" />);
     await user.click(screen.getByRole('button', { name: /record a pronunciation/i }));
 
     const big = new File([new Uint8Array(1024 * 1024 + 1)], 'big.mp3', { type: 'audio/mpeg' });

@@ -180,3 +180,18 @@ describe('Home page', () => {
     });
   });
 });
+
+describe('Word of the Day — Listen', () => {
+  test('plays a real recording when the word has one', async () => {
+    mockThreeCalls({ wotdData: mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', region: 'Kohat', audio: { url: 'https://storage.test/a.webm', mimeType: '' } } }) });
+    renderHome();
+    expect(await screen.findByRole('button', { name: 'Listen to کور' })).toBeInTheDocument();
+  });
+
+  test('shows no Listen button without a recording', async () => {
+    mockThreeCalls({ wotdData: mockConcept({ _id: '1', englishGloss: 'house', firstVariant: { _id: 'v1', pashto: 'کور', region: 'Kohat', audio: null } }) });
+    renderHome();
+    await screen.findByText('کور');
+    expect(screen.queryByRole('button', { name: /listen/i })).not.toBeInTheDocument();
+  });
+});

@@ -4,26 +4,8 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useLookups from '../hooks/useLookups';
 import AmbientBackground from '../components/AmbientBackground';
-
-const POS_SHORT = { noun: 'N.', verb: 'V.', adjective: 'Adj.', adverb: 'Adv.', phrase: 'Ph.', other: '—' };
-
-// ─── Waveform ──────────────────────────────────────────────────
-function Waveform({ color = '#00f5b4', animated = false }) {
-  const heights = [3, 6, 9, 5, 9, 6, 3];
-  const delays  = [0, 0.18, 0.36, 0.27, 0.09, 0.45, 0.13];
-  return (
-    <svg width="18" height="12" viewBox="0 0 22 16" className="shrink-0">
-      {heights.map((h, i) => (
-        <rect key={i}
-          className={animated ? 'wave-active' : 'wave-idle'}
-          x={i * 3} y={(16 - h) / 2} width="2" height={h} rx="1"
-          fill={color}
-          style={{ transformOrigin: 'center', animationDelay: `${delays[i]}s` }}
-        />
-      ))}
-    </svg>
-  );
-}
+import ConceptCard from '../components/ConceptCard';
+import ListenButton from '../components/audio/ListenButton';
 
 // ─── Avatar stack ──────────────────────────────────────────────
 const AVATAR_COLORS   = ['#e8c547', '#00f5b4', '#f87171', '#818cf8', '#fb923c'];
@@ -44,86 +26,6 @@ function AvatarStack() {
   );
 }
 
-// ─── Concept card (recent concepts grid) ──────────────────────
-function ConceptCard({ entry }) {
-  const { labelFor } = useLookups();
-  const [playing, setPlaying] = useState(false);
-  const cardRef = useRef(null);
-  // entry is a Concept; firstVariant is pre-populated by the list API
-  const firstVariant = entry.firstVariant ?? null;
-
-  function onMouseMove(e) {
-    const el = cardRef.current;
-    if (!el) return;
-    const { left, top, width, height } = el.getBoundingClientRect();
-    const x = (e.clientX - left) / width  - 0.5;
-    const y = (e.clientY - top)  / height - 0.5;
-    el.style.transition = 'transform 0.08s ease, box-shadow 0.08s ease';
-    el.style.transform  = `perspective(700px) rotateX(${-y * 12}deg) rotateY(${x * 12}deg) scale(1.03)`;
-    el.style.boxShadow  = `${x * -12}px ${y * -12}px 28px rgba(232,197,71,0.1), inset 0 1px 0 rgba(255,255,255,0.08)`;
-  }
-
-  function onMouseLeave() {
-    const el = cardRef.current;
-    if (!el) return;
-    el.style.transition = 'transform 0.55s cubic-bezier(0.22,1,0.36,1), box-shadow 0.55s ease';
-    el.style.transform  = '';
-    el.style.boxShadow  = '';
-  }
-
-  return (
-    <div
-      ref={cardRef}
-      data-testid="card"
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
-      className="bento-card w-full bg-white/[0.03] backdrop-blur-[24px] border border-white/[0.07] rounded-[16px] overflow-hidden flex flex-col h-full"
-      style={{ borderLeft: '2px solid rgba(196,119,90,0.5)' }}
-    >
-      <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
-
-        {/* Pashto word from first variant + POS badge */}
-        <div className="flex items-start justify-between gap-2">
-          {firstVariant ? (
-            <div dir="rtl" data-testid="card-pashto" className="pashto-bloom font-pashto text-warm font-bold text-2xl sm:text-3xl min-w-0" style={{ lineHeight: 1.7 }}>
-              {firstVariant.pashto}
-            </div>
-          ) : (
-            <div className="font-display text-warm font-bold text-lg min-w-0">{entry.englishGloss}</div>
-          )}
-          <span className="font-ui text-warm/50 border border-white/[0.1] rounded-md text-[9px] px-1.5 py-0.5 shrink-0 mt-2.5 uppercase tracking-wider">
-            {POS_SHORT[entry.partOfSpeech] || labelFor('partOfSpeech', entry.partOfSpeech) || '—'}
-          </span>
-        </div>
-
-        {/* English gloss */}
-        <div className="h-px bg-white/[0.06]" />
-
-        <p dir="ltr" className="font-display italic text-gold text-xs sm:text-sm leading-relaxed min-w-0 line-clamp-3 text-left">
-          {entry.englishGloss}
-        </p>
-
-        {firstVariant?.example && (
-          <p dir="ltr" className="font-ui text-warm/40 text-xs leading-relaxed min-w-0 line-clamp-2">
-            {firstVariant.example}
-          </p>
-        )}
-
-      </div>
-
-      <div className="border-t border-white/[0.05] px-4 sm:px-5 py-2.5 flex items-center justify-end">
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPlaying(p => !p); }}
-          className="listen-btn flex items-center gap-1.5 text-muted/70 hover:text-warm/80 transition-colors rounded-full border border-transparent hover:border-white/[0.08] px-2 py-1"
-        >
-          <Waveform color={playing ? '#c4775a' : '#444'} animated={playing} />
-          <span className="font-ui text-[9px] uppercase tracking-[0.1em]">{playing ? 'Playing' : 'Listen'}</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Home ──────────────────────────────────────────────────────
 export default function Home() {
   const { labelFor } = useLookups();
@@ -137,7 +39,6 @@ export default function Home() {
   const [error,          setError]          = useState(null);
   const [searchQuery,    setSearchQuery]    = useState('');
   const [searchFocused,  setSearchFocused]  = useState(false);
-  const [wotdPlaying,    setWotdPlaying]    = useState(false);
   const searchRef = useRef(null);
   const [recentSearches, setRecentSearches] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pashto_recent') || '[]'); }
@@ -302,13 +203,7 @@ export default function Home() {
                         {labelFor('partOfSpeech', wotd.partOfSpeech)}
                       </span>
                     )}
-                    <button
-                      onClick={() => setWotdPlaying(p => !p)}
-                      className="listen-btn flex items-center gap-1.5 border border-terracotta/35 rounded-full text-terracotta hover:bg-terracotta/10 text-xs px-3 py-1.5 self-start"
-                    >
-                      <Waveform color="#c4775a" animated={wotdPlaying} />
-                      <span className="font-ui">{wotdPlaying ? 'Playing…' : 'Listen'}</span>
-                    </button>
+                    <ListenButton clip={wotd.firstVariant?.audio} label={`Listen to ${wotd.firstVariant?.pashto ?? wotd.englishGloss}`} className="self-start" />
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col gap-3" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.32s' }}>
@@ -349,9 +244,9 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch">
               {conceptCards.map((entry, i) => (
-                <Link key={entry._id} to={`/concepts/${entry._id}`} className="block bento-enter" style={{ animationDelay: `${0.28 + i * 0.08}s` }}>
-                  <ConceptCard entry={entry} />
-                </Link>
+                <div key={entry._id} className="bento-enter" style={{ animationDelay: `${0.28 + i * 0.08}s` }}>
+                  <ConceptCard concept={entry} />
+                </div>
               ))}
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi, beforeEach } from 'vitest';
 import ConceptDetail from '../../pages/ConceptDetail';
@@ -160,5 +161,48 @@ describe('ConceptDetail — extra field values', () => {
     expect(await screen.findByText('Old Iranian')).toBeInTheDocument();
     expect(screen.getByText('کورونه')).toBeInTheDocument();
     expect(screen.queryByText('hidden')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConceptDetail — layout and word card actions', () => {
+  const renderWithLogin = () => render(
+    <MemoryRouter initialEntries={['/concepts/abc123']}>
+      <Routes>
+        <Route path="/concepts/:id" element={<ConceptDetail />} />
+        <Route path="/login" element={<p>Login page</p>} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  test('the concept panel sums up its words and regions', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
+    renderDetail();
+    expect(await screen.findByText('2 words · 2 regions')).toBeInTheDocument();
+  });
+
+  test('the example sentence is Pashto, shown right-to-left', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
+    renderDetail();
+    expect(await screen.findByText('دا کور دی')).toHaveAttribute('dir', 'rtl');
+  });
+
+  test('the action rail offers "I also say this" and "Suggest forms"; record only when the word has slots', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: fullConcept } });
+    renderDetail();
+    expect(await screen.findByRole('button', { name: '+ I also say this' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Suggest forms' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /record a pronunciation/i })).not.toBeInTheDocument();
+  });
+
+  test('a guest who tries to record is sent to log in', async () => {
+    const user = userEvent.setup();
+    const withSlots = {
+      ...fullConcept,
+      variants: fullConcept.variants.map((v) => ({ ...v, audioSlots: [{ slot: 'headword', text: v.pashto, maxSeconds: 3 }] })),
+    };
+    api.get.mockResolvedValueOnce({ data: { data: withSlots } });
+    renderWithLogin();
+    await user.click(await screen.findByRole('button', { name: /record a pronunciation/i }));
+    expect(await screen.findByText('Login page')).toBeInTheDocument();
   });
 });
