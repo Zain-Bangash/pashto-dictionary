@@ -6,6 +6,7 @@ import useLookups from '../hooks/useLookups';
 import AmbientBackground from '../components/AmbientBackground';
 import ConceptCard from '../components/ConceptCard';
 import ListenButton from '../components/audio/ListenButton';
+import AudioPlayButton from '../components/audio/AudioPlayButton';
 
 // ─── Avatar stack ──────────────────────────────────────────────
 const AVATAR_COLORS   = ['#e8c547', '#00f5b4', '#f87171', '#818cf8', '#fb923c'];
@@ -211,10 +212,13 @@ export default function Home() {
                       {wotd.englishGloss}
                     </p>
                     {wotd.firstVariant?.example && (
-                      <div className="border-l-2 border-gold/30 pl-3">
-                        <p dir="ltr" className="font-ui text-warm/55 text-sm leading-relaxed min-w-0">
-                          {wotd.firstVariant.example}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <AudioPlayButton clip={wotd.firstVariant.exampleAudio} label={`Play example for ${wotd.firstVariant.pashto}`} className="shrink-0" />
+                        <div className="flex-1 min-w-0 border-l-2 border-gold/30 pl-3">
+                          <p dir="ltr" className="font-ui text-warm/55 text-sm leading-relaxed min-w-0">
+                            {wotd.firstVariant.example}
+                          </p>
+                        </div>
                       </div>
                     )}
                     <div className="flex items-center flex-wrap gap-2 sm:gap-3 pt-1" style={{ animation: 'fadeSlideIn 0.4s ease both', animationDelay: '0.48s' }}>

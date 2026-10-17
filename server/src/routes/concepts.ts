@@ -4,6 +4,7 @@ import { verifyToken, optionalVerifyToken } from '../middleware/auth';
 import { requireModeratorOrAdmin, requireRole } from '../middleware/requireRole';
 import {
   getWanted,
+  getWantedAudio,
   createConcept,
   listConcepts,
   getConcept,
@@ -60,8 +61,15 @@ const wantedValidators = [
       return true;
     }),
   query('q').optional().isString().trim().isLength({ max: 100 }).withMessage('Search must be 100 characters or fewer'),
+  query('partOfSpeech').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid part of speech'),
+  query('domain').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid domain'),
   query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive number'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+];
+
+const wantedAudioValidators = [
+  ...wantedValidators,
+  query('slot').optional().isIn(['headword', 'example']).withMessage('slot must be headword or example'),
 ];
 
 const domainFilter = [query('domain').optional().isString().trim().isLength({ max: 50 }).withMessage('Invalid domain')];
@@ -81,6 +89,7 @@ const myConceptsValidators = [
 // static paths must come before /:id
 router.get('/wotd',           getWotd);
 router.get('/wanted',         wantedValidators, rejectInvalid, getWanted);
+router.get('/wanted-audio',   wantedAudioValidators, rejectInvalid, getWantedAudio);
 router.get('/suggest',        suggestConcepts);
 router.get('/search',         domainFilter, regionFilter, rejectInvalid, searchConcepts);
 router.get('/my-submissions', verifyToken, myConceptsValidators, rejectInvalid, getMyConceptSubmissions);

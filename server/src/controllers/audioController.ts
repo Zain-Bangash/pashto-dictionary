@@ -6,7 +6,7 @@ import Concept from '../models/Concept';
 import ModerationLog from '../models/ModerationLog';
 import { IAudioClip, AudioClipStatus } from '../types/models';
 import { probeAudio, AudioFormat } from '../utils/audioProbe';
-import { findSlot, HEADWORD, MIN_DURATION_MS, DURATION_TOLERANCE_MS } from '../utils/audioSlots';
+import { findSlot, HEADWORD, EXAMPLE, MIN_DURATION_MS, DURATION_TOLERANCE_MS } from '../utils/audioSlots';
 import { putObject, removeObject } from '../utils/storage';
 import { logClip, closeClip, deleteClipFile, withUrl } from '../utils/audioClips';
 import { enrichActors } from '../utils/enrichActors';
@@ -53,10 +53,10 @@ async function activeVariant(id: Types.ObjectId | string) {
   return { variant, concept, live };
 }
 
-// The submitter may record the headword of their own word while it is under review
+// The submitter may record the headword and example of their own word while it is under review
 function canRecord(found: NonNullable<Awaited<ReturnType<typeof activeVariant>>>, userId: string, slot: string): boolean {
   if (found.live) return true;
-  return found.variant.submittedBy === userId && IN_REVIEW.includes(found.variant.status) && slot === HEADWORD;
+  return found.variant.submittedBy === userId && IN_REVIEW.includes(found.variant.status) && [HEADWORD, EXAMPLE].includes(slot);
 }
 
 function clipFields(clip: Doc): Doc {

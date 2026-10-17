@@ -8,13 +8,11 @@ _No active phase._
 
 ---
 ## Rough Thoughts
-1. 'Wanted Words' make it a drop down and show the variant thats present and have a 'Also spoken in Kohat' type button next to each variant (keep the Add your word button)
 2. limit mod 'rights' and increase admin rights
 4. make example sentence like 'pashto word' and add a pashto text for REGION, Definiton, Phonetic, in the variant 
 6. Change mod functionality
   - mod can approve or reject with a note
   - anything else discuss with me
-11. Have a wanted audio page
 13. Only submitting variants for the region you account has 
 
 ## Backlog
@@ -85,6 +83,8 @@ _No active phase._
 - Record on Submit: optional headword recording on the Submit form, uploaded after the word is created (retry / continue on failure); the submitter may record their own pending/approved word; clip publish waits for the word ("Publish the word first"); `Submit.jsx` split into `components/submit/` + `useSubmitForm`; shared `RecordingControls` / `useClipCapture`; `AmbientBackground` extracted; Submit design pass
 - Browse and concept page pass: shared `ConceptCard` (Home + Browse) with real Listen from `firstVariant.audio` (also Word of the Day); region filter on list/search `[S2]`; card fields batched in `utils/conceptCards.ts`; concept page two-column with sticky `ConceptPanel`; word card split with a Contribute rail and one panel at a time; Pashto examples right-to-left; dark `Pagination`; `bento-enter` moved into `@layer components` so stagger delays apply
 - Word card: English gloss above the Pashto word, and "+ n more words" from `moreWordCount` (distinct `normalizedPashto` among published words, scoped to the region filter)
+- Wanted tabs: Words concepts open as dropdowns listing the published words used elsewhere, with "Also spoken in [Region]" (prefills Submit); new Audio tab (`GET /api/concepts/wanted-audio`) for words missing a headword or example recording, with chips that open the recorder via `/concepts/:id?record=&slot=`; part-of-speech and domain filters on both
+- Example recordings as easy as the word's: play button and credit beside the example on the concept page, cards and Word of the Day (`firstVariant.exampleAudio`); "Record the example" on the Contribute rail; optional example recording on Submit (the submitter may record their own pending word's example), per-clip retry
 - Persistent sessions: 30-day httpOnly refresh cookie, in-memory access token, `POST /api/auth/refresh` + `/logout` (Cognito `RevokeToken`), single-flight refresh-and-retry on 401, cross-tab logout via `BroadcastChannel`
 
 Full history: [docs/BuildHistory.md](docs/BuildHistory.md)

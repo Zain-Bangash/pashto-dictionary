@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import api, { createConcept, createVariant, checkCrossConceptPashto, uploadAudio } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
+import api, { createConcept, createVariant, checkCrossConceptPashto } from '../services/api';
 import useFieldDefinitions from './useFieldDefinitions';
-import useClipCapture from './useClipCapture';
+import useSubmitClips from './useSubmitClips';
 import { missingRequired } from '../context/fieldsValue';
 import { formKindFor, formsPayload } from '../utils/forms';
-import { headwordMaxSeconds } from '../utils/audio';
 
 const EMPTY = { pashto: '', phonetic: '', region: '', definition: '', example: '', submissionNote: '' };
 const messageOf = (err, fallback) => err?.response?.data?.error?.message ?? fallback;
 
-// State and submit sequence of the Submit page: concept → variant → optional headword recording
+// State and submit sequence of the Submit page: concept → variant → optional word and example recordings
 export default function useSubmitForm() {
   const { forType } = useFieldDefinitions();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState(1);
@@ -30,10 +28,7 @@ export default function useSubmitForm() {
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [savedVariantId, setSavedVariantId] = useState(null);
-  const [audioError, setAudioError] = useState('');
-
-  const capture = useClipCapture(headwordMaxSeconds(values.pashto));
+  const clips = useSubmitClips(values);
   const setField = (name, value) => setValues((v) => ({ ...v, [name]: value }));
 
   // Forms of the other kind stay in state but are hidden and not sent if the part of speech changes
@@ -103,23 +98,13 @@ export default function useSubmitForm() {
     if (!values.region) errs.region = 'Region is required';
     if (!values.definition.trim()) errs.definition = 'Definition is required';
     if (activeForms.some((f) => !f.pashto.trim())) errs.forms = 'Each form needs its Pashto text';
+    if (clips.captures.example.clip && !values.example.trim()) errs.example = 'Type the example sentence, or discard its recording';
     if (creatingNew && !newPos) errs.partOfSpeech = 'Part of speech is required';
     const conceptMissing = creatingNew ? missingRequired(forType('concept'), conceptExtra) : {};
     const variantMissing = missingRequired(forType('variant'), variantExtra);
     if (Object.keys(conceptMissing).length) errs.conceptExtra = conceptMissing;
     if (Object.keys(variantMissing).length) errs.variantExtra = variantMissing;
     return errs;
-  }
-
-  // The word is already saved when this runs, so a failure keeps the user here to retry or skip
-  async function sendClip(variantId) {
-    try {
-      await uploadAudio(variantId, 'headword', capture.clip);
-      navigate('/my-submissions');
-    } catch (err) {
-      setSavedVariantId(variantId);
-      setAudioError(messageOf(err, 'Upload failed. Please try again.'));
-    }
   }
 
   async function submit(e) {
@@ -145,8 +130,7 @@ export default function useSubmitForm() {
         conceptId, ...values, extra: variantExtra,
         ...(activeForms.length > 0 && { forms: formsPayload(activeForms) }),
       });
-      if (capture.clip) await sendClip(res.data.data._id);
-      else navigate('/my-submissions');
+      await clips.sendAfterSave(res.data.data._id);
     } catch (err) {
       setApiError(messageOf(err, 'Submission failed'));
     } finally {
@@ -156,8 +140,7 @@ export default function useSubmitForm() {
 
   async function retryClip() {
     setLoading(true);
-    setAudioError('');
-    await sendClip(savedVariantId);
+    await clips.retry();
     setLoading(false);
   }
 
@@ -168,7 +151,9 @@ export default function useSubmitForm() {
     values, setField, variantExtra, setVariantExtra,
     formKind, activeForms, setActiveForms,
     crossConceptWarnings, checkPashto,
-    capture, errors, apiError, loading, submit,
-    savedVariantId, audioError, retryClip, skipClip: () => navigate('/my-submissions'),
+    capture: clips.captures.headword, exampleCapture: clips.captures.example,
+    errors, apiError, loading, submit,
+    savedVariantId: clips.savedVariantId, failedSlots: clips.failedSlots, audioError: clips.audioError,
+    retryClip, skipClip: clips.skip,
   };
 }

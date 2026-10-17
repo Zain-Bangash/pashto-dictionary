@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
@@ -40,7 +40,10 @@ function renderAt(url, element, path) {
 }
 
 const page = (data, meta = {}) => ({ data: { success: true, data, meta: { page: 1, limit: 20, total: data.length, ...meta } } });
-const sun = { _id: 'c1', englishGloss: 'Sun', partOfSpeech: 'noun' };
+const sun = {
+  _id: 'c1', englishGloss: 'Sun', partOfSpeech: 'noun',
+  words: [{ pashto: 'لمر', phonetic: 'lmar', regions: ['Hangu', 'Tirah'] }, { pashto: 'نمر', phonetic: '', regions: ['Thal'] }],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -93,6 +96,60 @@ describe('Wanted Words page', () => {
     expect(await screen.findByText('Page 1 of 3')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(getWanted).toHaveBeenLastCalledWith({ region: 'Kohat', page: 2 }));
+  });
+
+  it('each concept is a closed dropdown that opens to the words used elsewhere', async () => {
+    const user = userEvent.setup();
+    getWanted.mockResolvedValue(page([sun]));
+    renderAt('/wanted?region=Kohat', <Wanted />, '/wanted');
+    const toggle = await screen.findByRole('button', { name: /sun/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText(/2 words elsewhere/)).toBeInTheDocument();
+    expect(screen.queryByText('لمر')).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('لمر')).toBeInTheDocument();
+    expect(screen.getByText('Hangu · Tirah')).toBeInTheDocument();
+    expect(screen.getByText('نمر')).toBeInTheDocument();
+  });
+
+  it('"Also spoken in" opens Submit with the concept, word, phonetic and region', async () => {
+    const user = userEvent.setup();
+    getWanted.mockResolvedValue(page([sun]));
+    renderAt('/wanted?region=Kohat', <Wanted />, '/wanted');
+    await user.click(await screen.findByRole('button', { name: /sun/i }));
+    const [first, second] = screen.getAllByRole('link', { name: 'Also spoken in Kohat' });
+    expect(first).toHaveAttribute('href', `/submit?${new URLSearchParams({ conceptId: 'c1', pashto: 'لمر', phonetic: 'lmar', region: 'Kohat' })}`);
+    expect(second).toHaveAttribute('href', `/submit?${new URLSearchParams({ conceptId: 'c1', pashto: 'نمر', region: 'Kohat' })}`);
+    expect(screen.getByRole('link', { name: 'Add your Kohat word' })).toBeInTheDocument();
+  });
+
+  it('a concept with no published words says so when opened', async () => {
+    const user = userEvent.setup();
+    getWanted.mockResolvedValue(page([{ ...sun, words: [] }]));
+    renderAt('/wanted?region=Kohat', <Wanted />, '/wanted');
+    await user.click(await screen.findByRole('button', { name: /sun/i }));
+    expect(screen.getByText(/no words yet/i)).toBeInTheDocument();
+  });
+
+  it('filters by part of speech in the URL and returns to page 1', async () => {
+    const user = userEvent.setup();
+    getWanted.mockResolvedValue(page([sun], { total: 45 }));
+    renderAt('/wanted?region=Kohat&page=2', <Wanted />, '/wanted');
+    await screen.findByText('Sun');
+    await user.selectOptions(screen.getByLabelText('Filter by part of speech'), 'verb');
+    await waitFor(() => expect(location.search).toBe('?region=Kohat&partOfSpeech=verb'));
+    expect(getWanted).toHaveBeenLastCalledWith({ region: 'Kohat', page: 1, partOfSpeech: 'verb' });
+  });
+
+  it('shows tabs for Words and Audio that keep the region and search', async () => {
+    getWanted.mockResolvedValue(page([sun]));
+    renderAt('/wanted?region=Thal&q=sun&partOfSpeech=noun', <Wanted />, '/wanted');
+    await screen.findByText('Sun');
+    const tabs = screen.getByRole('navigation', { name: 'Wanted' });
+    expect(within(tabs).getByRole('link', { name: 'Words' })).toHaveAttribute('aria-current', 'page');
+    expect(within(tabs).getByRole('link', { name: 'Audio' })).toHaveAttribute('href', '/wanted/audio?region=Thal&q=sun');
   });
 
   it('shows empty and error states', async () => {

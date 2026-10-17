@@ -124,3 +124,26 @@ describe('ConceptCard — gloss above the word and "+ n more words"', () => {
     expect(screen.queryByTestId('card-pashto')).not.toBeInTheDocument();
   });
 });
+
+describe('ConceptCard — example recording', () => {
+  const originalCanPlay = HTMLMediaElement.prototype.canPlayType;
+  beforeEach(() => { HTMLMediaElement.prototype.canPlayType = (type) => (type === 'audio/webm' ? 'maybe' : ''); });
+  afterEach(() => { HTMLMediaElement.prototype.canPlayType = originalCanPlay; });
+
+  const withExample = (exampleAudio) => ({
+    ...baseConcept,
+    firstVariant: { _id: 'v1', pashto: 'کور', example: 'دا کور دی', exampleAudio },
+  });
+
+  test('a play button sits beside the example when it has a published recording', () => {
+    renderCard(withExample({ _id: 'a1', url: 'https://storage.test/a1.webm', mimeType: 'audio/webm' }));
+    const play = screen.getByRole('button', { name: 'Play example for کور' });
+    expect(play.parentElement.parentElement).toBe(screen.getByText('دا کور دی').parentElement);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  test('no play button without one', () => {
+    renderCard(withExample(null));
+    expect(screen.queryByRole('button', { name: /play example/i })).not.toBeInTheDocument();
+  });
+});

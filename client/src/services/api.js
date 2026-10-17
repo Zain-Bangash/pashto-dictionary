@@ -106,6 +106,10 @@ export function getWanted(params = {}) {
   return api.get('/api/concepts/wanted', { params });
 }
 
+export function getWantedAudio(params = {}) {
+  return api.get('/api/concepts/wanted-audio', { params });
+}
+
 export function getMyVariantSubmissions(params = {}) {
   return api.get('/api/variants/my-submissions', { params });
 }

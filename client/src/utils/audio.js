@@ -29,8 +29,8 @@ export function speakerCredit(user, labelFor) {
   return place ? `${user.username} (${place})` : user.username;
 }
 
-// Mirrors the server's headword limit (utils/audioSlots.ts): a second per three letters plus two, at most 10
-export function headwordMaxSeconds(pashto) {
-  const chars = Array.from((pashto || '').replace(/\s/g, '')).length;
-  return Math.min(10, Math.ceil(chars / 3) + 2);
+// Mirrors the server's limit (utils/audioSlots.ts): a second per three letters plus two, at most 10 (20 for the example)
+export function slotMaxSeconds(slot, text) {
+  const chars = Array.from((text || '').replace(/\s/g, '')).length;
+  return Math.min(slot === 'example' ? 20 : 10, Math.ceil(chars / 3) + 2);
 }

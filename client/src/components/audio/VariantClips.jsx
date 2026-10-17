@@ -2,10 +2,10 @@ import useLookups from '../../hooks/useLookups';
 import { audioSlotLabel, speakerCredit } from '../../utils/audio';
 import AudioPlayButton from './AudioPlayButton';
 
-// Published recordings of a word other than the headword (which plays beside the word itself)
+// Published recordings of a word's forms; the headword and example play beside their own text
 export default function VariantClips({ variant }) {
   const { labelFor } = useLookups();
-  const others = (variant.audioSlots ?? []).filter((s) => s.slot !== 'headword' && variant.audio?.[s.slot]);
+  const others = (variant.audioSlots ?? []).filter((s) => !['headword', 'example'].includes(s.slot) && variant.audio?.[s.slot]);
   if (!others.length) return null;
 
   return (

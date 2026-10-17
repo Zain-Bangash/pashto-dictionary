@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Concepts from './pages/Concepts';
 import Wanted from './pages/Wanted';
+import WantedAudio from './pages/WantedAudio';
 import ConceptDetail from './pages/ConceptDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -32,6 +33,7 @@ function AppRoutes() {
         <Route path="/concepts" element={<Concepts />} />
         <Route path="/concepts/:id" element={<ConceptDetail />} />
         <Route path="/wanted" element={<Wanted />} />
+        <Route path="/wanted/audio" element={<WantedAudio />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route

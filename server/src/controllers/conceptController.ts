@@ -16,6 +16,7 @@ import { IAudioClip } from '../types/models';
 import { normalizePashto } from '../utils/normalize';
 import { alsoMeansFor } from '../utils/alsoMeans';
 import { withCardFields, conceptsInRegion } from '../utils/conceptCards';
+import { conceptFilter, publishedWords, wantedAudio, ConceptFilters } from '../utils/wanted';
 
 type Doc = Record<string, unknown>;
 
@@ -25,6 +26,11 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   rejected:  ['pending'],
   published: ['rejected'],
 };
+
+const conceptFiltersOf = (req: Request): ConceptFilters => ({
+  partOfSpeech: (req.query.partOfSpeech as string) || undefined,
+  domain: (req.query.domain as string) || undefined,
+});
 
 function invalidId(res: Response) {
   return res.status(400).json({ success: false, error: { message: 'Invalid concept id' } });
@@ -402,13 +408,32 @@ async function getWanted(req: Request, res: Response): Promise<void> {
   const q = ((req.query.q as string) || '').trim();
 
   const taken = await Variant.distinct('concept', { region, $or: [{ isDeleted: { $ne: true } }, { status: 'rejected' }] });
-  const filter: Record<string, unknown> = { status: 'published', isDeleted: { $ne: true }, _id: { $nin: taken } };
+  const filter: Record<string, unknown> = { ...conceptFilter(conceptFiltersOf(req)), _id: { $nin: taken } };
   if (q) filter.englishGloss = new RegExp(escapeRegex(q), 'i');
 
-  const [data, total] = await Promise.all([
+  const [concepts, total] = await Promise.all([
     Concept.find(filter, 'englishGloss partOfSpeech').sort({ normalizedGloss: 1 }).skip(skip).limit(limit).lean(),
     Concept.countDocuments(filter),
   ]);
+  const words = await publishedWords(concepts.map((c) => c._id));
+  const data = concepts.map((c) => ({ ...c, words: words.get(String(c._id)) ?? [] }));
+
+  res.status(200).json({ success: true, data, meta: { page, limit, total } });
+}
+
+async function getWantedAudio(req: Request, res: Response): Promise<void> {
+  const page  = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+  const q = ((req.query.q as string) || '').trim();
+
+  const { data, total } = await wantedAudio({
+    ...conceptFiltersOf(req),
+    region: req.query.region as string,
+    q: q || undefined,
+    slot: req.query.slot as string | undefined,
+    skip: (page - 1) * limit,
+    limit,
+  });
 
   res.status(200).json({ success: true, data, meta: { page, limit, total } });
 }
@@ -741,4 +766,4 @@ async function updateConcept(req: Request, res: Response): Promise<void> {
   res.status(200).json({ success: true, data: concept });
 }
 
-export { getWanted, createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts, updateConcept };
+export { getWanted, getWantedAudio, createConcept, listConcepts, getConcept, suggestConcepts, searchConcepts, transitionConceptStatus, getMyConceptSubmissions, getWotd, deleteConcept, editConcept, mergeConcepts, updateConcept };

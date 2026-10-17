@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi, beforeEach, describe, it, expect } from 'vitest';
@@ -438,5 +438,83 @@ describe('Submit page — pronunciation recording', () => {
     expect(screen.queryByText(/word changed since you recorded/i)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText(/pashto word/i), 'ونه');
     expect(screen.getByText(/word changed since you recorded/i)).toBeInTheDocument();
+  });
+
+  describe('example sentence recording', () => {
+    const exampleSection = () => screen.getByRole('region', { name: 'Example recording (optional)' });
+
+    it('asks for the example sentence before recording it, with the longer example limit', async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await toStep2(user);
+      expect(within(exampleSection()).getByText(/type the example sentence above/i)).toBeInTheDocument();
+      expect(within(exampleSection()).queryByLabelText('Upload a recording')).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText(/example sentence/i), 'لمر راختلی دی ښه ورځ ده');
+      expect(within(exampleSection()).getByLabelText('Upload a recording')).toBeInTheDocument();
+      expect(within(exampleSection()).getByText(/up to 8 seconds/i)).toBeInTheDocument();
+    });
+
+    it('uploads the word and example recordings after the word is created', async () => {
+      const user = userEvent.setup();
+      createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+      uploadAudio.mockResolvedValue({ data: { data: { _id: 'a1' } } });
+      const { locationRef } = renderSubmit();
+      await toStep2(user);
+      await fillWord(user);
+      await user.type(screen.getByLabelText(/example sentence/i), 'لمر راختلی دی');
+      const word = clipFile();
+      const example = new File([new Uint8Array(8)], 'example.webm', { type: 'audio/webm' });
+      await user.upload(within(screen.getByRole('region', { name: 'Pronunciation (optional)' })).getByLabelText('Upload a recording'), word);
+      await user.upload(within(exampleSection()).getByLabelText('Upload a recording'), example);
+      await user.click(screen.getByRole('button', { name: /submit word/i }));
+      await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+      expect(uploadAudio).toHaveBeenCalledWith('v1', 'headword', word);
+      expect(uploadAudio).toHaveBeenCalledWith('v1', 'example', example);
+    });
+
+    it('retries only the example when its upload fails', async () => {
+      const user = userEvent.setup();
+      createVariant.mockResolvedValueOnce({ data: { data: { _id: 'v1' } } });
+      uploadAudio
+        .mockResolvedValueOnce({ data: { data: { _id: 'a1' } } })
+        .mockRejectedValueOnce({ response: { data: { error: { message: 'Upload failed' } } } })
+        .mockResolvedValueOnce({ data: { data: { _id: 'a2' } } });
+      const { locationRef } = renderSubmit();
+      await toStep2(user);
+      await fillWord(user);
+      await user.type(screen.getByLabelText(/example sentence/i), 'لمر راختلی دی');
+      await user.upload(within(screen.getByRole('region', { name: 'Pronunciation (optional)' })).getByLabelText('Upload a recording'), clipFile());
+      await user.upload(within(exampleSection()).getByLabelText('Upload a recording'), clipFile());
+      await user.click(screen.getByRole('button', { name: /submit word/i }));
+
+      expect(await screen.findByText(/the example sentence recording couldn.t be uploaded/i)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /try again/i }));
+      await waitFor(() => expect(locationRef.current?.pathname).toBe('/my-submissions'));
+      expect(uploadAudio).toHaveBeenCalledTimes(3);
+      expect(uploadAudio.mock.calls[2][1]).toBe('example');
+    });
+
+    it('blocks submitting an example recording without the example text', async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await toStep2(user);
+      await fillWord(user);
+      await user.type(screen.getByLabelText(/example sentence/i), 'لمر');
+      await user.upload(within(exampleSection()).getByLabelText('Upload a recording'), clipFile());
+      await user.clear(screen.getByLabelText(/example sentence/i));
+      await user.click(screen.getByRole('button', { name: /submit word/i }));
+      expect(await screen.findByText(/type the example sentence, or discard its recording/i)).toBeInTheDocument();
+      expect(createVariant).not.toHaveBeenCalled();
+    });
+
+    it('warns when the example changes after recording', async () => {
+      const user = userEvent.setup();
+      renderSubmit();
+      await toStep2(user);
+      await user.type(screen.getByLabelText(/example sentence/i), 'لمر');
+      await user.upload(within(exampleSection()).getByLabelText('Upload a recording'), clipFile());
+      await user.type(screen.getByLabelText(/example sentence/i), ' دی');
+      expect(screen.getByText(/example changed since you recorded/i)).toBeInTheDocument();
+    });
   });
 });

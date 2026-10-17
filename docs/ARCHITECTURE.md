@@ -482,7 +482,13 @@ Three linked features help contributors fill holes in the dictionary without wea
 
 `GET /api/concepts/wanted?region=` lists published concepts with **no variant in that region**. Any variant hides the gap, whatever its status: pending, approved and published ones are live, and rejected ones are matched by status because rejection soft-deletes them. An abandoned rejection therefore keeps hiding its gap until its owner resubmits it or an admin deletes it. Admin-deleted variants (not rejected) do not hide it.
 
-It runs as two queries rather than an aggregation: `Variant.distinct('concept', { region, … })`, then `Concept.find({ status: 'published', _id: { $nin: ids } })` with skip/limit and a count on the same filter. The `{ region: 1, concept: 1 }` index covers the distinct. At the dataset sizes this project expects, a `$nin` list is cheap and both queries are trivially testable; if it grows into tens of thousands of concepts this is the single place to switch to a `$lookup`.
+It runs as two queries rather than an aggregation: `Variant.distinct('concept', { region, … })`, then `Concept.find({ status: 'published', _id: { $nin: ids } })` (narrowed by `partOfSpeech` and `domain` when given) with skip/limit and a count on the same filter. A third query (`utils/wanted.ts → publishedWords`) adds `words` to the page's concepts: their published variants grouped by `normalizedPashto`, each with its regions, which the Words tab shows in each dropdown and links to Submit as "Also spoken in [Region]". The `{ region: 1, concept: 1 }` index covers the distinct. At the dataset sizes this project expects, a `$nin` list is cheap and both queries are trivially testable; if it grows into tens of thousands of concepts this is the single place to switch to a `$lookup`.
+
+### Wanted Audio
+
+`GET /api/concepts/wanted-audio?region=` lists published concepts with a published variant in the region that is missing a `headword` recording, or an `example` recording when its example has text. A slot counts as missing when it has **no clip in either lane**: a live clip covers it, and an open (pending or approved) clip blocks new uploads for that slot anyway, so listing it would send people to a recorder they cannot use. Rejected, retired and withdrawn clips have no lane and do not cover it. Form slots are left out on purpose; many of them have no text.
+
+`utils/wanted.ts → wantedAudio` is one aggregation on `Variant`: match the region's published variants on concepts that pass the concept filters (and `q` through `variantMatch`, the same gloss/normalized Pashto/phonetic match as the queues), `$lookup` clips with a lane on the `{ variant, slot, lane }` index, compute `missing`, keep rows where it is non-empty (or contains `slot`), group by concept, sort by `normalizedGloss` and paginate with `$facet`. `meta.total` counts concepts. Chips on the client link to `/concepts/:id?record=<variantId>&slot=<slot>`, which opens the recorder on that word's card.
 
 ### Blank fields — one definition
 
@@ -548,7 +554,7 @@ Create and resubmit share a rate limiter (30 requests per 15 minutes) built the 
 
 ## Pronunciation audio
 
-Logged-in users record or upload a short clip of a published word, and a submitter can send a headword clip with their own new word from the Submit page. Clips are moderated like everything else, and nothing unreviewed is ever served to the public.
+Logged-in users record or upload a short clip of a published word, and a submitter can send headword and example clips with their own new word from the Submit page. Clips are moderated like everything else, and nothing unreviewed is ever served to the public.
 
 ```
 AudioClip { variant, slot, storageKey, mimeType, sizeBytes, durationMs, status, lane?,
@@ -587,7 +593,7 @@ A derived `lane` field is `live` for `published`, `open` for `pending`/`approved
 
 ### Recordings sent with a new word
 
-A word still under review has no public page, so normally nobody can record it. The one exception is the word's **own submitter**, who may upload a `headword` clip while the variant is `pending` or `approved` and neither it nor its concept is rejected or deleted. The Submit page uses this: it creates the concept and the variant, then uploads the clip held in the browser. If that upload fails, the word stays submitted and the page offers a retry.
+A word still under review has no public page, so normally nobody can record it. The one exception is the word's **own submitter**, who may upload a `headword` or `example` clip (the example only when it has text) while the variant is `pending` or `approved` and neither it nor its concept is rejected or deleted. Form slots wait for publication. The Submit page uses this: it creates the concept and the variant, then uploads the clips held in the browser (`hooks/useSubmitClips.js`). If an upload fails, the word stays submitted and the page offers a retry for just the failed clips.
 
 The clip runs its normal state machine from the start, so it shows in the Audio queue at once and a moderator may approve it before the word is reviewed. **Publishing waits for the word:** `PATCH /api/audio/:id/status` with `published` returns 400 "Publish the word first" until both the variant and its concept are published, which mirrors "publish the concept before its variants". Rejecting the word, or cascade-rejecting its concept, rejects the open clip through `rejectOpenClips`, the same path a published word already uses. Other slots (example, forms) stay closed until the word is published, because their text is not final while it is under review.
 

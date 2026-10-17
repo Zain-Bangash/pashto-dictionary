@@ -93,6 +93,26 @@ describe('firstVariant.audio on browse cards', () => {
     expect(cardOf(res, 'star').firstVariant.audio).toBeNull();
   });
 
+  test('exampleAudio carries the live example clip, or null without one', async () => {
+    const { variants } = await word('moon', [{ example: 'سپوږمۍ ښکاري' }]);
+    await clip(variants[0], 'published', 'example');
+    await word('star', [{ example: 'ستوری ځلیږي' }]);
+    const res = await request.get('/api/concepts');
+    const exampleAudio = cardOf(res, 'moon').firstVariant.exampleAudio;
+    expect(exampleAudio.url).toMatch(/^https:\/\/storage\.test\/audio\//);
+    expect(exampleAudio.submittedBy).toEqual(expect.objectContaining({ username: 'gul' }));
+    expect(exampleAudio.storageKey).toBeUndefined();
+    expect(cardOf(res, 'moon').firstVariant.audio).toBeNull();
+    expect(cardOf(res, 'star').firstVariant.exampleAudio).toBeNull();
+  });
+
+  test('word of the day carries exampleAudio too', async () => {
+    const { variants } = await word('sun', [{ example: 'لمر راختلی دی' }]);
+    await clip(variants[0], 'published', 'example');
+    const res = await request.get('/api/concepts/wotd');
+    expect(res.body.data.firstVariant.exampleAudio.url).toBeDefined();
+  });
+
   test('search results carry it too', async () => {
     const { variants } = await word('water', [{}]);
     await clip(variants[0]);

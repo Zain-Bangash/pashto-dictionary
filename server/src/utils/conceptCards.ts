@@ -24,7 +24,7 @@ export function conceptsInRegion(region: string): Promise<Id[]> {
   return Variant.distinct('concept', { ...LIVE_WORD, region });
 }
 
-// Adds firstVariant (the region's word when one is given) with audio (live headword clip or null), variantCount
+// Adds firstVariant (the region's word when one is given) with audio and exampleAudio (live clips or null), variantCount
 // (published regional rows) and moreWordCount (other distinct words, within the region when one is given)
 export async function withCardFields<T extends { _id: unknown }>(concepts: T[], region?: string): Promise<(T & Doc)[]> {
   if (!concepts.length) return [];
@@ -43,13 +43,13 @@ export async function withCardFields<T extends { _id: unknown }>(concepts: T[], 
   }
 
   const clips = await AudioClip.find(
-    { variant: { $in: [...first.values()].map((v) => v._id as Id) }, slot: 'headword', lane: 'live' },
-    'variant mimeType durationMs submittedBy storageKey fileDeletedAt'
+    { variant: { $in: [...first.values()].map((v) => v._id as Id) }, slot: { $in: ['headword', 'example'] }, lane: 'live' },
+    'variant slot mimeType durationMs submittedBy storageKey fileDeletedAt'
   ).lean();
-  const audioByVariant = new Map<string, Doc>();
+  const audioBySlot = new Map<string, Doc>();
   for (const clip of await enrichActors(clips as unknown as Doc[], 'submittedBy')) {
-    const { storageKey: _k, fileDeletedAt: _f, variant, ...rest } = await withUrl(clip);
-    if (rest.url) audioByVariant.set(String(variant), rest);
+    const { storageKey: _k, fileDeletedAt: _f, variant, slot, ...rest } = await withUrl(clip);
+    if (rest.url) audioBySlot.set(`${variant}|${slot}`, rest);
   }
 
   return concepts.map((c) => {
@@ -60,7 +60,11 @@ export async function withCardFields<T extends { _id: unknown }>(concepts: T[], 
     const { normalizedPashto: _n, ...firstVariant } = shown;
     return {
       ...c,
-      firstVariant: { ...firstVariant, audio: audioByVariant.get(String(shown._id)) ?? null },
+      firstVariant: {
+        ...firstVariant,
+        audio: audioBySlot.get(`${shown._id}|headword`) ?? null,
+        exampleAudio: audioBySlot.get(`${shown._id}|example`) ?? null,
+      },
       variantCount: list.length,
       moreWordCount: otherWordCount(list, shown, region),
     };

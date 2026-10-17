@@ -9,7 +9,7 @@ import SubmitAudio from '../components/submit/SubmitAudio';
 import VariantFields from '../components/submit/VariantFields';
 import AudioRetryPanel from '../components/submit/AudioRetryPanel';
 import { PRIMARY_CTA } from '../components/submit/submitStyles';
-import { headwordMaxSeconds } from '../utils/audio';
+import { slotMaxSeconds } from '../utils/audio';
 
 export default function Submit() {
   const form = useSubmitForm();
@@ -45,8 +45,11 @@ export default function Submit() {
 
             {step === 2 && form.savedVariantId && (
               <AudioRetryPanel
-                capture={capture}
-                maxSeconds={headwordMaxSeconds(values.pashto)}
+                failed={form.failedSlots.map((slot) => ({
+                  slot,
+                  capture: slot === 'example' ? form.exampleCapture : capture,
+                  maxSeconds: slotMaxSeconds(slot, slot === 'example' ? values.example : values.pashto),
+                }))}
                 error={form.audioError}
                 loading={loading}
                 onRetry={form.retryClip}
@@ -73,7 +76,7 @@ export default function Submit() {
                   error={errors.pashto}
                 />
 
-                <SubmitAudio capture={capture} pashto={values.pashto} />
+                <SubmitAudio capture={capture} text={values.pashto} />
 
                 <VariantFields form={form} />
 

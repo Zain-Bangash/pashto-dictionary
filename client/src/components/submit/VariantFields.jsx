@@ -1,6 +1,7 @@
 import LookupSelect from '../LookupSelect';
 import ExtraFieldsInputs from '../fields/ExtraFieldsInputs';
 import FormsEditor from '../forms/FormsEditor';
+import SubmitAudio from './SubmitAudio';
 import { inputClass, selectClass, labelClass, errorClass } from './submitStyles';
 
 function TextField({ id, label, value, onChange, error, placeholder }) {
@@ -13,7 +14,7 @@ function TextField({ id, label, value, onChange, error, placeholder }) {
   );
 }
 
-// Everything about the regional word after the headword and its recording
+// Everything about the regional word after the headword and its recording, including the example's recording
 export default function VariantFields({ form }) {
   const { values, setField, errors, formKind, activeForms, setActiveForms, variantExtra, setVariantExtra } = form;
   const bind = (name) => ({ value: values[name], onChange: (v) => setField(name, v), error: errors[name] });
@@ -38,6 +39,7 @@ export default function VariantFields({ form }) {
 
       <TextField id="definition" label="Definition" placeholder="Meaning in English…" {...bind('definition')} />
       <TextField id="example" label="Example sentence (optional)" {...bind('example')} />
+      <SubmitAudio capture={form.exampleCapture} text={values.example} slot="example" />
 
       <div>
         <FormsEditor

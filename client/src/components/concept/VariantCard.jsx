@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import useLookups from '../../hooks/useLookups';
@@ -11,15 +11,27 @@ import SuggestFormsPanel from './SuggestFormsPanel';
 import { speakerCredit } from '../../utils/audio';
 import { hasEmptyFormSlots } from '../../utils/forms';
 
-// One Pashto word with a region tab strip; reading on the left, contributing on the right, one panel open at a time
-export default function VariantCard({ group, conceptId, partOfSpeech, openVariantIds, onSuggestionSent, className = '' }) {
+const RECORD_PANELS = { headword: 'record', example: 'record-example' };
+
+// One Pashto word with a region tab strip; reading on the left, contributing on the right, one panel open at a time.
+// recordTarget ({ variantId, slot }) opens the recorder on that region's word, as linked from Wanted Audio
+export default function VariantCard({ group, conceptId, partOfSpeech, openVariantIds, onSuggestionSent, recordTarget, className = '' }) {
   const { user } = useAuth();
   const { labelFor } = useLookups();
   const navigate = useNavigate();
-  const [activeIdx, setActiveIdx] = useState(0);
+  const targetIdx = recordTarget ? group.findIndex((v) => String(v._id) === recordTarget.variantId) : -1;
+  const [activeIdx, setActiveIdx] = useState(Math.max(0, targetIdx));
   const [panel, setPanel] = useState(null);
+  const [targetOpened, setTargetOpened] = useState(false);
+  const cardRef = useRef(null);
   const [sentIds, setSentIds] = useState([]);
   const [openSlotsById, setOpenSlotsById] = useState({});
+
+  // Opens once the user is known (a refreshed page restores the session after the first render)
+  if (targetIdx >= 0 && user && !targetOpened) {
+    setTargetOpened(true);
+    setPanel(RECORD_PANELS[recordTarget.slot] ?? 'record');
+  }
 
   const pashtoWord = group[0].pashto;
   const selected = group[activeIdx] ?? group[0];
@@ -27,6 +39,12 @@ export default function VariantCard({ group, conceptId, partOfSpeech, openVarian
   const openSlots = openSlotsById[id] ?? selected.audioOpen ?? [];
   const slots = (selected.audioSlots ?? []).map((s) => ({ ...s, open: openSlots.includes(s.slot) }));
   const addedBy = speakerCredit(selected.submittedBy, labelFor);
+  const exampleSlot = slots.find((s) => s.slot === 'example');
+  const exampleState = exampleSlot ? (exampleSlot.open ? 'open' : 'available') : null;
+
+  useEffect(() => {
+    if (targetIdx >= 0) cardRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [targetIdx]);
 
   let formsState = null;
   if (sentIds.includes(id)) formsState = 'sent';
@@ -57,7 +75,7 @@ export default function VariantCard({ group, conceptId, partOfSpeech, openVarian
   };
 
   return (
-    <li className={`bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-5 sm:p-6 ${className}`}>
+    <li ref={cardRef} className={`bg-white/[0.035] backdrop-blur-[24px] border border-white/[0.08] rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-5 sm:p-6 ${className}`}>
       <div className="flex flex-col sm:flex-row gap-5">
         <div className="flex-1 min-w-0 space-y-3">
           <VariantHeader pashto={pashtoWord} variant={selected} />
@@ -67,8 +85,10 @@ export default function VariantCard({ group, conceptId, partOfSpeech, openVarian
         <VariantActions
           panel={panel}
           canRecord={slots.length > 0}
+          exampleState={exampleState}
           formsState={formsState}
           onRecord={toggle('record')}
+          onRecordExample={toggle('record-example')}
           onAlsoSay={alsoSayThis}
           onSuggestForms={toggle('forms')}
         />
@@ -76,11 +96,12 @@ export default function VariantCard({ group, conceptId, partOfSpeech, openVarian
 
       {panel && (
         <div className="mt-5 pt-5 border-t border-white/[0.06]">
-          {panel === 'record' && (
+          {(panel === 'record' || panel === 'record-example') && (
             <AudioRecorder
-              key={id}
+              key={`${id}-${panel}`}
               variantId={selected._id}
               slots={slots}
+              initialSlot={panel === 'record-example' ? 'example' : undefined}
               onUploaded={(slot) => setOpenSlotsById((m) => ({ ...m, [id]: [...openSlots, slot] }))}
               onClose={() => setPanel(null)}
             />

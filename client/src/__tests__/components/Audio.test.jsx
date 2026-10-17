@@ -12,6 +12,7 @@ import AudioQueueRow from '../../components/audio/AudioQueueRow';
 import MyRecordings from '../../components/audio/MyRecordings';
 import PublishedClips from '../../components/audio/PublishedClips';
 import VariantEditForm from '../../components/moderation/VariantEditForm';
+import ConceptDetail from '../../pages/ConceptDetail';
 import { LookupsWrapper } from '../helpers/lookups';
 import { FieldsWrapper } from '../helpers/fields';
 
@@ -22,12 +23,13 @@ vi.mock('../../services/api', () => ({
   getMyAudio: vi.fn(),
   transitionAudio: vi.fn(),
   getAudioQueue: vi.fn(),
+  getMySuggestions: vi.fn(() => Promise.resolve({ data: { data: [] } })),
 }));
 
 vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ user: null })) }));
 
-const wrap = (ui) => render(
-  <MemoryRouter initialEntries={['/concepts/c1']}>
+const wrap = (ui, url = '/concepts/c1') => render(
+  <MemoryRouter initialEntries={[url]}>
     <LookupsWrapper>
       <FieldsWrapper>
         <Routes>
@@ -79,12 +81,59 @@ describe('public word page', () => {
     expect(screen.getByText(/can.t play on this device/i)).toBeInTheDocument();
   });
 
-  it('lists other live recordings with their text', () => {
-    wrap(<VariantClips variant={variant({ audio: { example: clip() } })} />);
+  it('lists live form recordings with their text, leaving the headword and example to their own text', () => {
+    const form = { slot: 'form:masculine.plural.direct', text: 'لمرونه', maxSeconds: 3 };
+    wrap(<VariantClips variant={variant({ audio: { example: clip(), [form.slot]: clip({ _id: 'a2' }) }, audioSlots: [...variant().audioSlots.slice(0, 2), form] })} />);
     const list = screen.getByRole('list');
-    expect(within(list).getByText('Example sentence')).toBeInTheDocument();
-    expect(within(list).getByText('لمر راختلی دی')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play example sentence' })).toBeInTheDocument();
+    expect(within(list).getByText('لمرونه')).toBeInTheDocument();
+    expect(within(list).queryByText('Example sentence')).not.toBeInTheDocument();
+    expect(within(list).getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('plays the example recording beside the example sentence and credits the speaker', () => {
+    wrap(<VariantCard group={[variant({ audio: { example: clip() } })]} conceptId="c1" />);
+    expect(screen.getByRole('button', { name: 'Play Kohat example' })).toBeInTheDocument();
+    expect(screen.getByText('Example recorded by gul (Shakardara, Kohat)')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Pronunciation recordings' })).not.toBeInTheDocument();
+  });
+
+  it('"Record the example" opens the recorder on the example sentence', async () => {
+    const user = userEvent.setup();
+    useAuth.mockReturnValue({ user: { id: 'u1', role: 'user' } });
+    wrap(<VariantCard group={[variant()]} conceptId="c1" />);
+    await user.click(screen.getByRole('button', { name: 'Record the example' }));
+    expect(screen.getByRole('combobox')).toHaveValue('example');
+    expect(screen.getByRole('button', { name: 'Record the example' })).toHaveAttribute('aria-expanded', 'true');
+    await user.click(screen.getByRole('button', { name: /record a pronunciation/i }));
+    expect(screen.getByRole('combobox')).toHaveValue('headword');
+  });
+
+  it('hides "Record the example" without an example and says so while one is under review', () => {
+    const { unmount } = wrap(<VariantCard group={[variant({ example: '', audioSlots: variant().audioSlots.filter((s) => s.slot !== 'example') })]} conceptId="c1" />);
+    expect(screen.queryByRole('button', { name: 'Record the example' })).not.toBeInTheDocument();
+    unmount();
+    wrap(<VariantCard group={[variant({ audioOpen: ['example'] })]} conceptId="c1" />);
+    expect(screen.queryByRole('button', { name: 'Record the example' })).not.toBeInTheDocument();
+    expect(screen.getByText(/a recording of the example is under review/i)).toBeInTheDocument();
+  });
+
+  it('opens the recorder on the linked region and slot from ?record=&slot=', async () => {
+    useAuth.mockReturnValue({ user: { id: 'u1', role: 'user' } });
+    api.get.mockResolvedValueOnce({ data: { data: {
+      _id: 'c1', englishGloss: 'sun', partOfSpeech: 'noun',
+      variants: [variant(), variant({ _id: 'v2', region: 'Hangu', example: 'لمر ګرم دی' })],
+    } } });
+    wrap(<ConceptDetail />, '/concepts/c1?record=v2&slot=example');
+    expect(await screen.findByRole('region', { name: 'Record a pronunciation' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveValue('example');
+    expect(screen.getByText('لمر ګرم دی')).toBeInTheDocument();
+  });
+
+  it('does not open the recorder from the link for a guest', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: { _id: 'c1', englishGloss: 'sun', partOfSpeech: 'noun', variants: [variant()] } } });
+    wrap(<ConceptDetail />, '/concepts/c1?record=v1&slot=headword');
+    expect(await screen.findByRole('button', { name: /record a pronunciation/i })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Record a pronunciation' })).not.toBeInTheDocument();
   });
 
   it('sends guests to log in when they try to record', async () => {

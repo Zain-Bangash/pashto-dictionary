@@ -442,10 +442,19 @@ describe('recording sent with a new word', () => {
     expect(storage.files.size).toBe(0);
   });
 
-  test('only the headword can be recorded before the word is published', async () => {
+  test('the submitter can record the example of their own pending word', async () => {
     const { variant } = await unpublished();
-    expect((await upload(variant, 'example', owner.token)).status).toBe(400);
+    const res = await upload(variant, 'example', owner.token);
+    expect(res.status).toBe(201);
+    expect(res.body.data.slot).toBe('example');
+  });
+
+  test('only the headword and example can be recorded before the word is published', async () => {
+    const { variant } = await unpublished();
     expect((await upload(variant, 'form:masculine.plural.direct', owner.token)).status).toBe(400);
+    expect((await upload(variant, 'example', speaker.token)).status).toBe(400);
+    const { variant: noExample } = await setup({ status: 'pending', example: '' }, { status: 'pending' });
+    expect((await upload(noExample, 'example', owner.token)).status).toBe(400);
   });
 
   test('a rejected or deleted word of the submitter accepts no clip', async () => {

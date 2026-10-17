@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import AmbientBackground from '../components/AmbientBackground';
 import ConceptPanel from '../components/concept/ConceptPanel';
 import VariantCard from '../components/concept/VariantCard';
@@ -22,6 +22,9 @@ export default function ConceptDetail() {
   const { concept, loading, error } = useConcept(id);
   const { openVariantIds, markOpen } = useMyOpenSuggestions(id, Boolean(user));
   const groups = groupByPashto(concept?.variants);
+  const [searchParams] = useSearchParams();
+  const recordTarget = searchParams.get('record') ? { variantId: searchParams.get('record'), slot: searchParams.get('slot') } : null;
+  const targetsGroup = (group) => Boolean(recordTarget) && group.some((v) => String(v._id) === recordTarget.variantId);
 
   return (
     <div className="min-h-screen bg-charcoal">
@@ -54,6 +57,7 @@ export default function ConceptDetail() {
                       partOfSpeech={concept.partOfSpeech}
                       openVariantIds={openVariantIds}
                       onSuggestionSent={markOpen}
+                      recordTarget={targetsGroup(group) ? recordTarget : null}
                       className={`bento-enter ${STAGGER[Math.min(i, STAGGER.length - 1)]}`}
                     />
                   ))}

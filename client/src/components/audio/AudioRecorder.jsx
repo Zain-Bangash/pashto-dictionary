@@ -8,7 +8,7 @@ import RecordingControls from './RecordingControls';
 // slots: [{ slot, text, maxSeconds, open }] from the word's audioSlots; open ones are under review
 export default function AudioRecorder({ variantId, slots, initialSlot, onUploaded, onClose }) {
   const available = slots.filter((s) => !s.open);
-  const [slot, setSlot] = useState(initialSlot ?? available[0]?.slot);
+  const [slot, setSlot] = useState(available.some((s) => s.slot === initialSlot) ? initialSlot : available[0]?.slot);
   const target = slots.find((s) => s.slot === slot);
   const capture = useClipCapture(target?.maxSeconds ?? 10);
   const [uploading, setUploading] = useState(false);

@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import useLookups from '../hooks/useLookups';
 import useTilt from '../hooks/useTilt';
 import ListenButton from './audio/ListenButton';
+import AudioPlayButton from './audio/AudioPlayButton';
 
 // Word card for Home and Browse: the whole card links to the concept, Listen plays the first word's recording
+// and the play button beside the example plays the example's
 export default function ConceptCard({ concept }) {
   const { labelFor } = useLookups();
   const { ref: tiltRef, onMouseMove, onMouseLeave } = useTilt();
@@ -53,7 +55,10 @@ export default function ConceptCard({ concept }) {
             </div>
             <div className="h-px bg-white/[0.06]" />
             {word.example && (
-              <p dir="rtl" className="font-pashto text-warm/45 text-sm line-clamp-2">{word.example}</p>
+              <div className="flex items-center gap-2">
+                <AudioPlayButton clip={word.exampleAudio} label={`Play example for ${word.pashto}`} className="relative z-10 shrink-0" />
+                <p dir="rtl" className="flex-1 min-w-0 font-pashto text-warm/45 text-sm line-clamp-2">{word.example}</p>
+              </div>
             )}
           </>
         )}

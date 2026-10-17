@@ -136,6 +136,48 @@ describe('GET /api/concepts/wanted', () => {
     expect(res.body.meta).toEqual({ page: 2, limit: 2, total: 5 });
   });
 
+  test('each concept lists its published words from other regions, one per spelling with every region', async () => {
+    const concept = await makeConcept({ englishGloss: 'Sun' });
+    await makeVariant(concept, { pashto: 'لمر', phonetic: 'lmar', region: 'Hangu' });
+    await makeVariant(concept, { pashto: 'لَمَر', region: 'Tirah' });
+    await makeVariant(concept, { pashto: 'نمر', region: 'Thal' });
+
+    const res = await wanted('region=Kohat');
+    expect(res.body.data[0].words).toEqual([
+      { pashto: 'لمر', phonetic: 'lmar', regions: ['Hangu', 'Tirah'] },
+      { pashto: 'نمر', phonetic: '', regions: ['Thal'] },
+    ]);
+  });
+
+  test('words leave out pending, approved, rejected and deleted variants', async () => {
+    const concept = await makeConcept();
+    await makeVariant(concept, { region: 'Hangu', status: 'pending' });
+    await makeVariant(concept, { region: 'Tirah', status: 'approved' });
+    await makeVariant(concept, { region: 'Thal', status: 'published', isDeleted: true });
+    await makeVariant(concept, { region: 'Parachinar', status: 'rejected', isDeleted: true });
+    const res = await wanted('region=Kohat');
+    expect(res.body.data[0].words).toEqual([]);
+  });
+
+  test('partOfSpeech and domain narrow the list and the total', async () => {
+    await Lookup.create({ type: 'semanticDomain', key: 'food', label: 'Food' });
+    await makeConcept({ englishGloss: 'Bread', semanticDomains: ['food'] });
+    await makeConcept({ englishGloss: 'Run', partOfSpeech: 'verb' });
+    await makeConcept({ englishGloss: 'Cloud' });
+
+    let res = await wanted('region=Kohat&partOfSpeech=verb');
+    expect(res.body.data.map((c) => c.englishGloss)).toEqual(['Run']);
+    expect(res.body.meta.total).toBe(1);
+    res = await wanted('region=Kohat&domain=food');
+    expect(res.body.data.map((c) => c.englishGloss)).toEqual(['Bread']);
+    expect(res.body.meta.total).toBe(1);
+  });
+
+  test('rejects over-long partOfSpeech and domain filters', async () => {
+    expect((await wanted(`region=Kohat&partOfSpeech=${'x'.repeat(51)}`)).status).toBe(400);
+    expect((await wanted(`region=Kohat&domain=${'x'.repeat(51)}`)).status).toBe(400);
+  });
+
   test('region is required and must be an active region', async () => {
     expect((await wanted('')).status).toBe(400);
     expect((await wanted('region=Atlantis')).status).toBe(400);
